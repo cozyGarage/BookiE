@@ -1,4 +1,4 @@
-use bookie_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, QueryRowSet, Value};
 use rust_decimal::Decimal;
 
 #[derive(Debug, PartialEq)]
@@ -164,23 +164,27 @@ impl StatsAccumulator {
     }
 }
 
-pub fn column_stats(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> Vec<ColumnStats> {
+pub fn column_stats<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> Vec<ColumnStats> {
     column_stats_where(columns, rows, |_| true)
 }
 
-pub fn column_stats_in(columns: &[ColumnInfo], rows: &[Vec<Value>], only: &[usize]) -> Vec<ColumnStats> {
+pub fn column_stats_in<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, only: &[usize]) -> Vec<ColumnStats> {
     column_stats_where(columns, rows, |index| only.contains(&index))
 }
 
-fn column_stats_where(columns: &[ColumnInfo], rows: &[Vec<Value>], wanted: impl Fn(usize) -> bool) -> Vec<ColumnStats> {
+fn column_stats_where<R: QueryRowSet + ?Sized>(
+    columns: &[ColumnInfo],
+    rows: &R,
+    wanted: impl Fn(usize) -> bool,
+) -> Vec<ColumnStats> {
     columns
         .iter()
         .enumerate()
         .filter(|(index, _)| wanted(*index))
         .filter_map(|(index, column)| {
             let mut accumulator = StatsAccumulator::default();
-            for row in rows {
-                match row.get(index) {
+            for row_index in 0..rows.row_count() {
+                match rows.row(row_index).and_then(|row| row.get(index)) {
                     Some(value) => accumulator.push(value),
                     None => accumulator.unreadable(),
                 }

@@ -260,7 +260,7 @@ impl GridView {
         footer_columns(self.source.columns().len())
     }
 
-    pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
+    pub fn status_bar(&mut self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
         let compact = window_width < size::STATUS_COMPACT_WIDTH;
         let grid = self.status_shows_grid();
         let rows = self.status_count_text(compact);

@@ -1286,7 +1286,7 @@ fn copying_a_filtered_row_includes_its_full_pending_edit(cx: &mut TestAppContext
     let mut row = bookie_gpui::model::row_at(20);
     row[1] = Cell::Text(value.into());
     let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
-    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
+    let expected = bookie_app_services::result_copy::tsv(&columns, &[row], false);
     assert_eq!(actual.as_deref(), Some(expected.as_str()));
 }
 
@@ -1310,7 +1310,7 @@ fn local_sort_keeps_selection_and_pending_edits_attached_to_source_rows(cx: &mut
     let mut row = bookie_gpui::model::row_at(0);
     row[1] = Cell::Text(value.into());
     let columns = bookie_gpui::core_bridge::column_infos_for(&bookie_gpui::model::synthetic_columns());
-    let expected = bookie_app_services::result_copy::tsv(&columns, vec![row], false);
+    let expected = bookie_app_services::result_copy::tsv(&columns, &[row], false);
     assert_eq!(actual.as_deref(), Some(expected.as_str()));
 }
 
