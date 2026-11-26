@@ -42,6 +42,7 @@ This section is the one source for where a GPUI surface opens. Other documents l
 | New connection, edit connection | A centred dialog. Test results show inside it. |
 | Human approval | A centred dialog that nothing else can be typed behind. |
 | One-shot steps: export to a file, import, SQL review before saving, structure changes, Set cells, the row form | A centred dialog. Escape and Cancel close it and change nothing. |
+| Import and export menus | The top bar's Import / Export is for connections. File import and export (SQL files, results, CSV or Excel into a table) sit in the query editor toolbar and the grid strip. |
 | Destructive actions: drop or empty a table, delete rows, drop a column | A centred dialog that names the object, shows the SQL and has no default button. A Prod connection also asks for approval. |
 | Pending edits | A slim marker in the grid strip with the count, Save and Discard. It describes state, so it is not a dialog. |
 | Messages: saved, imported, failed, unknown write outcome, transaction left open | The notification centre: an indicator with a count at the bottom right of the status bar that opens the list. |

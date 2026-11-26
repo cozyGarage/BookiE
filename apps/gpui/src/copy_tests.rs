@@ -142,6 +142,7 @@ fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut Test
     let menus = [
         crate::menus::IMPORT_EXPORT_GROUPS,
         crate::menus::EXPORT_GROUPS,
+        crate::menus::FILE_GROUPS,
         crate::menus::OVERFLOW_GROUPS,
         crate::menus::ROW_GROUPS,
     ];

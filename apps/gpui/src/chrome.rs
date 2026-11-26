@@ -470,7 +470,7 @@ impl GridView {
             .ghost()
             .small()
             .compact()
-            .tooltip("Import and export data and connections")
+            .tooltip("Import and export connections")
             .accessibility_label("Import / Export")
             .child(icon("arrow-down-up", theme.muted_foreground))
             .children(labelled.then(|| div().whitespace_nowrap().child("Import / Export")))

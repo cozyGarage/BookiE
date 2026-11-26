@@ -64,7 +64,7 @@ pub(crate) enum SaveRequest {
     Edits(Vec<CellChange>),
     Deletes(Vec<Vec<bookie_core::Value>>),
     Insert(Vec<(String, String)>),
-    Import(std::path::PathBuf),
+    Import(std::path::PathBuf, bookie_app_services::csv_import_plan::ImportChoices),
     Structure(bookie_app_services::structure_change_plan::StructureChangeKind, String),
     DiagramForeignKey(bookie_core::ForeignKeyInfo),
 }
@@ -230,7 +230,9 @@ impl GridView {
                         SaveRequest::Insert(named) => {
                             plan_row_insert_named(target, &named).map_err(|error| error.to_string())
                         }
-                        SaveRequest::Import(file) => plan_file_import(target, &live.driver_id, &file),
+                        SaveRequest::Import(file, choices) => {
+                            plan_file_import(target, &live.driver_id, &file, &choices)
+                        }
                         SaveRequest::DiagramForeignKey(key) => {
                             return prepare_diagram_foreign_key(&live, &table, columns, key);
                         }
@@ -713,13 +715,18 @@ pub(crate) fn with_resolve_hint(message: &str) -> String {
     }
 }
 
-fn plan_file_import(target: SaveTarget<'_>, driver_id: &str, file: &std::path::Path) -> Result<CellSavePlan, String> {
+fn plan_file_import(
+    target: SaveTarget<'_>,
+    driver_id: &str,
+    file: &std::path::Path,
+    choices: &bookie_app_services::csv_import_plan::ImportChoices,
+) -> Result<CellSavePlan, String> {
     let capabilities = drivers_registry::default_registry()
         .get(driver_id)
         .map(|driver| driver.capabilities())
         .unwrap_or_default();
     let file = bookie_core::user_path::expand_tilde(file);
-    let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP)
+    let plan = plan_csv_import(target, capabilities, &file, crate::import_ui::IMPORT_ROW_CAP, choices)
         .map_err(|error| error.to_string())?;
     let cut = if plan.truncated {
         format!(" (the file has more; only the first {} are imported)", plan.rows)
