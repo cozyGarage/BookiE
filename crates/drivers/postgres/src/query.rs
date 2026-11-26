@@ -426,7 +426,7 @@ async fn refresh_domain_column_names(
          JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid = declared_type.typnamespace \
          WHERE declared_type.typtype = 'd'"
     );
-    let rows = sqlx::raw_sql(&sql)
+    let rows = sqlx::raw_sql(sqlx::AssertSqlSafe(sql))
         .fetch_all(&mut **connection)
         .await
         .map_err(map_sqlx_error)?;
