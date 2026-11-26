@@ -457,7 +457,7 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: gpui-junit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/bookie-gpui-extract/target/nextest/ci/junit.xml
+          path: apps/gpui/target/nextest/ci/junit.xml
           if-no-files-found: warn
           retention-days: 7
       - name: Finalize runner job

@@ -184,7 +184,7 @@ jobs:
         if: failure()
         run: |
           mkdir -p src/target/quality/gpui-layers
-          cp -- "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}/target/nextest/ci/junit.xml" src/target/quality/gpui-layers/ || true
+          cp -- src/apps/gpui/target/nextest/ci/junit.xml src/target/quality/gpui-layers/ || true
       - name: Retain GPUI test report
         if: failure()
         uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
