@@ -6,13 +6,13 @@ fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppCont
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.begin_background(
-                crate::Work::Load,
+                crate::Work::Query,
                 cx,
                 |_| (),
                 |view, ()| view.status = "stale plan".into(),
             );
             view.panel.explaining = true;
-            let cancel = view.loads.cancel.clone();
+            let cancel = view.queries.cancel.clone();
             view.toggle_results();
             assert!(cancel.is_cancelled());
             assert!(!view.panel.explaining);
@@ -65,7 +65,7 @@ fn a_blocked_explain_cannot_cancel_the_query_already_running(cx: &mut TestAppCon
             view.sql_input
                 .update(cx, |input, cx| input.set_value("SELECT id FROM orders", window, cx));
             view.run_query(cx);
-            let query = view.loads.cancel.clone();
+            let query = view.queries.cancel.clone();
             view.save.busy = true;
             view.explain_query(cx);
             assert!(view.status.contains("save is running"));
@@ -85,9 +85,9 @@ fn replacement_load_does_not_inherit_explain_cancellation(cx: &mut TestAppContex
                 .update(cx, |input, cx| input.set_value("SELECT id FROM orders", window, cx));
             view.explain_query(cx);
             assert!(view.panel.explaining);
-            let explain = view.loads.cancel.clone();
+            let explain = view.queries.cancel.clone();
             view.run_query(cx);
-            let query = view.loads.cancel.clone();
+            let query = view.queries.cancel.clone();
             view.toggle_results();
             assert!(explain.is_cancelled());
             assert!(!query.is_cancelled());

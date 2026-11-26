@@ -14,7 +14,7 @@ use bookie_gpui::theme::{Theme, size};
 impl GridView {
     pub(crate) fn toggle_results(&mut self) {
         if self.panel.explaining {
-            self.invalidate_background();
+            self.invalidate_query();
             self.status = "Canceled the explain".into();
         }
         self.panel.open = !self.panel.open;
@@ -151,7 +151,7 @@ impl GridView {
                     .child(format!("{seconds}s"))
             }))
             .when(running.is_some(), |bar| {
-                if self.loads.cancel.is_cancelled() {
+                if self.queries.cancel.is_cancelled() {
                     bar.child(crate::surfaces::unavailable_button(
                         ButtonKind::Ghost,
                         "stop-query",

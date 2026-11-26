@@ -115,13 +115,12 @@ impl GridView {
         let (text, cursor, selection) = (editor.value().to_string(), editor.cursor(), editor.selected_range());
         let range = run_source_range(&text, &driver, cursor, selection.clone());
         match run_target(&text, &driver, cursor, selection) {
-            Ok(sql) if bookie_app_services::query_parameters::statement_names(&sql, &driver).is_empty() => {
+            Ok(sql) => {
                 let source = range
                     .filter(|range| text.get(range.clone()) == Some(sql.as_str()))
                     .map(|range| (text, range));
-                self.run_sql_with_source(sql, Vec::new(), source, cx);
+                self.run_with_parameters(sql, source, cx);
             }
-            Ok(sql) => self.run_with_parameters(sql, cx),
             Err(message) => {
                 self.status = message;
                 cx.notify();

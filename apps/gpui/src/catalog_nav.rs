@@ -274,6 +274,9 @@ impl GridView {
         self.clear_fk_peek();
         self.row_inspector.reset();
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
+            self.invalidate_query();
+            self.params.rows.clear();
+            self.params.remembered.clear();
             self.schema_context = None;
             self.reset_diagram();
         }

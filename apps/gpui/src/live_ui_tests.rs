@@ -1442,6 +1442,58 @@ fn a_named_parameter_asks_for_its_value_first_and_then_runs_the_query_bound(cx: 
 }
 
 #[gpui::test]
+fn parameter_enter_runs_the_original_selection_after_the_editor_changes(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let selected = "SELECT :value";
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value(format!("SELECT 99; {selected}"), window, cx);
+                input.set_selected_range(11..11 + selected.len(), cx);
+            });
+            view.run_at_cursor(cx);
+            let field = view.params.rows[0].input.clone();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 99", window, cx));
+            field.update(cx, |input, cx| input.set_content("7", cx));
+            window.focus(&field.read(cx).focus_handle(cx), cx);
+        })
+    });
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let slot = view.run_tabs.slots.last().expect("selection result");
+        assert_eq!(slot.source.as_ref().expect("result").row(0), vec![Cell::Int(7)]);
+    });
+}
+
+#[gpui::test]
+fn run_all_keeps_each_statement_result(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let before = cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            let before = view.run_tabs.slots.len();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 19; SELECT 23", window, cx));
+            view.run_query(cx);
+            before
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let rows = view.run_tabs.slots[before..]
+            .iter()
+            .map(|slot| slot.source.as_ref().expect("result").row(0))
+            .collect::<Vec<_>>();
+        assert_eq!(rows, [vec![Cell::Int(19)], vec![Cell::Int(23)]], "{}", view.status);
+    });
+}
+
+#[gpui::test]
 fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_number(cx: &mut TestAppContext) {
     use bookie_core::ParameterKind;
     use bookie_gpui::model::CellText;
@@ -1587,13 +1639,13 @@ fn stop_targets_only_the_current_sql_run(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.panel.running = Some((view.loads.generation.saturating_add(1), std::time::Instant::now()));
+            view.panel.running = Some((view.queries.generation.saturating_add(1), std::time::Instant::now()));
             view.stop_query();
-            assert!(!view.loads.cancel.is_cancelled());
+            assert!(!view.queries.cancel.is_cancelled());
 
-            view.panel.running = Some((view.loads.generation, std::time::Instant::now()));
+            view.panel.running = Some((view.queries.generation, std::time::Instant::now()));
             view.stop_query();
-            assert!(view.loads.cancel.is_cancelled());
+            assert!(view.queries.cancel.is_cancelled());
             assert!(view.panel.running.is_some());
         });
     });

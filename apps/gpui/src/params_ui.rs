@@ -17,26 +17,47 @@ pub(crate) struct ParamRow {
 pub(crate) struct ParamsState {
     pub rows: Vec<ParamRow>,
     pub sql: String,
+    source: Option<(String, std::ops::Range<usize>)>,
     pub remembered: HashMap<String, String>,
 }
 
 impl GridView {
-    pub(crate) fn run_with_parameters(&mut self, sql: String, cx: &mut Context<Self>) {
+    pub(crate) fn run_with_parameters(
+        &mut self,
+        sql: String,
+        source: Option<(String, std::ops::Range<usize>)>,
+        cx: &mut Context<Self>,
+    ) {
         let Some(driver_id) = self.live.as_ref().map(|live| live.driver_id.clone()) else {
-            self.run_sql(sql, cx);
+            self.run_sql_with_source(sql, Vec::new(), source, cx);
             return;
         };
         let names = statement_names(&sql, &driver_id);
         if names.is_empty() {
             self.params.rows.clear();
-            self.run_sql(sql, cx);
+            self.run_sql_with_source(sql, Vec::new(), source, cx);
             return;
         }
-        let waiting = self.params.sql == sql && self.params.rows.iter().map(|row| &row.name).eq(names.iter());
+        let waiting = self.params.sql == sql
+            && self.params.source == source
+            && self.params.rows.iter().map(|row| &row.name).eq(names.iter());
         if !waiting {
+            self.params.source = source;
             self.ask_for_parameters(sql, names, cx);
             return;
         }
+        self.submit_parameters(cx);
+    }
+
+    fn submit_parameters(&mut self, cx: &mut Context<Self>) {
+        let Some(driver_id) = self.live.as_ref().map(|live| live.driver_id.clone()) else {
+            return;
+        };
+        if self.params.rows.is_empty() {
+            return;
+        }
+        let sql = self.params.sql.clone();
+        let source = self.params.source.clone();
         let entries: Vec<_> = self
             .params
             .rows
@@ -52,8 +73,6 @@ impl GridView {
         let bound = collect_values(&entries).and_then(|values| bind_statement(&sql, &driver_id, &values));
         match bound {
             Ok(bound) => {
-                let editor = self.sql_input.read(cx).value().to_string();
-                let source = (editor == sql).then(|| (editor.clone(), 0..editor.len()));
                 let parsed = bookie_core::extract_named_parameters(&sql, &driver_id);
                 self.run_sql_with_mapping(bound.sql, bound.values, source, Some((sql, parsed)), cx);
             }
@@ -71,7 +90,7 @@ impl GridView {
                 }
                 cx.subscribe(&input, |this, _, event: &InputEvent, cx| {
                     if matches!(event, InputEvent::Submit) {
-                        this.run_query(cx);
+                        this.submit_parameters(cx);
                     }
                     cx.notify();
                 })
@@ -130,7 +149,7 @@ impl GridView {
                     .text_size(px(size::TEXT_SMALL))
                     .text_color(rgb(theme.muted_foreground))
                     .child(
-                        "Auto reads numbers and true/false; choose Text to keep values like 007. Press Enter or Run.",
+                        "Auto reads numbers and true/false; choose Text to keep values like 007. Press Enter to submit the pending statement.",
                     ),
             ),
         )
