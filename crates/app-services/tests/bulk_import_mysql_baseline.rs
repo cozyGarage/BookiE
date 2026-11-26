@@ -1,12 +1,14 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 //! The MySQL half of the 100,000-row import baseline for #3741 (PostgreSQL and SQLite sit next to
-//! their own tests). Run with `--ignored --nocapture`; it needs Docker and prints the time.
+//! their own tests). It needs Docker and prints the time. Run the baseline on its own
+//! (`-- --ignored --nocapture a_hundred`) on an idle machine: running it next to the other
+//! ignored test in this file makes the number meaningless.
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use bookie_core::import::{CsvImportOptions, ImportTarget, build_insert_plan, read_csv};
-use bookie_core::{ConnectOptions, DatabaseDriver, Environment, OperationControl, TlsConfig, Value};
+use bookie_core::{ConnectOptions, Connection, DatabaseDriver, Environment, OperationControl, TlsConfig, Value};
 use bookie_policy::{
     AuditError, AuditEvent, AuditSink, AuditState, AutoApproveSink, BulkBatch, BulkInsertEnd, BulkInsertRequest,
     GuardContext, PolicyConfig, PolicyGuard, Principal,
@@ -28,9 +30,10 @@ impl AuditSink for DiscardAudit {
     }
 }
 
-#[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires docker; prints the import baseline measured for #3741"]
-async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
+async fn start_mysql() -> (
+    testcontainers::ContainerAsync<testcontainers_modules::mysql::Mysql>,
+    ConnectOptions,
+) {
     let container = testcontainers_modules::mysql::Mysql::default()
         .with_tag("8.4.13")
         .with_env_var("MYSQL_ROOT_PASSWORD", "bookie_test")
@@ -51,6 +54,31 @@ async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
         tls: TlsConfig::disabled(),
         ..Default::default()
     };
+    (container, options)
+}
+
+fn guard_for(raw: Box<dyn bookie_core::Connection>) -> PolicyGuard {
+    PolicyGuard::new(
+        Arc::from(raw),
+        GuardContext {
+            connection_id: Uuid::nil(),
+            connection_name: "mysql guarded test".into(),
+            driver_id: "mysql".into(),
+            environment: Environment::Local,
+            read_only: false,
+            principal: Principal::human_gui(),
+            policy: Arc::new(PolicyConfig::default()),
+            approval: Arc::new(AutoApproveSink),
+            audit: Arc::new(DiscardAudit),
+            audit_state: Arc::new(AuditState::new()),
+        },
+    )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires docker; prints the import baseline measured for #3741"]
+async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
+    let (_container, options) = start_mysql().await;
     let raw = drivers_mysql::MysqlDriver.connect(options.clone()).await.unwrap();
     raw.execute("CREATE TABLE import_bulk (id BIGINT PRIMARY KEY, name VARCHAR(100) NOT NULL, amount DECIMAL(10,2))")
         .await
@@ -71,21 +99,7 @@ async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
         mapping: &[Some(0), Some(1), Some(2)],
     };
     let plan = build_insert_plan(&target, &sheet, &import_options).unwrap();
-    let guard = PolicyGuard::new(
-        Arc::from(raw),
-        GuardContext {
-            connection_id: Uuid::nil(),
-            connection_name: "mysql import baseline".into(),
-            driver_id: "mysql".into(),
-            environment: Environment::Local,
-            read_only: false,
-            principal: Principal::human_gui(),
-            policy: Arc::new(PolicyConfig::default()),
-            approval: Arc::new(AutoApproveSink),
-            audit: Arc::new(DiscardAudit),
-            audit_state: Arc::new(AuditState::new()),
-        },
-    );
+    let guard = guard_for(raw);
     let mut scope = guard
         .begin_bulk_insert(BulkInsertRequest {
             schema: None,
@@ -130,4 +144,46 @@ async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
         .await
         .unwrap();
     assert_eq!(result.rows, vec![vec![Value::Text(BASELINE_ROWS.to_string())]]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires docker"]
+async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
+    let (_container, options) = start_mysql().await;
+    let raw = drivers_mysql::MysqlDriver.connect(options.clone()).await.unwrap();
+    raw.execute("CREATE TABLE n (id INT PRIMARY KEY)").await.unwrap();
+    let values: Vec<String> = (1..=200).map(|id| format!("({id})")).collect();
+    raw.execute(&format!("INSERT INTO n VALUES {}", values.join(",")))
+        .await
+        .unwrap();
+    let guard = guard_for(raw);
+    let short = || OperationControl::with_timeout(std::time::Duration::from_millis(200));
+
+    let read = guard
+        .query_controlled(
+            "SELECT count(*) FROM n a CROSS JOIN n b CROSS JOIN n c CROSS JOIN n d WHERE (a.id + b.id * c.id) % d.id = 0",
+            &short(),
+        )
+        .await;
+    assert!(
+        matches!(read, Err(bookie_core::DriverError::TimedOut)),
+        "a read keeps its deadline: {read:?}"
+    );
+
+    let write = guard
+        .execute_controlled(
+            "CREATE TABLE slow_copy AS SELECT a.id FROM n a CROSS JOIN n b CROSS JOIN n c",
+            &short(),
+        )
+        .await;
+    assert!(
+        write.is_ok(),
+        "a write is not cancelled by the read deadline: {write:?}"
+    );
+    let checker = drivers_mysql::MysqlDriver.connect(options).await.unwrap();
+    let count = checker
+        .query("SELECT CAST(count(*) AS CHAR) FROM slow_copy")
+        .await
+        .unwrap();
+    assert_eq!(count.rows, vec![vec![Value::Text("8000000".into())]]);
 }
