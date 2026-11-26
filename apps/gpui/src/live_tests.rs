@@ -260,7 +260,7 @@ fn decoded_budget_is_shared_across_pages_and_keeps_a_whole_row_prefix() {
 
     let mut second = make_page();
     assert!(bound_page(&mut second, &mut budget));
-    assert!(second.is_partial());
+    assert!(second.truncated);
     assert!((1..40).contains(&second.rows.len()));
     for (index, row) in second.rows.iter().enumerate() {
         assert_eq!(row[0], bookie_core::Value::Int(index as i64));

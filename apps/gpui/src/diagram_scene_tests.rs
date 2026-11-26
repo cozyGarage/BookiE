@@ -85,3 +85,21 @@ fn cards_do_not_overlap_and_the_extent_holds_them_all() {
 fn nothing_to_draw_gives_no_scene() {
     assert!(build_scene(&SchemaDiagram::default()).is_none());
 }
+
+#[test]
+fn moving_and_resizing_a_card_reanchors_its_edges() {
+    use bookie_app_services::er_diagram::layout::Point;
+    let diagram = diagram();
+    let mut scene = build_scene(&diagram).unwrap();
+    let orders = diagram.position_of(None, "orders").unwrap();
+    let customers = diagram.position_of(None, "customers").unwrap();
+    let before = scene.edges[0];
+    let fixed = scene.cards[customers];
+    let at = Point { x: 2_000.0, y: 900.0 };
+    scene.place_card(&diagram, orders, at, 320.0);
+    assert_eq!(scene.cards[orders].at, at);
+    assert_eq!(scene.cards[orders].shape.width, 320.0);
+    assert_eq!(scene.cards[customers], fixed);
+    assert_ne!(scene.edges[0], before);
+    assert!(scene.extent.right() >= scene.cards[orders].rect().right());
+}

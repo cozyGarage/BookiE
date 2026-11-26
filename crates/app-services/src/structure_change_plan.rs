@@ -107,6 +107,43 @@ pub fn plan_structure_change(
     })
 }
 
+pub fn plan_foreign_key(
+    target: SaveTarget<'_>,
+    key: ForeignKeyInfo,
+    referenced: &[ColumnInfo],
+) -> Result<StructureChangePlan, StructureChangeError> {
+    if !bookie_core::sql_dialect::alters_foreign_keys(target.driver_id) {
+        return Err(StructureChangeError::Input(
+            "This database cannot add foreign keys to an existing table".into(),
+        ));
+    }
+    if key.name.trim().is_empty() || key.columns.is_empty() || key.columns.len() != key.ref_columns.len() {
+        return Err(StructureChangeError::Input(
+            "Name the foreign key and choose matching column pairs".into(),
+        ));
+    }
+    for (columns, names) in [(target.columns, &key.columns), (referenced, &key.ref_columns)] {
+        let mut seen = std::collections::BTreeSet::new();
+        for name in names {
+            if !columns.iter().any(|column| column.name == *name) || !seen.insert(name) {
+                return Err(StructureChangeError::Input(format!(
+                    "Column {name} is missing or repeated"
+                )));
+            }
+        }
+    }
+    let op = StructureOp::AddForeignKey {
+        schema: target.schema.map(str::to_owned),
+        table: target.table.to_owned(),
+        fk: key,
+    };
+    let sql = materialize_ops(&[op], target.driver_id).map_err(describe)?;
+    Ok(StructureChangePlan {
+        preview: sql.join("\n"),
+        statements: sql.into_iter().map(|statement| (statement, Vec::new())).collect(),
+    })
+}
+
 fn plan_table_removal(
     target: &SaveTarget<'_>,
     kind: StructureChangeKind,
@@ -502,6 +539,42 @@ mod tests {
             enum_type: None,
             domain_type: None,
         }
+    }
+
+    #[test]
+    fn diagram_foreign_key_keeps_qualified_identity_and_column_order() {
+        let columns = [column("child 1"), column("child 2")];
+        let referenced = [column("parent 2"), column("parent 1")];
+        let target = SaveTarget {
+            driver_id: "postgres",
+            schema: Some("work space"),
+            table: "child.table",
+            columns: &columns,
+        };
+        let key = ForeignKeyInfo {
+            name: "linked records".into(),
+            columns: vec!["child 1".into(), "child 2".into()],
+            ref_schema: Some("other space".into()),
+            ref_table: "parent.table".into(),
+            ref_columns: vec!["parent 1".into(), "parent 2".into()],
+            on_delete: None,
+            on_update: None,
+        };
+        let plan = plan_foreign_key(target, key.clone(), &referenced).unwrap();
+        assert!(plan.preview.contains(r#"ALTER TABLE "work space"."child.table" "#));
+        assert!(plan.preview.contains(r#"FOREIGN KEY ("child 1", "child 2")"#));
+        assert!(
+            plan.preview
+                .contains(r#"REFERENCES "other space"."parent.table" ("parent 1", "parent 2")"#)
+        );
+        let missing = [column("parent 2")];
+        let target = SaveTarget {
+            driver_id: "postgres",
+            schema: Some("work space"),
+            table: "child.table",
+            columns: &columns,
+        };
+        assert!(plan_foreign_key(target, key, &missing).is_err());
     }
 
     fn stored_index(name: &str) -> IndexInfo {

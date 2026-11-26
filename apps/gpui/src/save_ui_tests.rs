@@ -1944,6 +1944,56 @@ fn the_schema_diagram_opens_in_its_own_tab_with_one_card_per_table(cx: &mut Test
 }
 
 #[gpui::test]
+fn closing_a_loading_schema_diagram_does_not_reopen_its_tab(cx: &mut TestAppContext) {
+    let path = fixture_copy("diagram-close");
+    let (view, cx) = saving_view(cx, &path);
+    view.update(cx, |view, cx| {
+        view.open_schema_diagram(cx);
+        assert!(view.search.diagram.loading);
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Diagram);
+        view.close_tab(view.tabs.active, cx);
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.tabs.items.contains(&bookie_gpui::shell::Tab::Diagram));
+        assert!(view.search.diagram.view.is_none());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn diagram_selection_opens_structure_and_can_open_export_in_place(cx: &mut TestAppContext) {
+    let path = fixture_copy("diagram-actions");
+    let (view, cx) = saving_view(cx, &path);
+    view.update(cx, |view, cx| view.open_schema_diagram(cx));
+    settle_saving(cx);
+
+    let export = cx.debug_bounds("diagram-export").expect("the diagram has export");
+    cx.simulate_click(export.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("bar-dialog").is_some());
+    let cancel = cx
+        .debug_bounds("cancel-schema-diagram")
+        .expect("the dialog offers Cancel");
+    cx.simulate_click(cancel.center(), Default::default());
+    cx.run_until_parked();
+
+    let card = cx.debug_bounds("diagram-card-0").expect("the first table has a card");
+    cx.simulate_click(card.center(), Default::default());
+    cx.run_until_parked();
+    let structure = cx
+        .debug_bounds("diagram-open-structure")
+        .expect("the selected table has Structure");
+    cx.simulate_click(structure.center(), Default::default());
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.catalog.grid_table.name, "customers");
+        assert!(view.structure.info.is_some());
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn backups_are_offered_only_on_postgres_and_a_refused_bar_stays_closed(cx: &mut TestAppContext) {
     let path = fixture_copy("backup-sqlite");
     let (view, cx) = saving_view(cx, &path);

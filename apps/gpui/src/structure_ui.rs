@@ -83,6 +83,7 @@ impl GridView {
         self.status = format!("Reading the structure of {}…", table.name);
         cx.spawn(async move |this, cx| {
             let asked = table.clone();
+            let owning_connection = live.clone();
             let read = cx
                 .background_executor()
                 .spawn(async move {
@@ -107,7 +108,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                if this.catalog.grid_table != asked {
+                if !this.is_current_session(&owning_connection) || this.catalog.grid_table != asked {
                     return;
                 }
                 match read {
@@ -208,6 +209,27 @@ impl GridView {
             },
         };
         self.prepare(live, SaveRequest::Structure(kind, text), labels, cx);
+    }
+
+    pub(crate) fn review_diagram_foreign_key(&mut self, key: bookie_core::ForeignKeyInfo, cx: &mut Context<Self>) {
+        if self.transaction_open() || self.reject_view_edits() {
+            cx.notify();
+            return;
+        }
+        let Some(live) = self.save_session() else {
+            cx.notify();
+            return;
+        };
+        let table = table_label(&self.catalog.grid_table);
+        let labels = ReviewLabels {
+            title: format!("Add foreign key {} on {table}?", key.name),
+            done: format!("Added foreign key {} on {table}", key.name),
+            review: "Review the relationship change, then apply or cancel".into(),
+            confirm: "Add foreign key",
+            note: Some("The database checks existing rows and may block writes while validating the new constraint."),
+            reconnect: None,
+        };
+        self.prepare(live, SaveRequest::DiagramForeignKey(key), labels, cx);
     }
 
     pub(crate) fn structure_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
