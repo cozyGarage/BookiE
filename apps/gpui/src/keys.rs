@@ -332,6 +332,9 @@ impl GridView {
         match key {
             "space" => {
                 if let Some(cursor) = self.cell_cursor {
+                    if self.toggle_boolean_at_cursor(window, cx) {
+                        return;
+                    }
                     self.click_row(self.base() + cursor.row as u64, false);
                 }
             }

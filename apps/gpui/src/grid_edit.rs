@@ -18,6 +18,13 @@ pub struct Editing {
     pub original: String,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EditMode {
+    Choice,
+    Inline,
+    Full,
+}
+
 const MAX_FULL_VALUE_EDIT_BYTES: usize = 1024 * 1024;
 
 fn exceeds_full_value_editor_limit(cell: &Cell, mode: crate::binary_mode::BinaryMode) -> bool {
@@ -92,12 +99,7 @@ impl GridView {
                 }
                 self.record_edit(key, cell);
                 self.edits_changed();
-                let count = self.cell_edit.edits.len();
-                self.status = if self.can_save_edits() {
-                    format!("{count} change(s) pending; press Ctrl+S to save")
-                } else {
-                    format!("{count} edited in this view only; nothing is saved")
-                };
+                self.status = self.pending_edit_status();
                 self.stop_edit(window, cx);
             }
             Err(reason) => {
@@ -107,8 +109,17 @@ impl GridView {
         }
     }
 
+    pub(crate) fn pending_edit_status(&self) -> String {
+        let count = self.cell_edit.edits.len();
+        if self.can_save_edits() {
+            format!("{count} change(s) pending; press Ctrl+S to save")
+        } else {
+            format!("{count} edited in this view only; nothing is saved")
+        }
+    }
+
     pub fn start_edit(&mut self, row: u64, column: usize, window: &mut Window, cx: &mut Context<Self>) {
-        self.start_edit_with(row, column, false, window, cx);
+        self.start_edit_mode(row, column, EditMode::Choice, window, cx);
     }
 
     pub(crate) fn open_value_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -116,14 +127,14 @@ impl GridView {
             return;
         };
         let source = self.source_row(self.base() + cursor.row as u64);
-        self.start_edit_with(source, cursor.column, true, window, cx);
+        self.start_edit_mode(source, cursor.column, EditMode::Full, window, cx);
     }
 
-    fn start_edit_with(
+    pub(crate) fn start_edit_mode(
         &mut self,
         row: u64,
         column: usize,
-        full_editor: bool,
+        mode: EditMode,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -161,6 +172,9 @@ impl GridView {
             cx.notify();
             return;
         }
+        if mode == EditMode::Choice && self.live.is_some() && self.begin_choice_edit(row, column, &cell, window, cx) {
+            return;
+        }
         let binary_mode = matches!(cell, Cell::Bytes(_)).then(|| self.binary_mode_for_column(column));
         if let (Cell::Bytes(bytes), Some(mode)) = (&cell, binary_mode)
             && crate::binary_mode::edit_text_len(bytes.len(), mode) > MAX_FULL_VALUE_EDIT_BYTES
@@ -186,7 +200,7 @@ impl GridView {
         let full_value = matches!(
             cell,
             Cell::Text(_) | Cell::JsonText(_) | Cell::Json(_) | Cell::Bytes(_) | Cell::Null
-        ) && (full_editor
+        ) && (mode == EditMode::Full
             || matches!(cell, Cell::JsonText(_) | Cell::Json(_))
             || text.len() > 512
             || text.contains(['\n', '\r', '\t', '\0']));
