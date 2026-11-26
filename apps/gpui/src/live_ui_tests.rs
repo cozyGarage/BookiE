@@ -804,6 +804,20 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
     });
 }
 
+#[gpui::test]
+fn failed_connection_switch_preserves_the_current_reconnect_target(cx: &mut TestAppContext) {
+    use bookie_gpui::live::Origin;
+    let (view, cx) = open(cx);
+    let path = orders_fixture();
+    connect_and_settle(&view, cx, path.clone());
+    let missing = std::path::PathBuf::from("/nonexistent/none.sqlite");
+    connect_and_settle(&view, cx, missing);
+    view.read_with(cx, |view, _| {
+        assert!(matches!(&view.search.origin, Some(Origin::File(current)) if *current == path));
+        assert_eq!(view.catalog.grid_table, table_info("customers"));
+    });
+}
+
 struct SqliteFixture(std::path::PathBuf);
 
 impl Drop for SqliteFixture {
@@ -2658,7 +2672,7 @@ fn cancelling_a_process_asks_first_and_escape_keeps_it_running(cx: &mut TestAppC
 }
 
 #[gpui::test]
-fn switching_to_home_or_settings_does_not_cancel_running_work(cx: &mut TestAppContext) {
+fn switching_between_the_tool_tabs_does_not_cancel_running_work(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     connect_and_settle(&view, cx, orders_fixture());
     let (generation, token) = view.read_with(cx, |view, _| (view.loads.generation, view.loads.cancel.clone()));
@@ -2667,6 +2681,12 @@ fn switching_to_home_or_settings_does_not_cancel_running_work(cx: &mut TestAppCo
             view.tabs.open_home();
             view.sync_grid_owner();
             view.tabs.open_settings();
+            view.sync_grid_owner();
+            view.tabs.open_history();
+            view.sync_grid_owner();
+            view.tabs.open_audit_log();
+            view.sync_grid_owner();
+            view.tabs.open_diagram();
             view.sync_grid_owner();
             view.tabs.open_home();
             view.sync_grid_owner();

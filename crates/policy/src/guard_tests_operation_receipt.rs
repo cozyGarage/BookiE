@@ -317,3 +317,46 @@ async fn cancellation_after_audit_intent_keeps_the_operation_receipt() {
         event.operation_id == receipt.operation_id && event.terminal_status == AuditTerminalStatus::Cancelled
     }));
 }
+
+#[tokio::test]
+async fn a_write_does_not_get_the_read_deadline_but_a_read_does() {
+    let audit = Arc::new(SequenceAuditSink::new(vec![]));
+    let guard = guard(
+        Arc::new(InterruptedQueryConn {
+            started: Arc::new(Notify::new()),
+        }),
+        audit,
+        false,
+    );
+    let read = guard
+        .query_result_sets_controlled_with_audit(
+            "SELECT 1",
+            &[],
+            &OperationControl::with_timeout(Duration::from_millis(20)),
+        )
+        .await;
+    assert!(
+        matches!(read.result, Err(DriverError::TimedOut)),
+        "a read keeps its deadline"
+    );
+
+    let token = CancellationToken::new();
+    let control = OperationControl::new(
+        token.clone(),
+        Some(tokio::time::Instant::now() + Duration::from_millis(20)),
+    );
+    let write = tokio::spawn(async move {
+        guard
+            .query_result_sets_controlled_with_audit("ALTER TABLE t ADD COLUMN b integer", &[], &control)
+            .await
+    });
+    tokio::time::sleep(Duration::from_millis(150)).await;
+    assert!(!write.is_finished(), "a write must outlive the read deadline");
+    token.cancel();
+    let outcome = write.await.expect("the write task");
+    assert!(
+        matches!(outcome.result, Err(DriverError::Cancelled)),
+        "Stop still cancels a write: {:?}",
+        outcome.result
+    );
+}

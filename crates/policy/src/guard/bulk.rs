@@ -316,25 +316,46 @@ impl PolicyGuard {
         if batch.rows.is_empty() {
             return Ok(0);
         }
-        let statements: Vec<(String, Vec<Value>)> = batch
+        let per_row: Vec<(String, Vec<Value>)> = batch
             .rows
             .iter()
             .map(|row| (scope.statement.clone(), row.clone()))
             .collect();
-        let result = self
+        let multi_row = self.multi_row_statements(&scope.statement, batch.rows);
+        let mut result = self
             .caught_write(
                 "BULK INSERT BATCH",
-                self.inner.execute_in_transaction_controlled(&statements, control),
+                self.inner
+                    .execute_in_transaction_controlled(multi_row.as_deref().unwrap_or(&per_row), control),
             )
             .await;
+        if multi_row.is_some() && result.as_ref().err().and_then(rejected_row).is_some() {
+            result = self
+                .caught_write(
+                    "BULK INSERT BATCH",
+                    self.inner.execute_in_transaction_controlled(&per_row, control),
+                )
+                .await;
+        }
         if let Err(error) = result {
             scope.open = false;
             return Err(error);
         }
-        let rows = statements.len() as u64;
+        let rows = per_row.len() as u64;
         scope.committed += rows;
-        self.synchronize_import_sequences(scope).await?;
         Ok(rows)
+    }
+
+    fn multi_row_statements(&self, statement: &str, rows: &[Vec<Value>]) -> Option<Vec<(String, Vec<Value>)>> {
+        let driver_id = self.ctx.driver_id.as_str();
+        let statements = super::bulk_multirow::multi_row_statements(statement, driver_id, rows)?;
+        let original = crate::classify::classify(statement, driver_id);
+        let widened = crate::classify::classify(&statements.first()?.0, driver_id);
+        let same_insert = widened.class == StatementClass::Insert
+            && !widened.is_multi_statement
+            && widened.writes()
+            && widened.tables == original.tables;
+        same_insert.then_some(statements)
     }
 
     pub async fn execute_bulk_batch_skipping_failed_rows(
@@ -382,7 +403,6 @@ impl PolicyGuard {
         let written = remaining.len() as u64;
         scope.committed += written;
         scope.skipped += skipped.len() as u64;
-        self.synchronize_import_sequences(scope).await?;
         Ok(BulkBatchOutcome { written, skipped })
     }
 
@@ -412,6 +432,11 @@ impl PolicyGuard {
     ) -> Result<u64, DriverError> {
         scope.open = false;
         let committed = scope.committed;
+        let sequence_sync = if committed > 0 {
+            self.synchronize_import_sequences(scope).await
+        } else {
+            Ok(())
+        };
         let (terminal_status, transaction_outcome, error_category) = bulk_terminal(end, committed);
         if terminal_status == AuditTerminalStatus::Unknown {
             self.ctx.audit_state.disable_governed_writes();
@@ -435,6 +460,7 @@ impl PolicyGuard {
             )
             .await;
         self.handle_write_outcome_failure(audit_result)?;
+        sequence_sync?;
         Ok(committed)
     }
 

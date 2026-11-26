@@ -1,6 +1,6 @@
 # 0052: GPUI is the cross-platform frontend; GTK is maintained in parallel
 
-- **Status**: Accepted (2026-11-11); amended 2026-11-13
+- **Status**: Superseded by 0058
 - **Date**: 2026-11-11
 - **Supersedes**: 0028, 0036, 0043 and 0044
 

@@ -309,12 +309,7 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
-        let label = match (self.run_tabs.slots[index].failure.is_some(), run.measured()) {
-            (true, _) => format!("{} · failed", run.label()),
-            (false, Some(took)) => format!("{} · {} rows · {took}", run.label(), thousands(run.rows)),
-            (false, None) => format!("{} · {} rows", run.label(), thousands(run.rows)),
-        };
-        let tab = segment(("run", index), label, active, theme).flex_none().child(
+        let tab = segment(("run", index), run.label(), active, theme).flex_none().child(
             compact_icon_button(("close-run", index), "x", "Close result", theme)
                 .size(px(size::LG))
                 .on_mouse_down(

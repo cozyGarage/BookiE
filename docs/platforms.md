@@ -1,6 +1,6 @@
 # Platforms, toolchains and packaging
 
-BookiE is focused on Linux first as a native desktop application, with cross-platform desktop support underway via GPUI ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)). Current Linux GTK source builds require GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 and GLib 2.88 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Arch Linux and Debian testing provide the native toolkit floor. Older native toolkit versions are unsupported.
+BookiE is focused on Linux first as a native desktop application, with cross-platform desktop support underway via GPUI. The GTK app remains the current primary Linux release until GPUI passes the installed accessibility, packaging, security and manual acceptance gate ([ADR 0058](decisions/0058-gpui-primary-gtk-historical.md)). Current Linux GTK source builds require GTK 4.24, libadwaita 1.10, GtkSourceView 5.22 and GLib 2.88 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Arch Linux and Debian testing provide the native toolkit floor. Older native toolkit versions are unsupported.
 
 ## Published artifacts
 

@@ -64,3 +64,41 @@ Gained:
 **Switching database client libraries as a cancellation shortcut.** Rejected when the change would lose native type metadata or alter transaction, TLS, session, cursor or policy contracts.
 
 **Returning a connection to the pool before its stop settles.** Rejected. A connection-scoped stop can arrive late and hit the next request. Cancellation tests cover the race matrix and assert server and reuse behaviour, not only the returned error: caller drop, deadline during cancel dispatch, a delayed stop after the work completed, stop transport failure, pool reuse and shutdown .
+
+## Amendment (2026-11-25): the read deadline does not cancel writes
+
+Status of this section: accepted by merging the proposal for #3910; the guard change is described under "What was built".
+
+**Problem.** `OperationControl` carries one deadline, built from the connection or global query timeout (`bookie_app_services::operation_control::bounded`). `run_server_cancellable` treats a deadline like a Stop: it dispatches the engine's cancel and waits. For a read that is the intent. For a write or DDL it is not: a slow `UPDATE` or `ALTER` that passes the read timeout is cancelled mid-flight, and when the engine does not confirm the abort the outcome is unknown, which disables governed writes until the user resolves it (ADR 0056).
+
+**Proposed rule.**
+
+1. **The read deadline applies to reads.** The caller that builds the control chooses the deadline from the statement class that policy already computes (`StatementClass`, `facts.writes()`), not the driver. A statement that writes, runs DDL, or cannot be parsed (vendor DDL counts as DDL) gets no read deadline.
+2. **An optional per-connection write timeout only stops waiting.** When set and exceeded, the client gives up and reports an unknown outcome. It never sends a cancel, so it cannot abort half of a statement.
+3. **Stop is unchanged.** Pressing Stop cancels every kind of statement through the server-side mechanism in this ADR and reports a terminal outcome only when the engine confirms it.
+4. **Transactions.** A statement inside an interactive transaction (ADR 0057) follows the same split: a read can time out, a write does not get the read deadline.
+
+**What stays the same.** The shared interruption sequence, the rule that only the engine's own abort error is a terminal outcome, the capability flag, and the poisoning of a session after an unknown outcome.
+
+**Consequences if accepted.**
+
+- One place decides the deadline per statement, next to the policy classification, instead of every driver treating a deadline as a cancel.
+- Per-engine tests: a slow `UPDATE` and a slow `ALTER` past the read timeout run to completion, a slow `SELECT` past it is cancelled with the engine's abort error, and Stop still cancels all three.
+- A long write can now run past the read timeout; the status line and the notification centre need to say it is still running, and the write timeout setting needs a UI home (a connection setting, off by default).
+
+**Open questions for the maintainer.**
+
+- Is "unparsable means DDL" the right default, or should an unparsable statement keep the read deadline?
+- Should the write timeout exist at all in the first change, or is Stop enough?
+- MCP and agentd run reads and writes with their own limits (ADR 0041 and the MCP budgets): should they keep a deadline for writes, since no person is watching?
+
+**What was built (#3910).** `Authorization::rearm` in `crates/policy/src/guard.rs` drops the deadline for a statement that a person runs and that writes or is unparseable, so the driver never sees a deadline to cancel on. The decisions on the open questions:
+
+- **Unparseable statements** count as writes (no read deadline), as proposed.
+- **A deadline that has already passed before dispatch** is kept, so the write is refused before it starts. Nothing ran, so this is safe, and it keeps the existing "expired control refuses the write" behaviour.
+- **Administrative operations** (backup, restore and the other `StatementClass::Administrative` work) keep their deadline and their unknown-outcome handling.
+- **Agents** (MCP and agentd principals) keep the deadline on writes, because no person is watching. This is the conservative answer to the third open question and can be revisited.
+- **The blast radius estimate** that runs before a DML statement is a read, so it keeps the caller's read deadline. If counting the affected rows takes longer than the deadline, the statement is refused before it starts with a timeout. Nothing ran, so this is safe, but a very large `UPDATE` or `INSERT … SELECT` can still fail this way; a DDL statement has no estimate.
+- **The optional write timeout** is not built; Stop is enough for now.
+
+Tests: a read past the deadline is still `TimedOut`, an `ALTER TABLE` past the read deadline keeps running, and Stop still cancels it (`a_write_does_not_get_the_read_deadline_but_a_read_does`). The per-engine slow `UPDATE`/`ALTER` tests from the consequences list are not written yet.

@@ -46,6 +46,26 @@ fn submit_where(view: &gpui::Entity<GridView>, cx: &mut VisualTestContext, text:
 }
 
 #[gpui::test]
+fn where_stays_in_the_table_view_and_opens_on_demand(cx: &mut TestAppContext) {
+    let (view, cx) = open_first_two_orders(cx);
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("server-filter-row").is_none());
+    let toggle = cx.debug_bounds("toggle-where").expect("the table offers WHERE");
+    cx.simulate_click(toggle.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("server-filter-row").is_some());
+
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sync_grid_owner();
+        cx.notify();
+    });
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("server-filter-row").is_none());
+    assert!(cx.debug_bounds("toggle-where").is_none());
+}
+
+#[gpui::test]
 fn a_where_filter_runs_on_the_server_not_on_the_loaded_rows(cx: &mut TestAppContext) {
     let (view, cx) = open_first_two_orders(cx);
     view.read_with(cx, |view, _| assert_eq!(view.source.total(), 2));

@@ -58,18 +58,18 @@ This page describes user-visible behavior and limits in the current source. Curr
 ## Platforms and packaging
 
 - Native builds require GTK 4.24, libadwaita 1.10 and GtkSourceView 5.22 or newer ([ADR 0021](decisions/0021-toolkit-floor.md)). Older toolkit stacks are unsupported for native packages.
-- The shipped product is the Linux GTK 4 and libadwaita client. Windows and macOS have no shipped package. [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's conditions hold. See [platforms](platforms.md) for Arch and AppImage install paths.
+- The current primary release is the Linux GTK 4 and libadwaita client; Windows and macOS have no supported package. GPUI is the primary frontend for new product work, while GTK is historical maintenance. GPUI is not a supported release until it passes installed accessibility, packaging, security and manual acceptance gates ([ADR 0058](decisions/0058-gpui-primary-gtk-historical.md)). See [platforms](platforms.md) for current install paths.
 
 ## Operation outcomes
 
 - **PostgreSQL transaction outcome can remain unknown after session loss.** A disconnected session cannot confirm whether its transaction committed. BookiE records an unknown outcome and blocks governed writes for that connection. A fresh session can run reads and end its read-only snapshot with ROLLBACK. Commits and other governed writes stay blocked until the outcome is reconciled. The app has no in-app reconciliation action ([#947](https://github.com/cozyGarage/BookiE/issues/947)).
 
-## GPUI frontend (`apps/gpui`, not shipped)
+## GPUI frontend (`apps/gpui`, unsupported preview)
 
-Limits of the GPUI frontend after the DataTable change. It is the chosen cross-platform frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)) and is not included in packages or releases yet.
+Limits of the GPUI frontend after the DataTable change. GPUI is the primary frontend for new work, but remains an unsupported preview until it passes the installed release gate ([ADR 0058](decisions/0058-gpui-primary-gtk-historical.md)).
 
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
-- **Sidebar:** the narrow header label clips when the pane is narrow; connection import and export menu entries report that they are not available yet.
-- **CSV delimiter:** the GPUI frontend has no CSV import; clipboard export writes to the clipboard. The palette command `csv delimiter <text>` (1 to 8 characters, no quote or line break) sets a multi-character delimiter for those copies until the app closes, and "CSV delimiter: back to the comma" resets it ([#3096](https://github.com/cozyGarage/BookiE/issues/3096)). File export opens a dialog with format (CSV, TSV, JSON, JSON Lines, SQL, Markdown, HTML, XLSX) and scope choices (Selected rows, Current page, Loaded rows, Full table; [#3788](https://github.com/cozyGarage/BookiE/pull/3788)).
+- **Sidebar:** the narrow header label clips when the pane is narrow; connection-bundle import and export menu entries are not available yet. These connection settings bundles are separate from importing table data from a file.
+- **CSV delimiter:** table import accepts CSV and XLSX files through the review flow for eligible saved writable connections. The import preview is capped at 1,000 rows per run, and confirming applies the import in one transaction. Clipboard export writes to the clipboard. The palette command `csv delimiter <text>` (1 to 8 characters, no quote or line break) sets a multi-character delimiter for those copies until the app closes, and "CSV delimiter: back to the comma" resets it ([#3096](https://github.com/cozyGarage/BookiE/issues/3096)). File export opens a dialog with format (CSV, TSV, JSON, JSON Lines, SQL, Markdown, HTML, XLSX) and scope choices (Selected rows, Current page, Loaded rows, Full table; [#3788](https://github.com/cozyGarage/BookiE/pull/3788)).
 - **GPUI export row limit:** the palette command `export limit <n>` (a whole number of at least 1) caps clipboard Export as CSV to the first n rows of the selection or page until the app closes, and a notification says when more rows were not exported; "Export limit: remove" clears it. It limits clipboard exports only and never fetches rows that are not loaded ([#3089](https://github.com/cozyGarage/BookiE/issues/3089)).
 - **Settings:** an Appearance page with a Dark theme switch and font family and size fields; the palette opens the page.

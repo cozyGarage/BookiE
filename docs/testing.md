@@ -272,7 +272,7 @@ It runs `pg_dump` and `pg_restore` from the `postgres:18-alpine` image through w
 
 The [manual checklist](manual-verification-0.2-features.md) records installed GTK workflows and layouts that need visual acceptance. Unit and widget tests do not establish installed desktop behavior. Keep run results in private verification records.
 
-The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; they do not replace the product's GTK or database acceptance tests. On GitHub, the `gpui` layer runs in the Linux gate; [gpui-macos.yml](../.github/workflows/gpui-macos.yml) also builds and tests `apps/gpui` on macOS when that tree changes. GPUI remains unshipped until [ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md) conditions hold.
+The [GPUI app](../apps/gpui/README.md) has its own tests. Run them when changing it; headless tests do not replace installed accessibility, packaging or database acceptance. On GitHub, the `gpui` layer runs in the Linux gate; [gpui-macos.yml](../.github/workflows/gpui-macos.yml) also builds and tests `apps/gpui` on macOS when that tree changes. The GTK frontend is historical and receives security, data-integrity and release-blocking fixes. GPUI becomes the supported primary release only after the gate in [ADR 0058](decisions/0058-gpui-primary-gtk-historical.md) passes.
 
 ## Regression case selection
 

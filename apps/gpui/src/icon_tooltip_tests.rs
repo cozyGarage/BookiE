@@ -82,10 +82,6 @@ fn every_icon_only_control_in_the_grid_bar_has_a_tooltip(cx: &mut TestAppContext
         &[
             ("pager-prev", "pager-prev tooltip: Previous page"),
             ("next", "next tooltip: Next page"),
-            (
-                "load-more",
-                "load-more tooltip: Append the next page instead of replacing the current one",
-            ),
             ("find-prev", "find-prev tooltip: Previous match"),
             ("find-next", "find-next tooltip: Next match"),
             ("show", "show tooltip: Show matching rows only"),
@@ -101,15 +97,11 @@ const KEYBOARD_PATHS: &[(&str, &str)] = &[
     ("sidebar-locate", "reveal-sidebar"),
     ("sidebar-filter", "sidebar-regex"),
     ("sidebar-active-only", "sidebar-active-only"),
-    ("first", "first"),
     ("pager-prev", "previous"),
     ("next", "next"),
-    ("last", "last"),
-    ("load-more", "append-pages"),
     ("find-prev", "find"),
     ("find-next", "find"),
     ("show", "filter"),
-    ("continuous", "continuous"),
     ("toggle-results", "results"),
 ];
 

@@ -11,6 +11,7 @@ mod catalog_nav;
 mod chart_plot;
 mod chart_ui;
 mod chrome;
+mod close_confirm_ui;
 mod closed_tabs_ui;
 mod column_projection;
 mod connection_bundle_ui;
@@ -237,6 +238,7 @@ struct GridView {
     counts: Ticket,
     charts: Ticket,
     pending_cancel_process: bool,
+    close_confirm: bool,
     cancel_confirm: Option<(i64, String)>,
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
@@ -483,8 +485,6 @@ impl GridView {
             Some("Commit or roll back the transaction before closing the window")
         } else if self.save.busy {
             Some("A save is running; wait for it to finish before closing the window")
-        } else if !self.cell_edit.edits.is_empty() {
-            Some("Save or discard the pending changes before closing the window")
         } else {
             None
         }
@@ -497,6 +497,11 @@ impl GridView {
                 .update(cx, |view, cx| match view.close_blocker() {
                     Some(reason) => {
                         view.status = reason.into();
+                        cx.notify();
+                        false
+                    }
+                    None if view.needs_close_confirmation() => {
+                        view.close_confirm = true;
                         cx.notify();
                         false
                     }
@@ -647,6 +652,7 @@ impl GridView {
             counts: Ticket::new(),
             charts: Ticket::new(),
             pending_cancel_process: false,
+            close_confirm: false,
             cancel_confirm: None,
             status: String::new(),
         }
@@ -949,9 +955,13 @@ mod tests {
 
     #[test]
     fn a_capped_load_is_marked_with_a_plus_in_the_title() {
-        assert_eq!(render::progress_text("", 100_000, true, 20), "100,000+ rows · 20 pages");
-        assert_eq!(render::progress_text("", 40, false, 1), "40 rows");
-        assert_eq!(render::progress_text("label · ", 1_500, true, 1), "label · 1,500+ rows");
+        assert_eq!(
+            render::page_summary(100_000, true, Some((1, 5_000))),
+            "Rows 1–5,000 of ≥ 100,000"
+        );
+        assert_eq!(render::page_summary(40, false, None), "40 rows");
+        assert_eq!(render::page_summary(1_500, true, None), "≥ 1,500 rows");
+        assert_eq!(render::page_summary(0, false, None), "0 rows");
     }
 
     #[test]

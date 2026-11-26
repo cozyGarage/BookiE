@@ -229,7 +229,7 @@ fn count_references(
                                 usize::try_from(bookie_gpui::source::ResultSource::total(&table)).unwrap_or(usize::MAX);
                             (
                                 rows.min(REFERENCE_COUNT_CAP),
-                                rows > REFERENCE_COUNT_CAP || table.truncated,
+                                rows > REFERENCE_COUNT_CAP || bookie_gpui::source::ResultSource::is_partial(&table),
                             )
                         });
                     ReferenceCount {
