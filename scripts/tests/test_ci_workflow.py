@@ -1600,7 +1600,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("bookie-driver-src", ledger)
 
     def test_value_search_postgres_runs_in_every_consumer_gate(self):
-        command = "-p bookie-app-services --test value_search_postgres -- --include-ignored --test-threads=1"
+        command = "-p bookie-app-services --test it value_search_postgres:: -- --include-ignored --test-threads=1"
         for path in ("scripts/ci-local.sh", ".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
             self.assertIn(command, (ROOT / path).read_text(), path)
         groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
@@ -1618,16 +1618,16 @@ class CiWorkflowTests(unittest.TestCase):
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "snapshot_export_postgres", "--", "--include-ignored", "--test-threads=1",
+                "it", "snapshot_export_postgres::", "--", "--include-ignored", "--test-threads=1",
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
+                "it", "browse_long_text_preview_engines::mysql_previews_a_huge_longtext_cell", "--",
                 "--include-ignored", "--test-threads=1",
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "data_dictionary_postgres", "--", "--include-ignored", "--test-threads=1",
+                "it", "data_dictionary_postgres::", "--", "--include-ignored", "--test-threads=1",
             ],
         ])
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
