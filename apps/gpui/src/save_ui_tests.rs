@@ -1781,23 +1781,24 @@ fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppCo
     let path = fixture_copy("selection-status-stats");
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
-        view.update(cx, |view, _| {
+        view.update(cx, |view, cx| {
             view.selection = Some(crate::Selection { anchor: 0, focus: 2 });
             view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            let items = view.selection_stat_items();
+            assert_eq!(
+                items,
+                vec![
+                    ("Count", "3".to_string()),
+                    ("Sum", "6".to_string()),
+                    ("Avg", "2".to_string()),
+                    ("Min", "1".to_string()),
+                    ("Max", "3".to_string()),
+                ]
+            );
+            assert_eq!(view.selection_stat_items(), items);
+            assert_eq!(view.selection_stats_computations(), 1);
+            cx.notify();
         })
-    });
-    view.read_with(cx, |view, _| {
-        let items = view.selection_stat_items();
-        assert_eq!(
-            items,
-            vec![
-                ("Count", "3".to_string()),
-                ("Sum", "6".to_string()),
-                ("Avg", "2".to_string()),
-                ("Min", "1".to_string()),
-                ("Max", "3".to_string()),
-            ]
-        );
     });
     cx.update(|_, cx| view.update(cx, |_, cx| cx.notify()));
     cx.run_until_parked();
@@ -1808,20 +1809,28 @@ fn the_status_bar_sums_the_cursor_column_of_the_selected_rows(cx: &mut TestAppCo
 
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 })
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
+            assert!(view.selection_stat_items().is_empty(), "a text column has no stats");
         })
-    });
-    view.read_with(cx, |view, _| {
-        assert!(view.selection_stat_items().is_empty(), "a text column has no stats")
     });
 
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
-            view.selection = Some(crate::Selection { anchor: 1, focus: 1 })
+            view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
+            view.selection = Some(crate::Selection { anchor: 0, focus: 1 });
+            let items = view.selection_stat_items();
+            assert_eq!(items[1], ("Sum", "3".to_string()));
+            assert_eq!(view.selection_stats_computations(), 3);
+
+            view.cell_edit.edits.insert((0, 0), bookie_core::Value::Int(10));
+            view.edits_changed();
+            let edited_items = view.selection_stat_items();
+            assert_eq!(edited_items[1], ("Sum", "12".to_string()));
+            assert_eq!(view.selection_stats_computations(), 4);
+
+            view.selection = Some(crate::Selection { anchor: 1, focus: 1 });
+            assert!(view.selection_stat_items().is_empty(), "one row is not summarised");
         })
-    });
-    view.read_with(cx, |view, _| {
-        assert!(view.selection_stat_items().is_empty(), "one row is not summarised")
     });
     std::fs::remove_file(&path).ok();
 }

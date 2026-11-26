@@ -253,6 +253,7 @@ struct GridView {
     compare: Option<std::sync::Arc<Diff>>,
     status: String,
     selection: Option<Selection>,
+    selection_stats_cache: selection_stats_ui::SelectionStatsCache,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
 }
@@ -626,6 +627,7 @@ impl GridView {
             cell_cursor: None,
             compare: None,
             selection: None,
+            selection_stats_cache: selection_stats_ui::SelectionStatsCache::default(),
             focus_editor: false,
             continuous: false,
             grid_is_query: false,

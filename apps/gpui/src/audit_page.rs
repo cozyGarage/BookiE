@@ -1,11 +1,11 @@
 use bookie_app_services::audit_view::{self, OperationRow};
+use bookie_app_services::service_runtime::block_on;
 use bookie_gpui::theme::{Theme, size};
 use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
 use crate::chrome::one_line;
-use crate::history_view::block_on_history;
 use crate::surfaces::{ListState, list_state};
 use crate::text_input::{InputEvent, TextInput};
 
@@ -76,7 +76,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let rows = cx
                 .background_executor()
-                .spawn(async move { block_on_history(audit_view::recent_operations(RECENT_RECORDS)) })
+                .spawn(async move { block_on(audit_view::recent_operations(RECENT_RECORDS)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if this.audit_page.generation != generation {

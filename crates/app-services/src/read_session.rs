@@ -72,6 +72,12 @@ pub struct TableStructure {
     pub referenced_by: Vec<bookie_core::InboundForeignKeyInfo>,
 }
 
+#[derive(Clone, Copy)]
+pub enum SessionAccess {
+    ReadOnly,
+    Writable,
+}
+
 pub struct ReadSession {
     database: Arc<DatabaseService>,
     id: Uuid,
@@ -249,74 +255,14 @@ impl ReadSession {
         self.supports_snapshot_cursor
     }
 
-    pub async fn open_saved(id: Uuid, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
-        Self::open_saved_controlled(id, registry, CancellationToken::new()).await
-    }
-
-    pub async fn open_saved_controlled(
-        id: Uuid,
-        registry: Arc<DriverRegistry>,
-        cancellation: CancellationToken,
-    ) -> Result<Self, OpenFailure> {
-        check_open_cancellation(&cancellation)?;
-        let saved = crate::read_session::saved_connection(id)
-            .await
-            .map_err(|error| OpenFailure::Other(error.to_string()))?
-            .ok_or_else(|| OpenFailure::Other(format!("connection {id} not found")))?;
-        check_open_cancellation(&cancellation)?;
-        Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
-    }
-
-    pub async fn open_file(path: &std::path::Path, registry: Arc<DriverRegistry>) -> Result<Self, OpenFailure> {
-        Self::open_file_controlled(path, registry, CancellationToken::new()).await
-    }
-
-    pub async fn open_file_controlled(
-        path: &std::path::Path,
-        registry: Arc<DriverRegistry>,
-        cancellation: CancellationToken,
-    ) -> Result<Self, OpenFailure> {
-        check_open_cancellation(&cancellation)?;
-        let file =
-            crate::open_request::classify_file(path).map_err(|error| OpenFailure::Other(format!("{error:?}")))?;
-        let mut saved = crate::open_request::file_connection(&file);
-        saved.read_only = true;
-        Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
-    }
-
     pub async fn open(
-        saved: SavedConnection,
-        registry: Arc<DriverRegistry>,
-        database: Arc<DatabaseService>,
-    ) -> Result<Self, OpenFailure> {
-        Self::open_controlled(saved, registry, database, CancellationToken::new()).await
-    }
-
-    pub async fn open_controlled(
-        saved: SavedConnection,
-        registry: Arc<DriverRegistry>,
-        database: Arc<DatabaseService>,
-        cancellation: CancellationToken,
-    ) -> Result<Self, OpenFailure> {
-        Self::open_with_access(saved, registry, database, cancellation, false).await
-    }
-
-    pub async fn open_writable_controlled(
-        saved: SavedConnection,
-        registry: Arc<DriverRegistry>,
-        database: Arc<DatabaseService>,
-        cancellation: CancellationToken,
-    ) -> Result<Self, OpenFailure> {
-        Self::open_with_access(saved, registry, database, cancellation, true).await
-    }
-
-    async fn open_with_access(
         mut saved: SavedConnection,
         registry: Arc<DriverRegistry>,
         database: Arc<DatabaseService>,
         cancellation: CancellationToken,
-        writable: bool,
+        access: SessionAccess,
     ) -> Result<Self, OpenFailure> {
+        let writable = matches!(access, SessionAccess::Writable);
         check_open_cancellation(&cancellation)?;
         if !writable {
             saved.read_only = true;
@@ -769,11 +715,12 @@ mod table_select_tests {
         #[tokio::test]
         async fn a_read_session_transaction_refuses_writes_and_changes_nothing() {
             let (_directory, _path, writer, saved) = fixture().await;
-            let session = ReadSession::open_controlled(
+            let session = ReadSession::open(
                 saved,
                 registry(),
                 Arc::new(DatabaseService::new_isolated()),
                 CancellationToken::new(),
+                SessionAccess::ReadOnly,
             )
             .await
             .unwrap();
@@ -795,11 +742,12 @@ mod table_select_tests {
         #[tokio::test]
         async fn a_writable_transaction_rolls_back_and_commits_through_the_guard() {
             let (_directory, _path, writer, saved) = fixture().await;
-            let session = ReadSession::open_writable_controlled(
+            let session = ReadSession::open(
                 saved,
                 registry(),
                 Arc::new(DatabaseService::new_isolated()),
                 CancellationToken::new(),
+                SessionAccess::Writable,
             )
             .await
             .unwrap();
