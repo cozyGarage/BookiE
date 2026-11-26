@@ -1,8 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-#[path = "value_path/accounting.rs"]
 mod accounting;
-#[path = "value_path/runner.rs"]
 mod runner;
 
 use std::collections::BTreeMap;

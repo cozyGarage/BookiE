@@ -400,6 +400,22 @@ class CiWorkflowTests(unittest.TestCase):
             for job in gpui_jobs:
                 self.assertIn("CARGO_TARGET_DIR: apps/gpui/target", job, workflow)
 
+    def test_gpui_macos_always_reports_one_aggregate_check(self):
+        workflow = (ROOT / ".github/workflows/gpui-macos.yml").read_text()
+        trigger, jobs = workflow.split("\njobs:\n", 1)
+        build = re.search(r"(?ms)^  build-and-test:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", jobs).group(1)
+        result = re.search(r"(?ms)^  result:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", jobs).group(1)
+
+        self.assertNotIn("paths:", trigger)
+        self.assertIn("if: needs.changes.outputs.gpui == 'true'", build)
+        self.assertLess(build.index("cargo clippy"), build.index("cargo build"))
+        self.assertLess(build.index("cargo build"), build.index("cargo nextest run"))
+        self.assertNotIn("\n  lint:\n", jobs)
+        self.assertIn("name: GPUI macOS\n", result)
+        self.assertIn("if: always()", result)
+        self.assertIn("needs: [changes, build-and-test]", result)
+        self.assertIn('"$BUILD_RESULT" = "skipped" ] && [ "$GPUI_CHANGED" = "false"', result)
+
     def test_release_appimage_uses_the_arch_candidate_vendor_inputs_offline(self):
         release = (ROOT / ".github/workflows/release.yml").read_text()
         builder = (ROOT / "scripts/build-appimage.sh").read_text()
@@ -1584,7 +1600,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertNotIn("bookie-driver-src", ledger)
 
     def test_value_search_postgres_runs_in_every_consumer_gate(self):
-        command = "-p bookie-app-services --test value_search_postgres -- --include-ignored --test-threads=1"
+        command = "-p bookie-app-services --test it value_search_postgres:: -- --include-ignored --test-threads=1"
         for path in ("scripts/ci-local.sh", ".github/workflows/build-linux.yml", ".forgejo/workflows/ci.yml"):
             self.assertIn(command, (ROOT / path).read_text(), path)
         groups = json.loads((ROOT / "scripts/ci-test-bundle-groups.json").read_text())["groups"]
@@ -1602,16 +1618,16 @@ class CiWorkflowTests(unittest.TestCase):
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "snapshot_export_postgres", "--", "--include-ignored", "--test-threads=1",
+                "it", "snapshot_export_postgres::", "--", "--include-ignored", "--test-threads=1",
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "browse_long_text_preview_engines", "mysql_previews_a_huge_longtext_cell", "--",
+                "it", "browse_long_text_preview_engines::mysql_previews_a_huge_longtext_cell", "--",
                 "--include-ignored", "--test-threads=1",
             ],
             [
                 "bash", "scripts/run-rust-tests.sh", "--locked", "-p", "bookie-app-services", "--test",
-                "data_dictionary_postgres", "--", "--include-ignored", "--test-threads=1",
+                "it", "data_dictionary_postgres::", "--", "--include-ignored", "--test-threads=1",
             ],
         ])
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
