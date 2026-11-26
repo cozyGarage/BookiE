@@ -58,6 +58,7 @@ jobs:
         with:
           workspaces: .
           prefix-key: linux-security-${{ matrix.layer }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install supply-chain tools
         if: matrix.layer == 'supply-chain'
         run: |

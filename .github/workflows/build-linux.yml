@@ -178,6 +178,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-clippy
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
@@ -297,6 +298,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-test-bundles
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build versioned executable test bundles
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -400,6 +402,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-gpui-test-bundles
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build versioned GPUI test bundle
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -448,7 +451,15 @@ jobs:
           mkdir -p "$RUNNER_TEMP/bookie-gpui-extract"
           "$NEXTEST" nextest run --archive-file "$RUNNER_TEMP/bookie-gpui-bundle/nextest.tar.zst" \
             --workspace-remap "$workspace_root" \
-            --extract-to "$RUNNER_TEMP/bookie-gpui-extract" --profile default --no-tests=fail
+            --extract-to "$RUNNER_TEMP/bookie-gpui-extract" --profile ci --no-tests=fail
+      - name: Upload GPUI test report
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: gpui-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/bookie-gpui-extract/target/nextest/ci/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
       - name: Finalize runner job
         if: always()
         run: rm -rf -- "$CARGO_TARGET_DIR" "$RUNNER_TEMP/bookie-gpui-extract"
@@ -581,6 +592,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-app-dist
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install package validation tools
         run: |
           apt-get update -qq
@@ -1595,6 +1607,7 @@ jobs:
         with:
           workspaces: .
           shared-key: linux-supply-chain
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install supply-chain tools
         run: |
           cargo install --locked cargo-deny --version 0.20.2

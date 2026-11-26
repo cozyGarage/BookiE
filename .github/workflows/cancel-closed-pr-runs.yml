@@ -11,6 +11,7 @@ permissions:
 
 jobs:
   cancel:
+    if: github.event.pull_request.merged == false
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

@@ -39,6 +39,7 @@ jobs:
         with:
           workspaces: apps/gpui
           prefix-key: gpui-binary
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Install the GPUI build dependencies
         run: |
           sudo apt-get update

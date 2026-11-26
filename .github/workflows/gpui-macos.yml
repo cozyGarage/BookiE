@@ -47,6 +47,10 @@ jobs:
         with:
           workspaces: apps/gpui
           prefix-key: gpui-macos
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+        with:
+          tool: cargo-nextest@0.9.148
       - name: Record macOS build environment
         run: |
           sw_vers
@@ -65,7 +69,15 @@ jobs:
       - name: Build the GPUI application
         run: cargo build --manifest-path apps/gpui/Cargo.toml --locked
       - name: Run GPUI tests
-        run: cargo test --manifest-path apps/gpui/Cargo.toml --locked
+        run: cargo nextest run --manifest-path apps/gpui/Cargo.toml --locked --profile ci
+      - name: Upload GPUI test report
+        if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: gpui-macos-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/gpui/target/nextest/ci/junit.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   lint:
     name: GPUI lint (macOS 15 arm64)
@@ -86,5 +98,6 @@ jobs:
         with:
           workspaces: apps/gpui
           prefix-key: gpui-macos-lint
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Lint the GPUI application
         run: cargo clippy --manifest-path apps/gpui/Cargo.toml --all-targets --locked
