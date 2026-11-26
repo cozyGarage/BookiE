@@ -629,7 +629,7 @@ fn pinned_and_hidden_columns_keep_the_last_cell_inside_the_scroll_viewport(cx: &
     cx.update(|window, _| {
         let pinned = window.find(("col-header", 0usize)).bounds();
         let last_header = window.find(("col-header", 39usize)).bounds();
-        let last_cell = window.find("table-cell-0:40").bounds();
+        let last_cell = window.find("table-cell-0:39").bounds();
         let visible_right = vertical_gutter.origin.x;
         assert!(
             pinned.origin.x >= viewport.origin.x
@@ -683,6 +683,36 @@ fn a_small_result_keeps_fitted_width_and_wide_headers_keep_pin_in_the_menu(cx: &
     cx.simulate_click(menu.center(), Default::default());
     cx.run_until_parked();
     assert!(cx.update(|window, _| window.try_find_by_label("Pin through category").is_some()));
+}
+
+#[gpui::test]
+fn grid_column_menu_applies_and_clears_sort(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    cx.run_until_parked();
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let descending = cx.update(|window, _| window.find_by_label("Sort descending").bounds());
+    cx.simulate_click(descending.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.local_sort
+                .as_ref()
+                .is_some_and(|sort| sort.column == "id" && !sort.ascending)
+        );
+    });
+
+    let menu = cx.update(|window, _| {
+        assert!(window.try_find(("column-sort-direction", 0usize)).is_some());
+        window.find_by_label("Actions for id").bounds()
+    });
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let clear = cx.update(|window, _| window.find_by_label("Clear sort").bounds());
+    cx.simulate_click(clear.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.local_sort.is_none()));
 }
 
 #[gpui::test]
