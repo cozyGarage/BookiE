@@ -324,7 +324,12 @@ async fn next_generated_id_after_importing_1200_explicit_keys(batches_to_run: us
     let audit = Arc::new(CapturingAudit {
         events: Mutex::new(Vec::new()),
     });
-    let guard = guard_for(raw, Environment::Local, Arc::new(AutoApproveSink), audit);
+    let expected_terminal = if cancel {
+        AuditTerminalStatus::Cancelled
+    } else {
+        AuditTerminalStatus::Succeeded
+    };
+    let guard = guard_for(raw, Environment::Local, Arc::new(AutoApproveSink), audit.clone());
     let mut scope = guard
         .begin_bulk_insert(BulkInsertRequest {
             schema: None,
@@ -356,6 +361,10 @@ async fn next_generated_id_after_importing_1200_explicit_keys(batches_to_run: us
         BulkInsertEnd::Completed
     };
     guard.finish_bulk_insert(&mut scope, end).await.unwrap();
+    assert_eq!(
+        audit.events.lock().unwrap().last().unwrap().terminal_status,
+        expected_terminal
+    );
     let checker = PgDriver.connect(opts).await.unwrap();
     let next = checker
         .query("INSERT INTO import_seq (name) VALUES ('generated') RETURNING id::text")

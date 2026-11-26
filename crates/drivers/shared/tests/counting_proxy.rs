@@ -59,7 +59,10 @@ impl CountingProxy {
                                         })
                                         .take(90)
                                         .collect();
-                                    println!("  burst {}: {text}", trips.bursts);
+                                    let _ = std::io::Write::write_fmt(
+                                        &mut std::io::stdout().lock(),
+                                        format_args!("  burst {}: {text}\n", trips.bursts),
+                                    );
                                 }
                             }
                             trips.last_was_client = true;
