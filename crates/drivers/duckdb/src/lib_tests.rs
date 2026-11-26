@@ -304,3 +304,41 @@ fn the_driver_declares_how_an_import_updates_existing_rows() {
 fn the_driver_declares_value_search() {
     assert!(DuckdbDriver.capabilities().supports_value_search);
 }
+
+#[tokio::test]
+async fn a_write_that_times_out_while_queued_never_executes() {
+    use std::time::Duration;
+
+    let native = DuckConnection::open_in_memory().unwrap();
+    native.execute_batch("CREATE TABLE pending (id INTEGER)").unwrap();
+    let session = Arc::new(DuckdbSession {
+        interrupt: native.interrupt_handle(),
+        conn: Mutex::new(native),
+        _selected_file: None,
+    });
+    let conn = DuckdbConnection {
+        session: session.clone(),
+    };
+    let (started, held) = tokio::sync::oneshot::channel();
+    let (release, released) = tokio::sync::oneshot::channel::<()>();
+    let holder = tokio::task::spawn_blocking(move || {
+        let _guard = session.conn.lock().unwrap();
+        started.send(()).unwrap();
+        let _ = released.blocking_recv();
+    });
+    held.await.unwrap();
+    let control = OperationControl::with_timeout(Duration::from_millis(50));
+    let result = tokio::time::timeout(
+        Duration::from_secs(1),
+        conn.execute_controlled("INSERT INTO pending VALUES (1)", &control),
+    )
+    .await;
+    release.send(()).unwrap();
+    holder.await.unwrap();
+
+    assert!(matches!(result, Ok(Err(DriverError::TimedOut))), "{result:?}");
+    assert_eq!(
+        conn.query("SELECT count(*) FROM pending").await.unwrap().rows[0][0],
+        Value::Int(0)
+    );
+}
