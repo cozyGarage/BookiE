@@ -1,12 +1,10 @@
 use bookie_gpui::keymap::Command;
 use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::Sizable as _;
+use gpui_component::menu::DropdownMenu as _;
 
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
-use crate::surfaces::{ButtonKind, button, compact_icon_button, segment, segmented};
+use crate::surfaces::{Bar, ButtonKind, button, compact_icon_button, menu_button, segment, segmented, select_button};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -42,31 +40,17 @@ impl GridView {
         }
     }
 
-    fn query_file_menu(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
+    fn query_file_menu(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = crate::menus::command_groups(self, crate::menus::FILE_GROUPS);
-        let button = Button::new("query-file-menu")
-            .ghost()
-            .small()
-            .tooltip("Open or save SQL files, export results or import a file");
-        let button = if compact {
-            button
-                .compact()
-                .accessibility_label("File actions")
-                .child(crate::assets::icon("folder", theme.muted_foreground))
-        } else {
-            button
-                .accessibility_label("Import / Export")
-                .child(
-                    div()
-                        .whitespace_nowrap()
-                        .text_color(rgb(theme.foreground))
-                        .child("Import / Export"),
-                )
-                .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-        };
-        div()
-            .debug_selector(|| "query-file-menu".into())
-            .child(button.dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)))
+        menu_button(
+            "query-file-menu",
+            "folder",
+            (!compact).then_some("File"),
+            "Open or save SQL files, export results or import a file",
+            Bar::Small,
+            theme,
+        )
+        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
@@ -74,7 +58,8 @@ impl GridView {
             .debug_selector(|| "query-editor-toolbar".into())
             .flex()
             .items_center()
-            .gap_2()
+            .when(compact, |toolbar| toolbar.gap_1())
+            .when(!compact, |toolbar| toolbar.gap_2())
             .min_w_0()
             .h(px(size::FORM_CONTROL))
             .px_2()
@@ -193,68 +178,77 @@ impl GridView {
 
     fn query_run_options(&self, selected: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let owner = cx.entity().downgrade();
-        Button::new("query-run-options")
-            .ghost()
-            .small()
-            .compact()
-            .tooltip("Choose what to run")
-            .accessibility_label("Run options")
-            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu(move |menu, _, _| {
-                let selection_owner = owner.clone();
-                let statement_owner = owner.clone();
-                let all_owner = owner.clone();
-                menu.item(
-                    PopupMenuItem::new("Run selection")
-                        .disabled(!selected)
-                        .on_click(move |_, _, cx| {
-                            let _ = selection_owner.update(cx, |view, cx| view.run_at_cursor(cx));
-                        }),
-                )
-                .item(PopupMenuItem::new("Run statement").on_click(move |_, _, cx| {
-                    let _ = statement_owner.update(cx, |view, cx| view.run_statement_at_cursor(cx));
-                }))
-                .item(PopupMenuItem::new("Run all").on_click(move |_, _, cx| {
+        let at_cursor = self.action_shortcut("run-at-cursor");
+        let all = self.action_shortcut("run");
+        let label = |id| bookie_gpui::palette::menu_label(id).unwrap_or(id);
+        let (statement, run_all) = (label("run-at-cursor"), label("run"));
+        select_button("query-run-options", None, "Run options", Bar::Small, theme).dropdown_menu(move |menu, _, _| {
+            let selection_owner = owner.clone();
+            let statement_owner = owner.clone();
+            let all_owner = owner.clone();
+            menu.item(
+                crate::menus::item("Run selection", None, at_cursor.clone().filter(|_| selected), false)
+                    .disabled(!selected)
+                    .on_click(move |_, _, cx| {
+                        let _ = selection_owner.update(cx, |view, cx| view.run_at_cursor(cx));
+                    }),
+            )
+            .item(
+                crate::menus::item(statement, Some("play"), at_cursor.clone().filter(|_| !selected), false).on_click(
+                    move |_, _, cx| {
+                        let _ = statement_owner.update(cx, |view, cx| view.run_statement_at_cursor(cx));
+                    },
+                ),
+            )
+            .item(
+                crate::menus::item(run_all, None, all.clone(), false).on_click(move |_, _, cx| {
                     let _ = all_owner.update(cx, |view, cx| view.run_query(cx));
-                }))
-            })
+                }),
+            )
+        })
     }
 
     fn query_editor_tools(&self, compact: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let owner = cx.entity().downgrade();
-        let button = Button::new("sql-editor-tools")
-            .ghost()
-            .small()
-            .tooltip("SQL editor tools");
-        let button = if compact {
-            button
-                .compact()
-                .accessibility_label("Editor tools")
-                .child(crate::assets::icon("sliders-horizontal", theme.muted_foreground))
-        } else {
-            button.label("Tools")
-        };
-        button.dropdown_menu(move |mut menu, _, _| {
+        let favorite_keys = self.action_shortcut("save-favorite");
+        let suggest_keys = Some(bookie_gpui::keymap::completion_chord().label());
+        let label = |id| bookie_gpui::palette::menu_label(id).unwrap_or(id);
+        let (explain_label, favorite_label) = (label("explain"), label("save-favorite"));
+        let tools = menu_button(
+            "sql-editor-tools",
+            "sliders-horizontal",
+            (!compact).then_some("Tools"),
+            "SQL editor tools",
+            Bar::Small,
+            theme,
+        );
+        tools.dropdown_menu(move |mut menu, _, _| {
             let explain = owner.clone();
             let format = owner.clone();
             let favorite = owner.clone();
             menu = menu
-                .item(PopupMenuItem::new("Explain").on_click(move |_, _, cx| {
-                    let _ = explain.update(cx, |view, cx| {
-                        view.explain_query(cx);
-                        cx.notify();
-                    });
-                }))
-                .item(PopupMenuItem::new("Format SQL").on_click(move |_, window, cx| {
-                    let _ = format.update(cx, |view, cx| view.format_query(window, cx));
-                }))
-                .item(PopupMenuItem::new("Save as favorite").on_click(move |_, _, cx| {
-                    let _ = favorite.update(cx, |view, cx| view.save_favorite(cx));
-                }))
+                .item(
+                    crate::menus::item(explain_label, None, None, false).on_click(move |_, _, cx| {
+                        let _ = explain.update(cx, |view, cx| {
+                            view.explain_query(cx);
+                            cx.notify();
+                        });
+                    }),
+                )
+                .item(
+                    crate::menus::item("Format SQL", None, None, false).on_click(move |_, window, cx| {
+                        let _ = format.update(cx, |view, cx| view.format_query(window, cx));
+                    }),
+                )
+                .item(
+                    crate::menus::item(favorite_label, None, favorite_keys.clone(), false).on_click(move |_, _, cx| {
+                        let _ = favorite.update(cx, |view, cx| view.save_favorite(cx));
+                    }),
+                )
                 .separator();
             for (label, replace) in [("Find in editor", false), ("Replace in editor", true)] {
                 let owner = owner.clone();
-                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                menu = menu.item(crate::menus::item(label, None, None, false).on_click(move |_, _, cx| {
                     let _ = owner.update(cx, |view, cx| {
                         view.sql_input.update(cx, |editor, cx| editor.open_search(replace, cx));
                     });
@@ -262,7 +256,7 @@ impl GridView {
             }
             let complete = owner.clone();
             menu = menu.item(
-                PopupMenuItem::new("Suggest SQL (Ctrl+Space)").on_click(move |_, window, cx| {
+                crate::menus::item("Suggest SQL", None, suggest_keys.clone(), false).on_click(move |_, window, cx| {
                     let _ = complete.update(cx, |view, cx| {
                         view.sql_input
                             .update(cx, |editor, cx| editor.show_completions(window, cx));
@@ -319,34 +313,39 @@ impl GridView {
             bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
                 .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()))
         });
-        Button::new("query-context-menu")
-            .ghost()
-            .small()
-            .compact()
-            .tooltip("Connection and database context")
-            .accessibility_label("Connection and database context")
-            .child(crate::assets::icon("database", theme.muted_foreground))
-            .dropdown_menu(move |menu, _, _| {
-                let connection_owner = owner.clone();
-                let mut menu = menu.item(PopupMenuItem::new(connection.clone()).on_click(move |_, _, cx| {
+        menu_button(
+            "query-context-menu",
+            "database",
+            None,
+            "Connection and database context",
+            Bar::Small,
+            theme,
+        )
+        .dropdown_menu(move |menu, _, _| {
+            let connection_owner = owner.clone();
+            let mut menu = menu.item(crate::menus::item(connection.clone(), None, None, false).on_click(
+                move |_, _, cx| {
                     let _ = connection_owner.update(cx, |view, cx| {
                         view.show_status();
                         cx.notify();
                     });
-                }));
-                if let Some(schema) = schema.clone() {
-                    let schema_owner = owner.clone();
-                    menu = menu.item(PopupMenuItem::new(format!("Database: {schema}")).on_click(
+                },
+            ));
+            if let Some(schema) = schema.clone() {
+                let schema_owner = owner.clone();
+                menu = menu.item(
+                    crate::menus::item(format!("Database: {schema}…"), None, None, false).on_click(
                         move |_, window, cx| {
                             let _ = schema_owner.update(cx, |view, cx| {
                                 view.open_picker(crate::palette_state::PaletteMode::SchemaContext, window, cx);
                                 cx.notify();
                             });
                         },
-                    ));
-                }
-                menu
-            })
+                    ),
+                );
+            }
+            menu
+        })
     }
 
     fn schema_context_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
@@ -526,42 +525,30 @@ impl GridView {
 
     fn result_view_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         let selected = self.panel.view;
-        let current = match selected {
-            ResultView::Table => "Table data",
-            ResultView::Summary => "Summary",
-            ResultView::Messages => "Messages",
-            ResultView::Plan => "Plan",
-            ResultView::Chart => "Chart",
-        };
-        let mut views = vec![
-            ("Table data", ResultView::Table),
-            ("Summary", ResultView::Summary),
-            ("Messages", ResultView::Messages),
+        let mut views: Vec<(gpui::SharedString, ResultView)> = vec![
+            ("Table data".into(), ResultView::Table),
+            ("Summary".into(), ResultView::Summary),
+            ("Messages".into(), ResultView::Messages),
         ];
         if !self.panel.plan.is_empty() {
-            views.push(("Plan", ResultView::Plan));
+            views.push(("Plan".into(), ResultView::Plan));
         }
         if !self.run_tabs.slots.is_empty() {
-            views.push(("Chart", ResultView::Chart));
+            views.push(("Chart".into(), ResultView::Chart));
         }
+        let current = views
+            .iter()
+            .find(|(_, view)| *view == selected)
+            .map_or_else(|| "Table data".to_string(), |(label, _)| label.to_string());
         let owner = cx.entity().downgrade();
-        Button::new("result-view-menu")
-            .ghost()
-            .small()
-            .label(current)
-            .tooltip("Choose result view")
-            .accessibility_label("Result view")
-            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu(move |mut menu, _, _| {
-                for (label, view) in views.iter().copied() {
-                    let owner = owner.clone();
-                    let item = PopupMenuItem::new(label).checked(view == selected);
-                    menu = menu.item(item.on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| this.select_result_view(view, cx));
-                    }));
-                }
-                menu
-            })
+        select_button("result-view-menu", Some(&current), "Result view", Bar::Compact, theme).dropdown_menu(
+            move |menu, _, _| {
+                let owner = owner.clone();
+                crate::menus::select(menu, &views, Some(&selected), move |view, _, cx| {
+                    let _ = owner.update(cx, |this, cx| this.select_result_view(view, cx));
+                })
+            },
+        )
     }
 
     pub(crate) fn result_header(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {

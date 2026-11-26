@@ -1,5 +1,7 @@
 use bookie_gpui::theme::{Theme, size};
 use gpui::{Div, ElementId, Role, SharedString, Stateful, div, prelude::*, px, rgb};
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::Sizable as _;
 
 use crate::assets::icon;
 
@@ -150,32 +152,69 @@ pub(crate) fn environment_color(environment: bookie_core::Environment, theme: Th
     }
 }
 
-pub(crate) fn icon_label_button(
-    id: &'static str,
+pub(crate) fn menu_button(
+    id: impl Into<ElementId>,
     name: &'static str,
-    text: &'static str,
-    tooltip: &'static str,
+    label: Option<&str>,
+    tooltip: impl Into<SharedString>,
+    bar: Bar,
     theme: Theme,
-) -> Stateful<Div> {
-    div()
-        .id(id)
-        .debug_selector(move || id.into())
-        .role(Role::Button)
-        .aria_label(tooltip)
-        .tooltip(tooltip_view(tooltip.into()))
-        .flex()
-        .flex_none()
-        .whitespace_nowrap()
-        .items_center()
-        .gap_1()
-        .px_2()
-        .h(px(Bar::Small.height()))
-        .rounded(px(theme.radius))
-        .cursor_pointer()
-        .text_color(rgb(theme.foreground))
-        .hover(move |style| style.bg(rgb(theme.accent)))
-        .child(icon(name, theme.muted_foreground))
-        .child(text)
+) -> Button {
+    menu_trigger(id, icon(name, theme.muted_foreground), label, tooltip, bar, theme)
+}
+
+pub(crate) fn select_button(
+    id: impl Into<ElementId>,
+    label: Option<&str>,
+    tooltip: impl Into<SharedString>,
+    bar: Bar,
+    theme: Theme,
+) -> Button {
+    trigger(id, None, label, tooltip, bar, theme)
+}
+
+pub(crate) fn menu_trigger(
+    id: impl Into<ElementId>,
+    leading: impl IntoElement,
+    label: Option<&str>,
+    tooltip: impl Into<SharedString>,
+    bar: Bar,
+    theme: Theme,
+) -> Button {
+    trigger(id, Some(leading.into_any_element()), label, tooltip, bar, theme)
+}
+
+fn trigger(
+    id: impl Into<ElementId>,
+    leading: Option<gpui::AnyElement>,
+    label: Option<&str>,
+    tooltip: impl Into<SharedString>,
+    bar: Bar,
+    theme: Theme,
+) -> Button {
+    let id = id.into();
+    let tooltip = tooltip.into();
+    let selector = id.to_string();
+    let marker = icon_selector(&selector, &tooltip);
+    Button::new(id)
+        .debug_selector(move || selector)
+        .ghost()
+        .small()
+        .compact()
+        .h(px(bar.height()))
+        .min_w(px(bar.height()))
+        .tooltip(tooltip.clone())
+        .accessibility_label(tooltip)
+        .children(leading.map(|leading| div().flex_none().debug_selector(move || marker).child(leading)))
+        .children(label.map(|label| {
+            div()
+                .flex_auto()
+                .min_w_0()
+                .truncate()
+                .text_color(rgb(theme.foreground))
+                .child(label.to_string())
+        }))
+        .child(icon("chevron-down", theme.muted_foreground))
 }
 
 pub(crate) fn button(

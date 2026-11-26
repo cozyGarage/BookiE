@@ -324,9 +324,7 @@ impl GridView {
         if !self.export.file.open {
             return None;
         }
-        use gpui_component::button::{Button, ButtonVariants};
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-        use gpui_kit::component::Sizable as _;
+        use gpui_component::menu::DropdownMenu as _;
 
         let format_owner = cx.entity().downgrade();
         let scope_options = self.export_scope_options();
@@ -354,27 +352,27 @@ impl GridView {
                 }
             }))
         });
-        let format_menu = Button::new("export-format")
-            .ghost()
-            .small()
-            .compact()
-            .accessibility_label("Export file format")
-            .child(format_label)
-            .child(crate::assets::icon("chevron-down", theme.muted_foreground))
-            .dropdown_menu(move |mut menu, _, _| {
-                for format in formats.iter().copied() {
-                    let owner = format_owner.clone();
-                    menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| {
-                            if this.export.file.cancel.is_none() {
-                                this.export.file.format = format;
-                                cx.notify();
-                            }
-                        });
-                    }));
-                }
-                menu
-            });
+        let current = self.export.file.format;
+        let options: Vec<(gpui::SharedString, bookie_core::export::ResultFormat)> =
+            formats.iter().map(|format| (format.label().into(), *format)).collect();
+        let format_menu = crate::surfaces::select_button(
+            "export-format",
+            Some(format_label),
+            "Export file format",
+            crate::surfaces::Bar::Compact,
+            theme,
+        )
+        .dropdown_menu(move |menu, _, _| {
+            let owner = format_owner.clone();
+            crate::menus::select(menu, &options, Some(&current), move |format, _, cx| {
+                let _ = owner.update(cx, |this, cx| {
+                    if this.export.file.cancel.is_none() {
+                        this.export.file.format = format;
+                        cx.notify();
+                    }
+                });
+            })
+        });
         Some(
             div()
                 .debug_selector(|| "export-form".into())

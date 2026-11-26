@@ -154,6 +154,7 @@ struct GridView {
     schema_context: Option<String>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
+    editor_hint: String,
     dark_mode: bool,
     tabs: Tabs,
     window_title_tab: Option<Tab>,
@@ -208,6 +209,13 @@ pub(crate) struct Pace {
     step: u32,
     steps: u32,
     begun: Instant,
+}
+
+pub(crate) fn editor_placeholder(keymap: &Keymap) -> String {
+    keymap.binding(bookie_gpui::keymap::Command::RunAtCursor).map_or_else(
+        || "SELECT …".to_string(),
+        |chord| format!("SELECT … ({} runs the selection or statement)", chord.label()),
+    )
 }
 
 fn thousands(value: u64) -> String {
@@ -321,7 +329,7 @@ impl GridView {
                 .folding(true)
                 .searchable(true)
                 .replaceable(true)
-                .placeholder("SELECT … (Ctrl+Enter runs the selection or statement)");
+                .placeholder(editor_placeholder(&Keymap::default()));
             Self::install_sql_completion(&mut editor, owner);
             editor
         });
@@ -604,6 +612,7 @@ impl GridView {
             live: None,
             schema_context: None,
             keymap: Keymap::default(),
+            editor_hint: editor_placeholder(&Keymap::default()),
             tabs: Tabs::default(),
             window_title_tab: None,
             tab_scroll: ScrollHandle::new(),

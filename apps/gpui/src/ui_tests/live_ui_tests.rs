@@ -1570,7 +1570,7 @@ fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_
     assert_eq!(value(&view, cx), "7", "Auto reads 007 as a number");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.cycle_param_kind(0, cx);
+            view.set_param_kind(0, ParameterKind::Text);
             assert_eq!(view.params.rows[0].kind, ParameterKind::Text);
             view.run_query(cx);
         })
@@ -2578,21 +2578,24 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-fn the_labelled_add_row_button_is_absent_without_a_writable_table(cx: &mut TestAppContext) {
+fn the_add_row_button_is_absent_without_a_writable_table(cx: &mut TestAppContext) {
     let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
-    assert!(cx.debug_bounds("add-row").is_none(), "no live table, nothing to add to");
+    assert!(
+        cx.debug_bounds("insert-row").is_none(),
+        "no live table, nothing to add to"
+    );
     connect_and_settle(&view, cx, orders_copy.to_path_buf());
     assert!(
-        cx.debug_bounds("add-row").is_none(),
+        cx.debug_bounds("insert-row").is_none(),
         "a file opened read-only offers no Add row"
     );
 }
 
 #[gpui::test]
-fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
+fn the_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
     let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
@@ -2697,8 +2700,68 @@ fn compact_grid_menu_preserves_grid_commands(cx: &mut TestAppContext) {
     view.read_with(cx, |view, _| {
         let groups =
             crate::menus::command_groups(view, &[&["first", "last"], &["compare", "export-file", "continuous"]]);
-        let ids: Vec<_> = groups.iter().flatten().map(|(id, _, _)| *id).collect();
+        let ids: Vec<_> = groups.iter().flatten().map(|entry| entry.id).collect();
         assert_eq!(ids, ["first", "last", "compare", "export-file", "continuous"]);
+    });
+}
+
+#[gpui::test]
+fn a_narrow_grid_keeps_add_row_compare_and_hidden_columns_in_the_more_menu(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(crate::ui_tests::test_kit::MEDIUM), gpui::px(800.0)));
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("grid-more").is_some(),
+        "the narrow strip has a More menu"
+    );
+    assert!(cx.debug_bounds("compare").is_none(), "Compare moved into More");
+    let ids: Vec<&str> = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::GRID_MORE_GROUPS)
+            .iter()
+            .flatten()
+            .map(|entry| entry.id)
+            .collect()
+    });
+    for id in [
+        "insert-row",
+        "compare",
+        "show-hidden-columns",
+        "refresh-table",
+        "export-file",
+    ] {
+        assert!(ids.contains(&id), "{id} is missing from More: {ids:?}");
+    }
+}
+
+#[gpui::test]
+fn shortcut_hints_in_text_follow_the_keymap(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.keymap.rebind_taking(
+                bookie_gpui::keymap::Command::SaveChanges,
+                bookie_gpui::keymap::Chord::parse("ctrl-alt-s").unwrap(),
+            );
+            view.keymap.rebind_taking(
+                bookie_gpui::keymap::Command::RunAtCursor,
+                bookie_gpui::keymap::Chord::parse("ctrl-alt-r").unwrap(),
+            );
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save_hint("save"), "press Ctrl+Alt+S to save");
+        assert!(view.editor_hint.contains("Ctrl+Alt+R"), "{}", view.editor_hint);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.keymap.unbind(bookie_gpui::keymap::Command::SaveChanges)
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.save_hint("save"), "use Save changes to save")
     });
 }
 
@@ -2853,7 +2916,7 @@ fn the_grid_strip_has_one_export_menu_for_files_and_the_clipboard(cx: &mut TestA
     let items = view.read_with(cx, |view, _| {
         crate::menus::command_groups(view, crate::menus::EXPORT_GROUPS)
     });
-    let ids: Vec<&str> = items.iter().flatten().map(|(id, _, _)| *id).collect();
+    let ids: Vec<&str> = items.iter().flatten().map(|entry| entry.id).collect();
     assert_eq!(ids, ["export-file", "export-csv"]);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("export-file", window, cx)));
     cx.run_until_parked();
@@ -2985,7 +3048,7 @@ fn the_top_bar_menu_is_for_connections_and_the_editor_has_the_file_menu(cx: &mut
         crate::menus::command_groups(view, crate::menus::IMPORT_EXPORT_GROUPS)
             .into_iter()
             .flatten()
-            .map(|(id, _, _)| id)
+            .map(|entry| entry.id)
             .collect()
     });
     assert_eq!(top, ["import-connections", "export-connections"]);
@@ -2993,7 +3056,7 @@ fn the_top_bar_menu_is_for_connections_and_the_editor_has_the_file_menu(cx: &mut
         crate::menus::command_groups(view, crate::menus::FILE_GROUPS)
             .into_iter()
             .flatten()
-            .map(|(id, _, _)| id)
+            .map(|entry| entry.id)
             .collect()
     });
     assert_eq!(
