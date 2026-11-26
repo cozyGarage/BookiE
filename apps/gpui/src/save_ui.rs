@@ -22,8 +22,8 @@ struct ForeignKeyReview {
 
 impl ForeignKeyReview {
     fn verify(&self, live: &LiveSession) -> Result<(), String> {
-        if live.table_columns(&self.source)? != self.source_columns
-            || live.table_columns(&self.target)? != self.target_columns
+        if live.diagram_columns(&self.source)? != self.source_columns
+            || live.diagram_columns(&self.target)? != self.target_columns
         {
             return Err("The relationship tables changed since review. Refresh the diagram and review again".into());
         }
@@ -66,7 +66,6 @@ pub(crate) enum SaveRequest {
     Insert(Vec<(String, String)>),
     Import(std::path::PathBuf, bookie_app_services::csv_import_plan::ImportChoices),
     Structure(bookie_app_services::structure_change_plan::StructureChangeKind, String),
-    DiagramForeignKey(bookie_core::ForeignKeyInfo),
 }
 
 pub(crate) struct ReviewLabels {
@@ -233,9 +232,6 @@ impl GridView {
                         SaveRequest::Import(file, choices) => {
                             plan_file_import(target, &live.driver_id, &file, &choices)
                         }
-                        SaveRequest::DiagramForeignKey(key) => {
-                            return prepare_diagram_foreign_key(&live, &table, columns, key);
-                        }
                         SaveRequest::Structure(kind, text) => {
                             let structure = if kind.needs_structure() {
                                 live.table_structure(&table)?
@@ -266,31 +262,103 @@ impl GridView {
         labels: ReviewLabels,
         cx: &mut Context<Self>,
     ) {
+        self.prepare_diagram(
+            live,
+            table,
+            labels,
+            move |live, target| {
+                let columns = if create {
+                    None
+                } else {
+                    Some(live.diagram_columns(target)?)
+                };
+                Ok(((plan, None), columns))
+            },
+            cx,
+        );
+    }
+
+    pub(crate) fn review_diagram_foreign_key(
+        &mut self,
+        table: bookie_core::TableInfo,
+        key: bookie_core::ForeignKeyInfo,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(live) = self.live.clone().filter(|live| live.writable.is_some()) else {
+            self.status = "Adding a relationship needs a writable saved connection".into();
+            cx.notify();
+            return;
+        };
+        if !matches!(self.tabs.current(), Tab::Diagram)
+            || self.transaction_open()
+            || self.save.busy
+            || self.save.pending.is_some()
+            || self.form_open()
+        {
+            self.status = "Finish the open transaction or form before reviewing a relationship".into();
+            cx.notify();
+            return;
+        }
+        let name = table_label(&table);
+        let labels = ReviewLabels {
+            title: format!("Add foreign key {} on {name}?", key.name),
+            done: format!("Added foreign key {} on {name}", key.name),
+            review: "Review the relationship change, then apply or cancel".into(),
+            confirm: "Add foreign key",
+            note: Some("The database checks existing rows and may block writes while validating the new constraint."),
+            reconnect: None,
+        };
+        self.prepare_diagram(
+            live,
+            table,
+            labels,
+            move |live, target| {
+                let source_columns = live.diagram_columns(target)?;
+                prepare_diagram_foreign_key(live, target, source_columns, key).map(|plan| (plan, None))
+            },
+            cx,
+        );
+    }
+
+    fn prepare_diagram(
+        &mut self,
+        live: Arc<LiveSession>,
+        table: bookie_core::TableInfo,
+        labels: ReviewLabels,
+        plan: impl FnOnce(
+            &LiveSession,
+            &bookie_core::TableInfo,
+        ) -> Result<(PreparedSave, Option<Vec<bookie_core::ColumnInfo>>), String>
+        + Send
+        + 'static,
+        cx: &mut Context<Self>,
+    ) {
         let generation = self.save.generation;
         let revision = self.search.diagram.request.generation;
         self.save.busy = true;
         self.status = "Preparing the schema changes…".into();
         cx.spawn(async move |this, cx| {
             let target = table.clone();
+            let session = live.clone();
             let result = cx
                 .background_executor()
-                .spawn(async move {
-                    if create {
-                        Ok(None)
-                    } else {
-                        live.table_columns(&target).map(Some)
-                    }
-                })
+                .spawn(async move { plan(&session, &target) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if this.search.diagram.request.generation != revision || !matches!(this.tabs.current(), Tab::Diagram) {
+                if this.search.diagram.request.generation != revision
+                    || !matches!(this.tabs.current(), Tab::Diagram)
+                    || this.live.as_ref().is_none_or(|current| !Arc::ptr_eq(current, &live))
+                {
                     this.save.busy = false;
                     this.status = "The diagram changed while preparing the review".into();
                 } else {
-                    let reviewed_columns = result.as_ref().ok().cloned().flatten();
-                    this.receive_plan(result.map(|_| (plan, None)), labels, (generation, table), Vec::new());
+                    let (plan, columns) = match result {
+                        Ok((plan, columns)) => (Ok(plan), columns),
+                        Err(error) => (Err(error), None),
+                    };
+                    this.receive_plan(plan, labels, (generation, table), Vec::new());
                     if let Some(pending) = &mut this.save.pending {
-                        pending.diagram = Some((revision, reviewed_columns));
+                        pending.diagram = Some((revision, columns));
                     }
                 }
                 cx.notify();
@@ -425,7 +493,7 @@ impl GridView {
         let opened_with = live.stamp.clone();
         let done = pending.done;
         self.save.refresh_diagram = pending.diagram.as_ref().map(|(_, columns)| {
-            if columns.is_none() {
+            if columns.is_none() && pending.relationship.is_none() {
                 pending.table.schema.clone()
             } else {
                 self.search.diagram.scope.clone()
@@ -434,7 +502,6 @@ impl GridView {
         let diagram_columns = pending.diagram.and_then(|(_, columns)| columns);
         let table = pending.table;
         let relationship = pending.relationship;
-        let is_relationship = relationship.is_some();
         let (statements, expect_one) = (pending.plan.statements, pending.plan.expect_one);
         cx.spawn(async move |this, cx| {
             let result = cx
@@ -452,7 +519,7 @@ impl GridView {
                         .map_or(Ok(()), |review| review.verify(&live))
                         .and_then(|()| {
                             if let Some(columns) = diagram_columns
-                                && live.table_columns(&table)? != columns
+                                && live.diagram_columns(&table)? != columns
                             {
                                 return Err(
                                     "The table changed since review. Refresh the diagram and review again".into()
@@ -471,10 +538,6 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                if is_relationship && result.as_ref().is_ok_and(|(_, applied)| applied.is_ok()) {
-                    this.search.diagram.relationship = None;
-                    this.search.diagram.failure = Some("Schema changed. Refresh to see the new relationship".into());
-                }
                 this.finish_save(connection_id, done, result, cx);
                 cx.notify();
             })
@@ -672,7 +735,7 @@ fn prepare_diagram_foreign_key(
         schema: key.ref_schema.clone(),
         name: key.ref_table.clone(),
     };
-    let target_columns = live.table_columns(&target)?;
+    let target_columns = live.diagram_columns(&target)?;
     let target_spec = SaveTarget {
         driver_id: &live.driver_id,
         schema: source.schema.as_deref(),

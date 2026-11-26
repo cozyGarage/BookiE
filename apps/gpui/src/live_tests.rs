@@ -218,6 +218,33 @@ fn unsupported_server_sort_is_refused_instead_of_sorting_a_partial_page() {
 }
 
 #[test]
+fn diagram_metadata_does_not_supersede_a_query() {
+    let session = LiveSession::open(&fixture()).unwrap();
+    let query_epoch = session.next_epoch();
+    let target = TableInfo {
+        schema: None,
+        name: "orders".into(),
+    };
+
+    let columns = session.diagram_columns(&target).unwrap();
+    assert!(columns.iter().any(|column| column.name == "id"));
+
+    let (result, _) = session
+        .runtime
+        .block_on(query_pages(
+            &session.sessions,
+            session.session_id,
+            ("SELECT id FROM orders", &[]),
+            100,
+            &CancellationToken::new(),
+            query_epoch,
+            &session.epoch,
+        ))
+        .unwrap();
+    assert!(!result.rows.is_empty());
+}
+
+#[test]
 fn a_cancelled_live_load_is_not_returned_as_a_complete_table() {
     let session = LiveSession::open(&fixture()).unwrap();
     let cancellation = CancellationToken::new();
@@ -571,5 +598,11 @@ fn reading_a_tables_columns_does_not_supersede_the_running_request() {
     assert!(
         live.completion_columns(&table).is_ok(),
         "a read at the running epoch still applies"
+    );
+    live.table_structure(&table).expect("the structure is read");
+    assert_eq!(
+        live.epoch.load(Ordering::Relaxed),
+        running,
+        "a structure read must not move the epoch either"
     );
 }

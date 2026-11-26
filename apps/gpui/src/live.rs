@@ -419,6 +419,10 @@ impl LiveSession {
         self.read_columns(table, true, Duration::from_secs(1))
     }
 
+    pub fn diagram_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+        self.table_columns(table)
+    }
+
     fn read_columns(
         &self,
         table: &TableInfo,
@@ -453,9 +457,9 @@ impl LiveSession {
             .get(&self.driver_id)
             .map(|driver| driver.capabilities())
             .unwrap_or_default();
-        let epoch = self.next_epoch();
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(10));
-        let event = self.runtime.block_on(dispatch_read(
+        let event = self.runtime.block_on(dispatch_once(
             DispatchContext::Sessions(&self.sessions),
             Command::ReadStructure {
                 epoch,
@@ -464,8 +468,6 @@ impl LiveSession {
                 capabilities,
             },
             &control,
-            epoch,
-            &self.epoch,
         ))?;
         let Event::StructureRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());
