@@ -140,9 +140,11 @@ async fn the_round_trips_each_statement_costs_are_counted() {
     if std::env::var_os("ROUND_TRIP_TRACE").is_some() {
         proxy.reset();
         proxy.trace(true);
-        println!("one SELECT 1:");
-        connection.query("SELECT 1").await.unwrap();
-        println!("one table SELECT:");
+        for round in 1..=3 {
+            println!("SELECT 1, run {round}:");
+            connection.query("SELECT 1").await.unwrap();
+        }
+        println!("table SELECT:");
         connection.query("SELECT id, name FROM trips").await.unwrap();
         proxy.trace(false);
     }
