@@ -373,7 +373,7 @@ impl GridView {
 
     fn retain_result(&mut self, slot: RunSlot) -> bool {
         let Some(evictions) = result_evictions(&self.run_tabs, slot.estimated_bytes) else {
-            let message = "Result could not be kept. Close unused result tabs and try again.".to_string();
+            let message = "Result could not be kept. Close unused result tabs before running more queries.".to_string();
             self.notices.push(message.clone(), notifications::NoticeKind::Error);
             self.status = message;
             return false;
