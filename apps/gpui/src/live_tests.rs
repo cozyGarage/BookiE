@@ -94,11 +94,10 @@ fn a_stale_open_event_closes_its_session() {
     };
     let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
     std::fs::copy(source, &file.0).unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
     let database = Arc::new(bookie_app_services::database_service::DatabaseService::new_isolated());
     let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database.clone());
     let control = OperationControl::with_timeout(Duration::from_secs(5));
-    let opened = runtime.block_on(sessions.open_file(&file.0, &control)).unwrap();
+    let opened = bookie_app_services::service_runtime::block_on(sessions.open_file(&file.0, &control)).unwrap();
 
     let result = keep_current_event(
         DispatchContext::Sessions(&sessions),
@@ -143,8 +142,7 @@ fn oversized_fixture() -> FixtureFile {
     let path = std::env::temp_dir().join(format!("bookie-gpui-budget-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::File::create(&path).unwrap();
     let file = FixtureFile(path);
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
+    bookie_app_services::service_runtime::block_on(async {
         let registry = drivers_registry::default_registry();
         let driver = registry.get("sqlite").unwrap();
         let connection = driver
@@ -159,8 +157,9 @@ fn oversized_fixture() -> FixtureFile {
             .execute("INSERT INTO wide VALUES (zeroblob(67108865))")
             .await
             .unwrap();
-        connection.close().await.unwrap();
-    });
+        connection.close().await.map_err(|error| error.to_string())
+    })
+    .unwrap();
     file
 }
 

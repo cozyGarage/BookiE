@@ -2,8 +2,9 @@ use gpui::{Modifiers, MouseButton, TestAppContext};
 
 use crate::GridView;
 use crate::live_ui_tests::open_live;
-use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
+use crate::save_ui_tests::saving_view;
 use crate::table_menu::TableMenuItem;
+use crate::ui_tests::test_kit::{orders, until};
 use bookie_core::TableInfo;
 use bookie_gpui::shell::{SidebarFilter, Tab, TreeRow, tree_rows_grouped};
 
@@ -41,7 +42,7 @@ fn right_click_table(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCon
 
 #[gpui::test]
 fn right_clicking_a_sidebar_table_offers_its_actions_with_destructive_ones_last(cx: &mut TestAppContext) {
-    let path = fixture_copy("table-menu");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     right_click_table(&view, cx, &customers());
     view.read_with(cx, |view, _| {
@@ -60,36 +61,30 @@ fn right_clicking_a_sidebar_table_offers_its_actions_with_destructive_ones_last(
             ]
         );
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn open_data_from_the_table_menu_opens_that_table(cx: &mut TestAppContext) {
-    let path = fixture_copy("table-menu-open");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.run_table_menu_item(TableMenuItem::OpenData, &customers(), window, cx)
         })
     });
-    for _ in 0..100 {
-        settle_saving(cx);
-        if view.read_with(cx, |view, _| view.catalog.grid_table == customers()) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    until(&view, cx, "the customers table opens", |view| {
+        view.catalog.grid_table == customers()
+    });
     view.read_with(cx, |view, _| {
         assert_eq!(view.catalog.grid_table, customers(), "{}", view.status);
         assert_eq!(view.tabs.current(), &Tab::Table(customers()));
         assert!(view.row_menu.is_none());
     });
-    std::fs::remove_file(&path).ok();
 }
 
 #[gpui::test]
 fn a_read_only_connection_hides_empty_and_drop(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     right_click_table(&view, cx, &customers());
     view.read_with(cx, |view, _| {
         assert!(view.row_menu.is_some(), "the table menu is open");
@@ -102,7 +97,7 @@ fn a_read_only_connection_hides_empty_and_drop(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn new_query_from_the_table_menu_prefills_a_quoted_select(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.run_table_menu_item(TableMenuItem::SelectQuery, &customers(), window, cx)
