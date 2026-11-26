@@ -46,10 +46,14 @@ impl GridView {
     }
 }
 
-fn typed_explain(sql: &str) -> bool {
+pub(crate) fn typed_explain(sql: &str) -> bool {
     sql.trim_start()
         .get(..7)
         .is_some_and(|word| word.eq_ignore_ascii_case("explain"))
+        && sql.trim_start()[7..]
+            .chars()
+            .next()
+            .is_none_or(|next| !next.is_alphanumeric() && next != '_' && next != '$')
 }
 
 fn plan_nodes(table: &impl ResultSource) -> Vec<PlanNode> {

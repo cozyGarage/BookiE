@@ -5,13 +5,13 @@ fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppCont
     let (view, cx) = crate::ui_tests::open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.panel.explaining = true;
             view.begin_background(
                 crate::Work::Load,
                 cx,
                 |_| (),
                 |view, ()| view.status = "stale plan".into(),
             );
+            view.panel.explaining = true;
             let cancel = view.loads.cancel.clone();
             view.toggle_results();
             assert!(cancel.is_cancelled());
@@ -54,5 +54,44 @@ fn format_rewrites_the_editor_with_the_shared_formatter_and_leaves_empty_text_al
             view.format_query(window, cx);
             assert!(view.status.is_empty(), "blank text is not formatted");
         })
+    });
+}
+
+#[gpui::test]
+fn a_blocked_explain_cannot_cancel_the_query_already_running(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT id FROM orders", window, cx));
+            view.run_query(cx);
+            let query = view.loads.cancel.clone();
+            view.save.busy = true;
+            view.explain_query(cx);
+            assert!(view.status.contains("save is running"));
+            view.toggle_results();
+            assert!(!query.is_cancelled());
+            assert!(!view.panel.explaining);
+        });
+    });
+}
+
+#[gpui::test]
+fn replacement_load_does_not_inherit_explain_cancellation(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT id FROM orders", window, cx));
+            view.explain_query(cx);
+            assert!(view.panel.explaining);
+            let explain = view.loads.cancel.clone();
+            view.run_query(cx);
+            let query = view.loads.cancel.clone();
+            view.toggle_results();
+            assert!(explain.is_cancelled());
+            assert!(!query.is_cancelled());
+            assert!(!view.panel.explaining);
+        });
     });
 }
