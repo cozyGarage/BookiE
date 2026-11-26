@@ -39,7 +39,7 @@ impl SqlMarkRevision {
     }
 
     #[cfg(test)]
-    fn plan_builds(&self) -> usize {
+    pub(crate) fn plan_builds(&self) -> usize {
         self.plan_builds.get()
     }
 

@@ -1820,6 +1820,77 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
 }
 
 #[gpui::test]
+fn typing_into_a_large_sql_editor_rebuilds_marks_once_after_debounce(cx: &mut TestAppContext) {
+    use bookie_gpui::live::{LiveTable, Origin};
+    let origin = Origin::File(orders_fixture());
+    let table = std::sync::Arc::new(
+        LiveTable::load(
+            &origin,
+            &TableInfo {
+                schema: None,
+                name: "orders".into(),
+            },
+            100,
+        )
+        .expect("load"),
+    );
+    cx.update(text_input::bind_keys);
+    let (view, cx) = cx.add_window_view(|window, cx| {
+        let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
+        view.attach_live(table.clone());
+        view
+    });
+    cx.update(|window, cx| {
+        let focus = view.read(cx).focus.clone();
+        window.focus(&focus, cx);
+    });
+    cx.simulate_keystrokes("ctrl-t");
+    cx.update(|window, cx| {
+        let editor = view.read(cx).sql_input.clone();
+        editor.update(cx, |editor, cx| editor.focus(window, cx));
+    });
+
+    let sql = format!("SELECT 1;\n-- {}\n", "x".repeat(200 * 1024));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.set_sql_text(sql, window, cx)));
+    cx.run_until_parked();
+    let debounce = std::time::Duration::from_millis(80);
+    cx.executor().advance_clock(debounce);
+    cx.run_until_parked();
+    let initial_builds = view.read_with(cx, |view, _| view.sql_mark_revision.plan_builds());
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input.update(cx, |editor, cx| {
+                editor.set_cursor_position(lsp_types::Position::new(2, 0), window, cx);
+                editor.focus(window, cx);
+            });
+        });
+    });
+
+    for (index, text) in ["a", "b", "c"].into_iter().enumerate() {
+        cx.simulate_input(text);
+        cx.run_until_parked();
+        if index < 2 {
+            cx.executor().advance_clock(std::time::Duration::from_millis(25));
+            cx.run_until_parked();
+        }
+    }
+    view.read_with(cx, |view, cx| {
+        assert!(view.sql_input.read(cx).value().contains("abc"));
+    });
+    cx.executor().advance_clock(debounce);
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.sql_mark_revision.plan_builds(), initial_builds);
+    });
+    cx.executor().advance_clock(debounce);
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert_eq!(view.sql_mark_revision.plan_builds(), initial_builds + 1);
+        assert!(view.sql_input.read(cx).value().contains("abc"));
+    });
+}
+
+#[gpui::test]
 fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
     let origin = Origin::File(orders_fixture());
