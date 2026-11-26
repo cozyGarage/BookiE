@@ -71,17 +71,26 @@ async fn the_round_trips_each_statement_costs_are_counted() {
     for _ in 0..RUNS {
         connection.query("SELECT 1").await.unwrap();
     }
-    per_statement("SELECT 1 (query)", proxy.bursts());
+    let plain = per_statement("SELECT 1 (query)", proxy.bursts());
 
     proxy.reset();
     for _ in 0..RUNS {
         connection.query_controlled("SELECT 1", &control()).await.unwrap();
     }
-    per_statement("SELECT 1 (query_controlled)", proxy.bursts());
+    let controlled = per_statement("SELECT 1 (query_controlled)", proxy.bursts());
 
     proxy.reset();
     for _ in 0..RUNS {
         connection.query("SELECT id, name FROM trips").await.unwrap();
     }
-    per_statement("table SELECT (query)", proxy.bursts());
+    let table = per_statement("table SELECT (query)", proxy.bursts());
+    assert!(
+        plain < 5.5,
+        "a plain statement was 7.1 to 7.25 round trips before the setup was merged: {plain}"
+    );
+    assert!(
+        controlled < 6.5,
+        "a controlled statement was 9.2 to 9.3 round trips before: {controlled}"
+    );
+    assert!(table < 5.5, "a table statement was 7.2 round trips before: {table}");
 }
