@@ -1,3 +1,4 @@
+use bookie_app_services::service_runtime::block_on;
 use std::sync::{Arc, Mutex};
 
 use bookie_core::{FilterValueKind, QueryResult, QueryRows, Value, filter_value_kind};
@@ -94,9 +95,6 @@ fn spool_rows_from(
     rows: impl Iterator<Item = Vec<Value>>,
     cancel: &CancellationToken,
 ) -> Result<ScanSource, &'static str> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .map_err(|_| "the result could not be prepared for scanning")?;
     let spool = spool_manager()
         .create()
         .map_err(|_| "the result could not be prepared for scanning")?;
@@ -110,9 +108,13 @@ fn spool_rows_from(
             rows: QueryRows::from_rows(std::mem::take(page)),
             truncated: false,
         };
-        runtime
-            .block_on(spool.append_page(*page_index, Arc::new(rows)))
-            .map_err(|_| "the result could not be prepared for scanning")?;
+        block_on(async {
+            spool
+                .append_page(*page_index, Arc::new(rows))
+                .await
+                .map_err(|error| error.to_string())
+        })
+        .map_err(|_| "the result could not be prepared for scanning")?;
         *page_index += 1;
         Ok(())
     };
