@@ -818,7 +818,7 @@ fn failed_connection_switch_preserves_the_current_reconnect_target(cx: &mut Test
     });
 }
 
-struct SqliteFixture(std::path::PathBuf);
+pub(crate) struct SqliteFixture(pub(crate) std::path::PathBuf);
 
 impl Drop for SqliteFixture {
     fn drop(&mut self) {
@@ -826,7 +826,7 @@ impl Drop for SqliteFixture {
     }
 }
 
-fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
+pub(crate) fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
     let path = std::env::temp_dir().join(format!("bookie-empty-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::File::create(&path).expect("create database");
     let fixture = SqliteFixture(path);

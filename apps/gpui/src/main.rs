@@ -10,6 +10,8 @@ mod cancel_process_ui;
 mod catalog_nav;
 mod chart_plot;
 mod chart_ui;
+mod choice_edit;
+mod choice_ui;
 mod chrome;
 mod close_confirm_ui;
 mod closed_tabs_ui;
@@ -1225,6 +1227,8 @@ fn main() {
         });
 }
 
+#[cfg(test)]
+mod choice_edit_tests;
 #[cfg(test)]
 mod connection_form_ui_tests;
 #[cfg(test)]
