@@ -1,6 +1,6 @@
 use bookie_core::export::{CsvOptions, render_csv, render_in_clause, render_json, render_markdown, render_tsv};
 use bookie_core::sql_literal::build_insert_literal;
-use bookie_core::{ColumnInfo, QueryRows, TableInfo, Value};
+use bookie_core::{ColumnInfo, QueryRowSet, TableInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CopyFormat {
@@ -23,25 +23,28 @@ pub struct Copied {
     pub note: Option<String>,
 }
 
-pub fn render(format: CopyFormat, context: &CopyContext<'_>, rows: &[Vec<Value>]) -> Result<Copied, String> {
+pub fn render<R: QueryRowSet + ?Sized>(
+    format: CopyFormat,
+    context: &CopyContext<'_>,
+    rows: &R,
+) -> Result<Copied, String> {
     render_with(format, context, rows, &CsvOptions::default())
 }
 
-pub fn render_with(
+pub fn render_with<R: QueryRowSet + ?Sized>(
     format: CopyFormat,
     context: &CopyContext<'_>,
-    rows: &[Vec<Value>],
+    rows: &R,
     csv: &CsvOptions,
 ) -> Result<Copied, String> {
     let infos = context.columns;
-    let values = QueryRows::from_rows(rows.to_vec());
     let plain = |text: String| Copied { text, note: None };
     match format {
-        CopyFormat::Csv => Ok(plain(render_csv(infos, &values, csv))),
-        CopyFormat::Json => Ok(plain(render_json(infos, &values))),
-        CopyFormat::Markdown => Ok(plain(render_markdown(infos, &values))),
+        CopyFormat::Csv => Ok(plain(render_csv(infos, rows, csv))),
+        CopyFormat::Json => Ok(plain(render_json(infos, rows))),
+        CopyFormat::Markdown => Ok(plain(render_markdown(infos, rows))),
         CopyFormat::InList => {
-            let list = render_in_clause(context.driver_id, &values, context.column);
+            let list = render_in_clause(context.driver_id, rows, context.column);
             if list.sql.is_empty() {
                 return Err("no value in this column can be written as a SQL literal".into());
             }
@@ -50,25 +53,27 @@ pub fn render_with(
         }
         CopyFormat::Insert => {
             let target = context.target.as_ref().ok_or("no table target is available")?;
-            let statements: Result<Vec<String>, String> = values
-                .iter()
-                .map(|row| {
+            let mut statements = Vec::with_capacity(rows.row_count());
+            for index in 0..rows.row_count() {
+                let row = rows.row(index).ok_or("a selected row is no longer available")?;
+                statements.push(
                     build_insert_literal(context.driver_id, target.schema.as_deref(), &target.name, infos, row)
-                        .map_err(|error| format!("{error:?}"))
-                })
-                .collect();
-            Ok(plain(statements?.join("\n")))
+                        .map_err(|error| format!("{error:?}"))?,
+                );
+            }
+            Ok(plain(statements.join("\n")))
         }
     }
 }
 
-pub fn tsv(columns: &[ColumnInfo], rows: Vec<Vec<Value>>, with_headers: bool) -> String {
-    render_tsv(columns, &QueryRows::from_rows(rows), with_headers)
+pub fn tsv<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R, with_headers: bool) -> String {
+    render_tsv(columns, rows, with_headers)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bookie_core::Value;
 
     fn columns() -> Vec<ColumnInfo> {
         ["id", "name"].into_iter().map(info).collect()
@@ -278,7 +283,7 @@ mod tests {
             &lines[0][lines[0].len() - 80..]
         );
         assert!(lines[1].ends_with("VALUES (NULL, NULL, NULL);"), "{}", lines[1]);
-        let tsv = tsv(&columns, rows, false);
+        let tsv = tsv(&columns, &rows, false);
         assert!(tsv.starts_with(&format!("\\x{hex}\ttrue\t2026-09-27T07:04:56+00:00\n")));
         assert!(tsv.ends_with("\\N\t\\N\t\\N"));
     }

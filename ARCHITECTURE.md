@@ -1,16 +1,16 @@
 # Architecture
 
-**BookiE** is an independent native database client focused on Linux first, with cross-platform desktop underway via GPUI ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). Frontends (the flagship GTK desktop app, cross-platform GPUI, and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
+**BookiE** is an independent native database client. GPUI (`apps/gpui`) is the primary frontend for new work. The GTK app (`apps/linux/app`) is historical and remains the supported Linux release until GPUI passes the release gate in [ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md). Frontends (the GPUI and GTK desktop apps and the headless MCP daemon) share one governed path: resolve credentials → open a tunnel if needed → wrap the driver in `PolicyGuard` → classify and evaluate → approve when required → write required audit intent → execute → mask eligible returned results → write terminal audit → return bounded results. There is no browser UI, no runtime driver plugin ABI, and no remote entitlement gate.
 
 The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). BookiE is a fully autonomous project with its own architecture, development lifecycle, and product roadmap.
 
 ### Product and system identifiers
 
 BookiE is completely decoupled from any external projects and operates independently. After [ADR 0027](docs/decisions/0027-complete-bookie-rename.md), current system and storage identifiers are `bookie` / `com.bookie.linux`:
-- **Crate & binary names**: Workspace crates and Cargo binaries use `bookie-*`, `bookie-app`, and `bookie-agentd`.
-- **Packaging names**: The user-facing binaries installed by Meson and distro packages are `bookie` and `bookie-agentd`.
-- **Application ID & D-Bus**: `com.bookie.linux`
-- **XDG storage paths**: `$XDG_CONFIG_HOME/bookie/` and `$XDG_DATA_HOME/bookie/`
+- **Crate & binary names**: Workspace crates use `bookie-*`. Cargo binaries are `bookie-app`, `bookie-agentd`, `bookie-askpass`, `bookie-audit` and, in the separate `apps/gpui` workspace, `bookie-gpui`.
+- **Packaging names**: Meson and distro packages install `bookie`, `bookie-agentd` and `bookie-askpass`. The GPUI preview tarball contains `bookie-gpui`.
+- **Application ID & D-Bus**: `com.bookie.linux`. Both frontends use this app id.
+- **XDG storage paths**: `$XDG_CONFIG_HOME/bookie/` and `$XDG_DATA_HOME/bookie/`. GPUI also keeps settings under `$XDG_CONFIG_HOME/bookie-gpui/` ([persistence](#persistence)).
 - **Secret Service schema**: `com.bookie.linux.Password`
 
 Legacy `tablepro` paths and keyring entries are copied forward on first start and left in place for rollback; do not reintroduce them as current identifiers.
@@ -24,8 +24,8 @@ DuckDB is a built-in driver. The diagrams below give the detail.
 | Path | Holds |
 | --- | --- |
 | `crates/` | GTK-free workspace crates: `core`, `policy`, `storage`, `ssh`, `transport`, `results`, `app-services`, `dump`, `mcp`, `agentd`, `audit`, `registry`, `checks`, `pg-sessions`, `kafka-browser`, `avro-container` and `drivers/*`. None depends on GTK. |
-| `apps/linux/` | The shipped GTK application (`app/`) and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
-| `apps/gpui/` | The chosen cross-platform GPUI frontend ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)); own lockfile, not packaged until that ADR's shipping conditions hold. |
+| `apps/linux/` | The historical GTK application (`app/`), still the supported Linux release, and what only it needs: `data/`, `po/`, `flatpak/`, `packaging/`. |
+| `apps/gpui/` | The primary GPUI frontend ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)). A separate Cargo workspace with its own `Cargo.lock`, built through `scripts/gpui-cargo.sh`. Tagged releases add an unsupported Linux x86_64 preview tarball. |
 | `tests/` | Cross-crate test crates (`release/`, `driver-tls/`), fixtures and shared test data (`data/`). Unit tests stay beside their code; per-crate integration tests stay in `crates/<name>/tests`. |
 | `scripts/`, `ci/`, `vendor/`, `docs/` | Tooling, CI helpers, vendored patches and documentation. |
 | root | `Cargo.toml` workspace, toolchain and lint config, `meson.build`, this file, `AGENTS.md`, `README.md`. |
@@ -49,24 +49,26 @@ This page is the one-page map. Accepted [ADRs](docs/decisions/README.md) constra
 
 | Mode | Process | Notes |
 |---|---|---|
-| Desktop (Linux flagship) | `bookie` (`bookie-app`) | GTK on the GLib main context; DB work on Tokio via Relm4 commands |
-| Desktop (Cross-platform) | `bookie-gpui` (`apps/gpui`) | High-performance GPUI frontend on Linux and macOS ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)) |
-| Headless MCP | `bookie-agentd` (`bookie-agentd`) | Same static drivers and `PolicyGuard` path; no GTK |
-| Development profile | Either binary with `BOOKIE_PROFILE=development` | Uses `bookie-devel` XDG paths and a separate keyring schema |
+| Desktop (GTK, historical) | `bookie` (`bookie-app`) | Current supported Linux release. GTK on the GLib main context; DB work on Tokio via Relm4 commands |
+| Desktop (GPUI, primary) | `bookie-gpui` (`apps/gpui`) | Primary frontend for new work ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)). Tagged releases include an unsupported Linux x86_64 preview tarball. On macOS, CI only compiles it and runs headless tests |
+| Headless MCP | `bookie-agentd` (`bookie-agentd`) | Same static drivers and `PolicyGuard` path; no GUI |
+| Audit reconciliation | `bookie-audit` (`crates/audit`) | Local command for unknown write outcomes ([ADR 0056](docs/decisions/0056-audited-reconciliation-of-unknown-write-outcomes.md)). A Cargo binary; Meson does not install it |
+| SSH askpass helper | `bookie-askpass` (`bookie-ssh`) | Started by system OpenSSH; asks the running BookiE process for a secret over a private socket ([connections](docs/connections.md)) |
+| Development profile | Any binary built with `BOOKIE_PROFILE=development` | Uses `bookie-devel` XDG paths and a separate keyring schema. GPUI's settings and window files under `$XDG_CONFIG_HOME/bookie-gpui/` ignore the profile |
 | Validation | Scripts under `scripts/` | Local checks and required CI checks ([playbook](docs/validation-playbook.md#ci-tiers)) |
 
-The native library floor (GTK 4.24, libadwaita 1.10, GtkSourceView 5.22) is in [ADR 0021](docs/decisions/0021-toolkit-floor.md) and [platforms](docs/platforms.md).
+The native library floor in [ADR 0021](docs/decisions/0021-toolkit-floor.md) (GTK 4.24, libadwaita 1.10, GtkSourceView 5.22) applies to the GTK app only; see [platforms](docs/platforms.md). GPUI needs Vulkan graphics on Linux and Metal on macOS.
 
 ## System context
 
-One actor: the person at their desktop (focused on Linux first, with cross-platform desktop underway via GPUI) or an MCP client they run. BookiE stays on their machine. Outbound traffic is only to databases and SSH bastions they configure. There is no BookiE cloud account.
+One actor: the person at their desktop or an MCP client they run. BookiE stays on their machine. Outbound traffic is only to databases and SSH bastions they configure. There is no BookiE cloud account.
 
 ```mermaid
 flowchart LR
     user["Local user<br/>DBA / developer"]
     mcpClient["MCP client<br/>agent / IDE"]
-    bookie["bookie<br/>GTK4 / Libadwaita"]
-    gpui["bookie-gpui<br/>GPUI (cross-platform)"]
+    bookie["bookie<br/>GTK (historical)"]
+    gpui["bookie-gpui<br/>GPUI (primary)"]
     agentd["bookie-agentd<br/>MCP host"]
     keyring["Secret Service / Keyring"]
     bastion["SSH bastion"]
@@ -87,18 +89,22 @@ flowchart LR
     bastion --> db
 ```
 
-Both processes register the same static drivers and must obtain a `PolicyGuard` before any consumer sees a live database handle.
+All three composition roots (GTK, GPUI and `bookie-agentd`) register the same static drivers through `default_registry()` and must obtain a `PolicyGuard` before any consumer sees a live database handle.
 
 ## Containers (crates)
 
-Production dependencies point downward. `bookie-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only the composition roots (`app`, `gpui`, and `agentd`) depend on driver crates. Crate tests also use selected drivers to verify real engine behavior.
+Production dependencies point downward. `bookie-core` is the contract layer and depends on no other workspace crate. UI code reaches engines only through the driver registry; in production, only `bookie-driver-registry` and the composition roots depend on driver crates. `app` and `agentd` also list some driver crates directly: for tests, for the SQL Server `kerberos` feature and, in `app`, for a MongoDB display helper. The graph omits those edges. Crate tests also use selected drivers to verify real engine behavior. `bookie-avro-container` has no workspace dependencies and no dependents yet, so the graph omits it.
 
 ```mermaid
 flowchart TB
     subgraph roots["Composition roots"]
-        app["bookie-app<br/>bookie (GTK4)"]
-        gpui["bookie-gpui<br/>apps/gpui (GPUI)"]
+        app["bookie-app<br/>bookie (GTK, historical)"]
+        gpui["bookie-gpui<br/>apps/gpui (GPUI, primary)"]
         agentd["bookie-agentd<br/>bookie-agentd (MCP)"]
+    end
+
+    subgraph cli["Local command"]
+        audit["bookie-audit<br/>unknown-outcome reconciliation"]
     end
 
     subgraph surfaces["Surfaces"]
@@ -132,7 +138,7 @@ flowchart TB
     end
 
     subgraph drivers["Drivers & Registry"]
-        registry["bookie-driver-registry<br/>unified static drivers"]
+        registry["bookie-driver-registry<br/>static drivers, LISTEN and pub/sub sampling"]
         drv["10 static drivers:<br/>postgres · mysql · sqlite · mssql<br/>clickhouse · redis · mongodb · duckdb<br/>cassandra · oracle"]
     end
 
@@ -148,6 +154,7 @@ flowchart TB
     gpui --> registry
     gpui --> core
     gpui --> results
+    audit --> app_services
     app_services --> results
     app_services --> checks
     app_services --> pg_sessions
@@ -187,24 +194,24 @@ flowchart TB
 
 | Crate | Role |
 |---|---|
-| `bookie-app` | GTK composition root. Cargo binary `bookie-app`; installed as `bookie`. |
-| `bookie-gpui` | Cross-platform GPUI composition root (`apps/gpui`). |
+| `bookie-app` | Historical GTK composition root. Cargo binary `bookie-app`; installed as `bookie`. |
+| `bookie-gpui` | Primary GPUI composition root (`apps/gpui`, separate Cargo workspace). Cargo binary `bookie-gpui`. Depends on `core`, `results`, `app-services` and `driver-registry` only. |
 | `bookie-agentd` | Headless MCP composition root. Cargo binary `bookie-agentd`; installed as `bookie-agentd`. |
 | `bookie-audit` | Local, non-MCP command that lists unknown write outcomes in the audit journal and records a person's decision on one ([ADR 0056](docs/decisions/0056-audited-reconciliation-of-unknown-write-outcomes.md)). It is the only route for a global (all-connection) block when no GUI is running. Depends on `app-services`; starts no server. |
-| `bookie-core` | Domain types, driver traits, values, filters, transactions, registry. No workspace dependency. |
+| `bookie-core` | Domain types, driver traits, values, filters, transactions and the `DriverRegistry` type. No workspace dependency. Drivers are registered in `bookie-driver-registry`. |
 | `bookie-policy` | Classify, rules, approval, masking, blast radius, audit types, `PolicyGuard`. Production dependency: `core`. |
-| `bookie-results` | Pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree). Depends only on `core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)). |
-| `bookie-app-services` | GTK-free application state and service logic used by the desktop app. Depends on `core`, `results`, `dump`, `mcp`, `policy`, `storage` and `transport`. |
+| `bookie-results` | Pure result logic: compare, filter, find, predicate, scan, result page, grid cursor, highlight and text match, sidebar tree, stream page budget, index and window, stream result spool, UUID display and exact values. Depends only on `core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)). |
+| `bookie-app-services` | UI-free application state and service logic used by both frontends and `bookie-audit`. Depends on `core`, `results`, `checks`, `pg-sessions`, `kafka-browser`, `dump`, `mcp`, `policy`, `ssh`, `storage` and `transport`. |
 | `bookie-storage` | Saved connections, Secret Service, query history, audit journal. |
 | `bookie-ssh` | Built-in `russh` tunnels and optional system OpenSSH backend. |
 | `bookie-transport` | Saved-connection → dial options, SSH chain, tunnel, TLS service identity. |
 | `bookie-dump` | GTK-free vendor-tool supervision, private password files and PostgreSQL dump/restore requests. Application services run backup and restore through `PolicyGuard::run_administrative`. Depends on `core`; [ADR 0019](docs/decisions/0019-database-tooling-without-sidecars.md) governs the feature. |
 | `bookie-mcp` | MCP auth, scopes, connection allowlists, rate limits, tools. Never exposes a raw driver connection. |
 | `bookie-driver-*` | One static crate per engine. |
-| `bookie-driver-registry` | Registers every static driver in one `default_registry()` for the three composition roots (`app`, `agentd`, `apps/gpui`). |
-| `bookie-checks` | TCP reachability checks and their rolling result history; re-exported by `app-services` and used by `apps/gpui`. |
-| `bookie-pg-sessions` | The PostgreSQL session list query and its row type; re-exported by `app-services` and used by `apps/gpui`. |
-| `bookie-kafka-browser` | Read-only Kafka topic listing and bounded record tail through `rskafka`; re-exported by `app-services` and used by `apps/gpui`. |
+| `bookie-driver-registry` | Registers every static driver in one `default_registry()` for the three composition roots (`app`, `agentd`, `apps/gpui`). Also re-exports the PostgreSQL LISTEN and Redis pub/sub sampling helpers. |
+| `bookie-checks` | TCP reachability checks and their rolling result history; re-exported by `app-services`, through which `apps/gpui` uses it. |
+| `bookie-pg-sessions` | The PostgreSQL session list query and its row type; re-exported by `app-services`, through which `apps/gpui` uses it. |
+| `bookie-kafka-browser` | Read-only Kafka topic listing and bounded record tail through `rskafka`; re-exported by `app-services`, through which `apps/gpui` uses it. |
 | `bookie-avro-container` | Bounded Avro object container decoding for [ADR 0050](docs/decisions/0050-avro-container-decode.md). No crate depends on it yet. |
 | `bookie-driver-tls-tests` / `bookie-release-tests` | Test-only fixtures. |
 
@@ -226,11 +233,11 @@ These traits are the seams that keep engines and UI replaceable. Behaviour detai
 
 Adding an engine means implementing `DatabaseDriver` + `Connection` behind those traits, not teaching the UI a new driver id ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 
-The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s and retains pages within a 64 MiB estimated-row budget, except that the newest page remains when it alone exceeds the budget. The cache budget applies per streamed result. A process-local encrypted spool makes fetched pages revisitable after eviction, with a shared 1 GiB quota and 4,096 pages per result ([ADR 0025](docs/decisions/0025-transient-result-page-spool.md)). Pinned results and overlapping snapshots can retain additional pages. Other engines and unsupported query shapes use materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)).
+The optional cursor path is governed by `PolicyGuard`: it accepts one read statement in a read-only session snapshot, masks and audits each fetched page under the same operation, and closes the cursor on terminal outcomes. PostgreSQL is the only driver that supports it today. The GTK SQL editor uses this path for supported single-statement PostgreSQL `SELECT`s and retains pages within a 64 MiB estimated-row budget, except that the newest page remains when it alone exceeds the budget. The cache budget applies per streamed result. A process-local encrypted spool makes fetched pages revisitable after eviction, with a shared 1 GiB quota and 4,096 pages per result ([ADR 0025](docs/decisions/0025-transient-result-page-spool.md)). Pinned results and overlapping snapshots can retain additional pages. Other engines and unsupported query shapes use materialized results and their existing caps ([ADR 0011](docs/decisions/0011-paged-query-results.md)). GPUI does not use the query cursor path or its page spool. Its table loads and query results are materialized and capped at 100,000 rows (`ROW_CAP` in `apps/gpui/src/live.rs`).
 
 ## Governed request pipeline
 
-One path for the GTK app, MCP tools and `bookie-agentd`:
+One path for both frontends, MCP tools and `bookie-agentd`:
 
 ![The request path: resolve, route, connect, guard, execute, record](docs/images/request-path.svg)
 
@@ -281,13 +288,19 @@ sequenceDiagram
 Nothing points back up. Cycles are forbidden. Composition roots sit at the top; `core` is the leaf.
 
 ```text
-bookie-app ────────┬──► app-services, mcp, policy, storage, transport, ssh, drivers, core
-bookie-agentd ────┘
+bookie-app        ──► app-services, results, mcp, policy, storage, transport, ssh, registry, drivers, core
+bookie-gpui       ──► app-services, results, registry, core   (separate Cargo workspace)
+bookie-agentd     ──► mcp, policy, storage, transport, ssh, registry, drivers (mssql, sqlite), core
+bookie-audit      ──► app-services
 
-bookie-release-tests ──► mcp, policy, storage, transport, ssh, drivers, core
-bookie-driver-tls-tests ──► transport, ssh, drivers, core
-bookie-app-services ──► results, dump, mcp, policy, storage, transport, core
-bookie-results ──► core
+bookie-release-tests    ──► policy, storage, transport, ssh, driver-postgres, core; mcp (dev only)
+bookie-driver-tls-tests ──► transport, ssh, core; drivers (dev only)
+
+bookie-app-services ──► results, checks, pg-sessions, kafka-browser, dump, mcp, policy, storage, transport, ssh, core
+bookie-driver-registry ──► drivers, core
+bookie-results    ──► core
+bookie-pg-sessions ──► core
+bookie-checks, bookie-kafka-browser, bookie-avro-container ──► (no workspace crate)
 
 bookie-mcp        ──► policy, storage, core
 bookie-transport  ──► storage, ssh, policy, core
@@ -299,9 +312,11 @@ bookie-driver-*   ──► core
 bookie-core       ──► (no workspace crate)
 ```
 
+`scripts/check-crate-boundaries.py` enforces these edges for every root-workspace crate except the GTK app, refuses any dependency on the GTK app or, outside it, on GTK crates, and limits `apps/gpui` to `core`, `results`, `app-services` and `driver-registry`.
+
 Rules that keep this sound:
 
-1. **Three production composition roots.** `app`, `agentd` and `apps/gpui` register drivers and assemble services. Domain crates do not construct GTK widgets or start Relm4. Test crates may assemble drivers to exercise their contracts against real engines.
+1. **Three production composition roots.** `app`, `agentd` and `apps/gpui` register drivers and assemble services. Domain crates do not construct GTK or GPUI widgets or start Relm4. Test crates may assemble drivers to exercise their contracts against real engines.
 2. **One governance seam.** Every live database handle a consumer sees is a `PolicyGuard`. Token scopes and connection allowlists never replace it.
 3. **Static drivers.** Engines are linked at build time and registered in code. There is no plugin discovery ABI ([ADR 0001](docs/decisions/0001-no-plugin-system.md)).
 4. **Trust at the edges.** MCP input, saved connection files, imported files, environment variables and database metadata are untrusted input.
@@ -310,8 +325,12 @@ Rules that keep this sound:
 
 | You are changing | Put it here |
 |---|---|
-| GTK widget, Relm4 component, tab or browse UX | `apps/linux/app` (main context only for widgets) |
+| New UI feature, design change or frontend architecture | `apps/gpui` ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)) |
+| GTK security, data-integrity or release-blocking fix | `apps/linux/app` (main context only for widgets). No new features; GTK-only issues use the `gtk-historical` label |
+| Application state or service logic shared by frontends | `crates/app-services` (no GTK, GLib, Relm4 or GPUI dependency) |
+| Pure result logic (paging, find, filter, compare, spool) | `crates/results` |
 | Headless MCP process wiring | `crates/agentd` |
+| Local audit reconciliation command | `crates/audit` |
 | MCP tool, token scope, allowlist or rate limit | `crates/mcp` (must still return a `PolicyGuard`) |
 | Classify, approve, mask, blast radius, audit types | `crates/policy` |
 | Saved connections, keyring, history, audit journal | `crates/storage` |
@@ -373,6 +392,7 @@ MCP may ask policy whether a statement needs write capability for a scope check;
 | MCP token hash, scopes, allowlist | `bookie-mcp` |
 | GTK widgets / Relm4 component state | `bookie-app` (main context only) |
 | Tab UUID, dirty rows, result generation | `bookie-app` tab controllers |
+| GPUI view state, staged edits and work generations | `GridView` in `apps/gpui/src/main.rs` |
 | Query result rows | `bookie-core::QueryRows` stores cells contiguously with row offsets; the GTK `RowStore` refers to source rows by index and creates row objects on demand |
 | Driver protocol connection | Inner `Connection` behind `PolicyGuard` |
 
@@ -416,6 +436,14 @@ Each engine exports a type implementing `bookie_core::DatabaseDriver`. Connect r
 
 ## UI and async ownership
 
+Both frontends follow the same rule: database work runs off the UI thread, and a late reply applies only while its generation still matches.
+
+In GPUI, `GridView` starts background work through `begin_background` in `apps/gpui/src/main.rs`. The work runs on GPUI's background executor; live sessions run their database calls on a per-session Tokio runtime (`apps/gpui/src/live.rs`). Each kind of work (load, query, scan, count, chart) has a `Ticket` with a generation counter and a cancellation token. Starting new work of that kind increments the generation and cancels the old token. The reply is applied on the foreground thread only if the ticket's generation still matches.
+
+The diagrams and table below describe the GTK app (historical).
+
+### GTK (historical)
+
 ```mermaid
 sequenceDiagram
     autonumber
@@ -445,6 +473,8 @@ sequenceDiagram
 ```
 
 ### Result streaming and memory spooling
+
+This diagram applies to the GTK SQL editor. GPUI materializes results instead ([trait boundaries](#trait-boundaries)).
 
 ```mermaid
 flowchart TD
@@ -484,7 +514,14 @@ flowchart TD
 
 ## Persistence
 
-Config and history live under `$XDG_CONFIG_HOME/bookie/` (or `bookie-devel` in development builds). The audit journal is under `$XDG_DATA_HOME/bookie/`. Passwords and SSH secrets stay in Secret Service through `oo7`. Schema id: `com.bookie.linux`. Details: [storage.md](docs/storage.md), [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md).
+Config and history live under `$XDG_CONFIG_HOME/bookie/` (or `bookie-devel` in development builds). The audit journal is under `$XDG_DATA_HOME/bookie/`. Passwords and SSH secrets stay in Secret Service through `oo7`. Schema: `com.bookie.linux.Password` (`com.bookie.linux.Devel.Password` in development builds).
+
+GPUI shares saved connections, history, the audit journal and keyring entries with the GTK app. It also writes its own files:
+
+- `$XDG_CONFIG_HOME/bookie-gpui/settings.json` (fonts and theme) and `window.json` (window geometry). These paths ignore `BOOKIE_PROFILE`.
+- `gpui-keymap.json` and `diagram-layouts/<id>.json` under the BookiE config directory (`bookie` or `bookie-devel`).
+
+Details: [storage.md](docs/storage.md), [ADR 0009](docs/decisions/0009-persistence-and-identity-compatibility.md).
 
 ## Build and validation
 
@@ -494,12 +531,12 @@ Workspace Clippy and unit checks include the DuckDB driver like every other crat
 
 | Limit | Why |
 |---|---|
-| Shipped surface is Linux GTK | The shipped product is the GTK/libadwaita Linux client and its packaging. [ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md) chooses GPUI as the cross-platform frontend and keeps GTK in parallel; GPUI is not packaged or released until that ADR's accessibility, packaging and security conditions hold. UI-free crates serve both frontends, the headless daemon and tests. |
+| Supported release is Linux GTK | The supported release is the historical GTK/libadwaita Linux client and its packaging. GPUI is the primary frontend for new work, but tagged releases ship it only as an unsupported Linux x86_64 preview tarball. It becomes a supported release only after it passes the [ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md) gate on each platform. UI-free crates serve both frontends, the headless daemon and tests. |
 | Static drivers | Compile-time registration; no plugin ABI. |
 | No embedded browser | Native widgets only (GTK and GPUI). |
 | No in-process user scripting | Reduces attack surface beside SQL policy. |
 | Redis topology | Single endpoint; unsupported topologies and release status are in [known limitations](docs/known-limitations.md#editing-and-connections). |
-| Packaging | Current GitHub releases provide an Arch package and an AppImage; 0.2.4 also has Debian and Flatpak (ADRs 0031 and 0032). Native package requirements, OpenSSL sonames and AppImage toolkit notes are in [platforms](docs/platforms.md). |
+| Packaging | Current GitHub releases provide a GTK Arch package and a GTK AppImage; the release workflow also attaches the unsupported GPUI Linux preview tarball. 0.2.4 also has Debian and Flatpak (ADRs 0031 and 0032). Native package requirements, OpenSSL sonames and AppImage toolkit notes are in [platforms](docs/platforms.md). |
 
 ## How to read this architecture map
 
