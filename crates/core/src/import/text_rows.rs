@@ -6,6 +6,7 @@ pub struct TextRows {
     short_ends: Vec<u16>,
     wide_ends: Vec<u32>,
     row_ends: Vec<RowEnd>,
+    workbook_cells: Vec<WorkbookCell>,
     width: usize,
 }
 
@@ -31,10 +32,26 @@ impl CellEnds<'_> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum WorkbookValue {
+    Bool(bool),
+    Int(i64),
+    FloatBits(u64),
+    DateTime(chrono::NaiveDateTime),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct WorkbookCell {
+    row: usize,
+    column: usize,
+    value: WorkbookValue,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct TextRow<'a> {
     text: &'a str,
     cell_ends: CellEnds<'a>,
+    workbook_cells: &'a [WorkbookCell],
     width: usize,
 }
 
@@ -64,6 +81,22 @@ impl TextRows {
             .max(end.short_cells - start.short_cells + end.wide_cells - start.wide_cells);
         self.row_ends.push(end);
         Ok(())
+    }
+
+    pub(super) fn push_workbook_row<'a>(
+        &mut self,
+        fields: impl IntoIterator<Item = (&'a str, Option<WorkbookValue>)>,
+    ) -> Result<(), ImportError> {
+        let row = self.len();
+        let mut cells = std::mem::take(&mut self.workbook_cells);
+        let result = self.push(fields.into_iter().enumerate().map(|(column, (text, native))| {
+            if let Some(value) = native {
+                cells.push(WorkbookCell { row, column, value });
+            }
+            text
+        }));
+        self.workbook_cells = cells;
+        result
     }
 
     fn end(&self) -> RowEnd {
@@ -113,6 +146,8 @@ impl TextRows {
         TextRow {
             text: &self.text[start.bytes..end.bytes],
             cell_ends,
+            workbook_cells: &self.workbook_cells[self.workbook_cells.partition_point(|cell| cell.row < index)
+                ..self.workbook_cells.partition_point(|cell| cell.row <= index)],
             width: self.width,
         }
     }
@@ -122,6 +157,8 @@ impl TextRows {
             return;
         }
         self.row_ends.truncate(len);
+        self.workbook_cells
+            .truncate(self.workbook_cells.partition_point(|cell| cell.row < len));
         let end = self.row_ends.last().copied().unwrap_or_default();
         self.short_ends.truncate(end.short_cells);
         self.wide_ends.truncate(end.wide_cells);
@@ -150,6 +187,14 @@ impl<'a> TextRow<'a> {
             .and_then(|prev| self.cell_ends.get(prev))
             .unwrap_or(0);
         self.text.get(start..end)
+    }
+
+    pub(super) fn workbook_value(self, index: usize) -> Option<WorkbookValue> {
+        let index = self
+            .workbook_cells
+            .binary_search_by_key(&index, |cell| cell.column)
+            .ok()?;
+        Some(self.workbook_cells[index].value)
     }
 
     pub fn iter(self) -> impl ExactSizeIterator<Item = &'a str> {

@@ -648,3 +648,38 @@ fn a_table_name_containing_values_is_not_rewritten_by_the_override_clause() {
         "INSERT INTO \"my VALUES t\" (\"id\", \"name\") OVERRIDING SYSTEM VALUE VALUES ($1, $2)"
     );
 }
+
+#[test]
+fn workbook_numbers_and_fractional_timestamps_bind_as_native_values() {
+    use rust_xlsxwriter::{ExcelDateTime, Format, Workbook};
+
+    let mut workbook = Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "amount").unwrap();
+    worksheet.write_string(0, 1, "recorded").unwrap();
+    let time = ExcelDateTime::from_ymd(2025, 4, 3)
+        .unwrap()
+        .and_hms_milli(12, 2, 5, 789)
+        .unwrap();
+    let format = Format::new().set_num_format("yyyy-mm-dd hh:mm:ss.000");
+    worksheet.write_number(1, 0, 2.5).unwrap();
+    worksheet.write_datetime_with_format(1, 1, &time, &format).unwrap();
+    let bytes = workbook.save_to_buffer().unwrap();
+    let sheet = crate::import::read_xlsx(&bytes, 1).unwrap();
+    let columns = [column("amount", "REAL"), column("recorded", "DATETIME")];
+    let mapping = [Some(0), Some(1)];
+    let target = ImportTarget {
+        driver_id: "sqlite",
+        ..target(&columns, &mapping)
+    };
+    let options = CsvImportOptions {
+        null_marker: "2.5".to_owned(),
+        ..Default::default()
+    };
+    let result = build_insert_plan(&target, &sheet, &options).unwrap();
+    let expected = chrono::NaiveDate::from_ymd_opt(2025, 4, 3)
+        .unwrap()
+        .and_hms_milli_opt(12, 2, 5, 789)
+        .unwrap();
+    assert_eq!(result.rows, [[Value::Float(2.5), Value::DateTime(expected)]]);
+}

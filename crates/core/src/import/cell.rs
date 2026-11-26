@@ -254,6 +254,10 @@ fn parse_bytes(text: &str) -> Result<Value, CellError> {
 
 pub trait CsvFields {
     fn field(&self, index: usize) -> Option<&str>;
+
+    fn native_value(&self, _index: usize, _column: &ColumnInfo, _driver_id: &str) -> Option<Value> {
+        None
+    }
 }
 
 impl<T: AsRef<[String]> + ?Sized> CsvFields for T {
@@ -265,6 +269,23 @@ impl<T: AsRef<[String]> + ?Sized> CsvFields for T {
 impl CsvFields for super::TextRow<'_> {
     fn field(&self, index: usize) -> Option<&str> {
         self.get(index)
+    }
+
+    fn native_value(&self, index: usize, column: &ColumnInfo, driver_id: &str) -> Option<Value> {
+        use super::text_rows::WorkbookValue;
+
+        let value = self.workbook_value(index)?;
+        let kind = crate::import::text_kind::column_kind_for(column, driver_id);
+        match (value, kind) {
+            (WorkbookValue::Bool(value), ColumnKind::Bool) => Some(Value::Bool(value)),
+            (WorkbookValue::Int(value), ColumnKind::Int) => Some(Value::Int(value)),
+            (WorkbookValue::FloatBits(bits), ColumnKind::Float) => Some(Value::Float(f64::from_bits(bits))),
+            (WorkbookValue::DateTime(value), ColumnKind::DateTime) => Some(Value::DateTime(value)),
+            (WorkbookValue::DateTime(value), ColumnKind::Date) if value.time() == chrono::NaiveTime::MIN => {
+                Some(Value::Date(value.date()))
+            }
+            _ => None,
+        }
     }
 }
 
@@ -294,9 +315,15 @@ pub(crate) fn row_to_values_for_driver(
         .iter()
         .zip(mapping)
         .map(|(column, field)| {
-            let Some(text) = field.and_then(|index| row.field(index)) else {
+            let Some(index) = field else {
                 return Ok(Value::Null);
             };
+            let Some(text) = row.field(*index) else {
+                return Ok(Value::Null);
+            };
+            if let Some(value) = row.native_value(*index, column, driver_id) {
+                return Ok(value);
+            }
             value_for(text, column, options, driver_id).map_err(|reason| CsvRowError {
                 line,
                 column: column.name.clone(),

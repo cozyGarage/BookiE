@@ -11,6 +11,14 @@ use super::csv_import::{
     CsvSheet, ImportError, MAX_COLUMNS, MAX_FIELD_BYTES, MAX_FILE_BYTES, MAX_IMPORT_ROWS, finish_sheet,
 };
 
+use super::text_rows::WorkbookValue;
+
+#[derive(Default)]
+struct WorksheetCell {
+    text: String,
+    native: Option<WorkbookValue>,
+}
+
 const ZIP_MAGIC: &[u8] = b"PK\x03\x04";
 const MAX_SHARED_STRINGS_BYTES: u64 = MAX_FILE_BYTES;
 
@@ -21,7 +29,9 @@ pub fn is_xlsx(bytes: &[u8]) -> bool {
 pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
     let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
     visit_xlsx_rows(bytes, |row| {
-        writer.write_record(row.iter()).map_err(|_| ImportError::NotSpreadsheet)
+        writer
+            .write_record(row.iter().map(|cell| &cell.text))
+            .map_err(|_| ImportError::NotSpreadsheet)
     })?;
     writer.into_inner().map_err(|_| ImportError::NotSpreadsheet)
 }
@@ -32,9 +42,9 @@ pub fn read_xlsx(bytes: &[u8], row_limit: usize) -> Result<CsvSheet, ImportError
     let mut truncated = false;
     visit_xlsx_rows(bytes, |row| {
         if headers.is_none() {
-            headers = Some(std::mem::take(row));
+            headers = Some(row.drain(..).map(|cell| cell.text).collect());
         } else if rows.len() < row_limit {
-            rows.push(row.iter().map(String::as_str))?;
+            rows.push_workbook_row(row.iter().map(|cell| (cell.text.as_str(), cell.native)))?;
         } else {
             truncated = true;
         }
@@ -45,7 +55,7 @@ pub fn read_xlsx(bytes: &[u8], row_limit: usize) -> Result<CsvSheet, ImportError
 
 fn visit_xlsx_rows(
     bytes: &[u8],
-    mut visit: impl FnMut(&mut Vec<String>) -> Result<(), ImportError>,
+    mut visit: impl FnMut(&mut Vec<WorksheetCell>) -> Result<(), ImportError>,
 ) -> Result<(), ImportError> {
     check_output_size(0, bytes.len())?;
     check_workbook_xml_bounds(bytes)?;
@@ -54,7 +64,7 @@ fn visit_xlsx_rows(
         let mut cells = workbook
             .worksheet_cells_reader(&name)
             .map_err(|_| ImportError::NotSpreadsheet)?;
-        let mut row: Vec<String> = Vec::new();
+        let mut row = Vec::new();
         let mut row_payload_bytes = 0usize;
         let mut output_bytes = 0u64;
         let mut current = None;
@@ -116,7 +126,7 @@ fn check_row_order(current_row: u32, next_row: u32) -> Result<(), ImportError> {
 }
 
 fn set_cell(
-    row: &mut Vec<String>,
+    row: &mut Vec<WorksheetCell>,
     column: usize,
     value: &DataRef<'_>,
     line: usize,
@@ -130,7 +140,7 @@ fn set_cell(
         });
     }
     if row.len() <= column {
-        row.resize(column + 1, String::new());
+        row.resize_with(column + 1, WorksheetCell::default);
     }
     let text = cell_text(value);
     if text.len() > MAX_FIELD_BYTES {
@@ -139,15 +149,18 @@ fn set_cell(
             limit: MAX_FIELD_BYTES,
         });
     }
-    *row_payload_bytes = *row_payload_bytes - field_csv_bytes(&row[column]) + field_csv_bytes(&text);
+    *row_payload_bytes = *row_payload_bytes - field_csv_bytes(&row[column].text) + field_csv_bytes(&text);
     check_output_size(output_bytes, row_csv_bytes(*row_payload_bytes, row.len()))?;
-    row[column] = text.into_owned();
+    row[column] = WorksheetCell {
+        text: text.into_owned(),
+        native: native_value(value),
+    };
     Ok(())
 }
 
 fn emit_row(
-    visit: &mut impl FnMut(&mut Vec<String>) -> Result<(), ImportError>,
-    row: &mut Vec<String>,
+    visit: &mut impl FnMut(&mut Vec<WorksheetCell>) -> Result<(), ImportError>,
+    row: &mut Vec<WorksheetCell>,
     rows_written: &mut usize,
     output_bytes: &mut u64,
     row_payload_bytes: &mut usize,
@@ -268,6 +281,16 @@ fn row_csv_bytes(payload: usize, columns: usize) -> usize {
     })
 }
 
+fn native_value(value: &DataRef<'_>) -> Option<WorkbookValue> {
+    match value {
+        DataRef::Int(number) => Some(WorkbookValue::Int(*number)),
+        DataRef::Float(number) => Some(WorkbookValue::FloatBits(number.to_bits())),
+        DataRef::Bool(flag) => Some(WorkbookValue::Bool(*flag)),
+        DataRef::DateTime(stamp) if stamp.is_datetime() => stamp.as_datetime().map(WorkbookValue::DateTime),
+        _ => None,
+    }
+}
+
 fn cell_text<'a>(value: &'a DataRef<'_>) -> Cow<'a, str> {
     match value {
         DataRef::Empty | DataRef::Error(_) => Cow::Borrowed(""),
@@ -284,7 +307,7 @@ fn cell_text<'a>(value: &'a DataRef<'_>) -> Cow<'a, str> {
                 if moment.time() == chrono::NaiveTime::MIN {
                     moment.format("%Y-%m-%d").to_string()
                 } else {
-                    moment.format("%Y-%m-%d %H:%M:%S").to_string()
+                    moment.format("%Y-%m-%d %H:%M:%S%.f").to_string()
                 }
             },
         )),
@@ -297,8 +320,11 @@ mod tests {
 
     #[test]
     fn keeps_room_for_a_header_before_refusing_rows_after_the_import_limit() {
-        let mut visit = |_: &mut Vec<String>| Ok(());
-        let mut row = vec!["value".to_owned()];
+        let mut visit = |_: &mut Vec<WorksheetCell>| Ok(());
+        let mut row = vec![WorksheetCell {
+            text: "value".to_owned(),
+            ..Default::default()
+        }];
         let mut rows_written = MAX_IMPORT_ROWS;
         let mut output_bytes = 0;
         let mut row_payload_bytes = 5;
