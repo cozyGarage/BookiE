@@ -163,7 +163,7 @@ impl GridView {
                         this.panel.open = true;
                         this.status = format!("Exported {} table(s); see Messages", results.len());
                     }
-                    Err(message) => this.status = format!("Could not export the tables: {message}"),
+                    Err(message) => this.report_failure("export the tables", &message),
                 }
                 cx.notify();
             })

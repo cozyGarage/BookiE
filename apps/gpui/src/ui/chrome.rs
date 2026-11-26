@@ -140,6 +140,24 @@ mod environment_tests {
         assert_ne!(environment_tint(Environment::Prod, theme), theme.background);
         assert_eq!(environment_color(Environment::Prod, theme), Some(theme.destructive));
     }
+
+    #[test]
+    fn no_environment_uses_the_link_colour() {
+        for theme in [Theme::light(), Theme::dark()] {
+            for environment in [
+                Environment::Local,
+                Environment::Dev,
+                Environment::Staging,
+                Environment::Prod,
+            ] {
+                assert_ne!(
+                    environment_color(environment, theme),
+                    Some(theme.info),
+                    "{environment:?}"
+                );
+            }
+        }
+    }
 }
 
 impl GridView {

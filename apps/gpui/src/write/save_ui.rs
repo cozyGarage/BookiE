@@ -9,7 +9,7 @@ use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 use bookie_gpui::source::ViewAccess;
 
 use crate::chrome::tip;
-use crate::surfaces::{ButtonKind, button, compact_button, task_bar_frame, task_title};
+use crate::surfaces::{ButtonKind, button, compact_button, sql_preview, task_bar_frame, task_title};
 use crate::*;
 
 type PreparedSave = (CellSavePlan, Option<ForeignKeyReview>);
@@ -505,8 +505,7 @@ impl GridView {
         };
         let target_current = match &pending.diagram {
             Some((revision, _)) => {
-                matches!(self.tabs.current(), Tab::Diagram)
-                    && *revision == self.search.diagram.request.generation
+                matches!(self.tabs.current(), Tab::Diagram) && *revision == self.search.diagram.request.generation
             }
             None => {
                 pending.table == self.catalog.grid_table
@@ -755,16 +754,12 @@ impl GridView {
                         .text_color(rgb(theme.muted_foreground))
                         .child(note)
                 }))
-                .child(
-                    div()
-                        .id("save-preview")
-                        .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
-                        .overflow_y_scroll()
-                        .font_family("monospace")
-                        .text_size(px(size::TEXT_SMALL))
-                        .text_color(rgb(theme.muted_foreground))
-                        .child(pending.plan.preview.clone()),
-                )
+                .child(sql_preview(
+                    "save-preview",
+                    pending.plan.preview.clone(),
+                    size::SAVE_PREVIEW_MAX_HEIGHT,
+                    theme,
+                ))
                 .children(preview_overflows(&pending.plan.preview).then(|| {
                     div()
                         .debug_selector(|| "save-preview-more".into())

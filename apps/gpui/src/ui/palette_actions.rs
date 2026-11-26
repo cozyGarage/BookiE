@@ -602,13 +602,6 @@ impl GridView {
             return;
         };
         let id = actions[index].id;
-        if id == "font" {
-            self.palette.fonts = true;
-            self.palette.index = 0;
-            self.palette.input.update(cx, |input, cx| input.set_content("", cx));
-            cx.notify();
-            return;
-        }
         if id == "font-choice" {
             self.fonts.current = actions[index].label.clone().into();
             self.close_palette(window, cx);
@@ -623,14 +616,20 @@ impl GridView {
         self.execute_palette_action(id, window, cx);
     }
 
-    fn execute_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
-        if self.execute_grid_palette_action(id, window, cx) {
-            return;
-        }
-        if self.execute_activity_palette_action(id, window, cx) {
-            return;
-        }
-        self.execute_workspace_palette_action(id, window, cx);
+    pub(crate) fn execute_palette_action(
+        &mut self,
+        id: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        self.execute_grid_palette_action(id, window, cx)
+            || self.execute_activity_palette_action(id, window, cx)
+            || self.execute_workspace_palette_action(id, window, cx)
+    }
+
+    fn open_font_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_palette(window, cx);
+        self.palette.fonts = true;
     }
 
     fn execute_grid_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) -> bool {
@@ -750,8 +749,14 @@ impl GridView {
         }
     }
 
-    fn execute_workspace_palette_action(&mut self, id: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    fn execute_workspace_palette_action(
+        &mut self,
+        id: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> bool {
         match id {
+            "font" => self.open_font_picker(window, cx),
             "sidebar" => self.sidebar.open = !self.sidebar.open,
             "quick-switcher" => self.open_picker(PaletteMode::Tables, window, cx),
             "jump-column" => self.open_picker(PaletteMode::Columns, window, cx),
@@ -820,7 +825,8 @@ impl GridView {
                 Theme::current(cx).toggled().install(cx);
                 window.refresh();
             }
-            _ => {}
+            _ => return false,
         }
+        true
     }
 }

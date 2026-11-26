@@ -1,4 +1,4 @@
-use crate::surfaces::{ButtonKind, button, dialog_surface, scrim};
+use crate::surfaces::{ButtonKind, ConfirmDialog, button, confirm_dialog};
 use crate::*;
 
 impl GridView {
@@ -31,50 +31,25 @@ impl GridView {
 
     pub(crate) fn cancel_process_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let (pid, sql) = self.cancel_confirm.as_ref()?;
-        Some(
-            scrim(theme).id("cancel-process-overlay").occlude().child(
-                dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
-                    .id("cancel-process-dialog")
-                    .debug_selector(|| "cancel-process-dialog".into())
-                    .max_w(gpui::relative(0.92))
-                    .gap_2()
-                    .p_3()
-                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(
-                        div()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child(format!("Cancel server process {pid}?")),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child("The server stops what this process is running. A Prod connection asks for approval first."),
-                    )
-                    .child(
-                        div()
-                            .font_family("monospace")
-                            .text_size(px(size::TEXT_SMALL))
-                            .child(sql.clone()),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_end()
-                            .gap_2()
-                            .child(
-                                button(ButtonKind::Destructive, "confirm-cancel-process", "Cancel process", theme)
-                                    .debug_selector(|| "confirm-cancel-process".into())
-                                    .on_click(cx.listener(|this, _, _, cx| this.confirm_cancel_process(cx))),
-                            )
-                            .child(
-                                button(ButtonKind::Ghost, "keep-process", "Keep running", theme)
-                                    .debug_selector(|| "keep-process".into())
-                                    .on_click(cx.listener(|this, _, _, cx| this.keep_process_running(cx))),
-                            ),
-                    ),
-            ),
-        )
+        let dialog = ConfirmDialog {
+            id: "cancel-process",
+            title: format!("Cancel server process {pid}?").into(),
+            body: "The server stops what this process is running. A Prod connection asks for approval first.".into(),
+            sql: Some(sql.clone().into()),
+        };
+        let actions = [
+            button(
+                ButtonKind::Destructive,
+                "confirm-cancel-process",
+                "Cancel process",
+                theme,
+            )
+            .debug_selector(|| "confirm-cancel-process".into())
+            .on_click(cx.listener(|this, _, _, cx| this.confirm_cancel_process(cx))),
+            button(ButtonKind::Ghost, "keep-process", "Keep running", theme)
+                .debug_selector(|| "keep-process".into())
+                .on_click(cx.listener(|this, _, _, cx| this.keep_process_running(cx))),
+        ];
+        Some(confirm_dialog(dialog, actions, theme))
     }
 }

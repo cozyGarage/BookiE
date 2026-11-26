@@ -74,9 +74,8 @@ impl GridView {
         let overview = match live.overview() {
             Ok(overview) => overview,
             Err(error) => {
-                let message = format!("Could not read connection status: {error}");
-                self.status = message.clone();
-                self.panel.messages.push(MessageKind::Error, message);
+                self.report_failure("read connection status", &error.to_string());
+                self.panel.messages.push(MessageKind::Error, self.status.clone());
                 return;
             }
         };
@@ -93,9 +92,7 @@ impl GridView {
         if self.live.as_ref().is_some_and(|live| live.driver_id == "postgres") {
             self.tabs.open_query();
             self.sync_grid_owner();
-            self.sql_input.update(cx, |input, cx| {
-                input.set_value(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx)
-            });
+            self.set_sql_text(bookie_app_services::pg_sessions::SESSIONS_SQL, window, cx);
             self.pending_cancel_process = true;
             self.run_query(cx);
             return;
@@ -113,7 +110,7 @@ impl GridView {
         if let Ok(sql) = bookie_core::activity_sql(&live.driver_id, kind, None) {
             self.tabs.open_query();
             self.sync_grid_owner();
-            self.sql_input.update(cx, |input, cx| input.set_value(&sql, window, cx));
+            self.set_sql_text(&sql, window, cx);
             self.pending_cancel_process = matches!(
                 kind,
                 bookie_core::ActivityQuery::Sessions | bookie_core::ActivityQuery::LongRunning

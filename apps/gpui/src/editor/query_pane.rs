@@ -34,8 +34,7 @@ impl GridView {
         let settings = bookie_core::sql_syntax::script::LexicalSettings::default_for(grammar);
         let formatted = bookie_core::sql_format::format_script(&text, grammar, settings);
         if formatted != text {
-            self.sql_input
-                .update(cx, |input, cx| input.set_value(formatted, window, cx));
+            self.set_sql_text(formatted, window, cx);
             self.status = "Formatted the SQL".into();
         }
     }
@@ -233,7 +232,7 @@ impl GridView {
             compact,
         )
         .dropdown_caret(!compact)
-        .dropdown_menu(move |mut menu, _, _| {
+        .dropdown_menu(move |mut menu, _, cx| {
             let explain = owner.clone();
             let format = owner.clone();
             let favorite = owner.clone();
@@ -268,7 +267,8 @@ impl GridView {
                     });
                 }),
             );
-            crate::sql_editor::snippet_menu(menu, &owner)
+            let snippets = owner.read_with(cx, |view, _| view.sql_snippets.clone()).ok().flatten();
+            crate::sql_editor::snippet_menu(menu, &owner, snippets)
         })
     }
 
@@ -461,7 +461,7 @@ impl GridView {
         let editor = self.query_editor_pane(theme, compact, cx);
         let divider = self.query_split_divider(theme, cx);
         let result = self.result_pane(theme, grid, compact, cx);
-        let tools = self.tool_bars(theme, cx);
+        let tools = self.value_search_bar(theme, cx);
         div()
             .flex_1()
             .flex()

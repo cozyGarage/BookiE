@@ -184,7 +184,7 @@ impl GridView {
                         }
                         this.status = "Enter the bundle passphrase to review its connections".into();
                     }
-                    Err(message) => this.status = format!("Could not read connections: {message}"),
+                    Err(message) => this.report_failure("read connections", &message),
                 }
                 cx.notify();
             })
@@ -220,7 +220,7 @@ impl GridView {
                 match outcome {
                     (bundle, Err(message)) => {
                         this.connection_bundle.encrypted = Some(bundle);
-                        this.status = format!("Could not unlock the connection bundle: {message}");
+                        this.report_failure("unlock the connection bundle", &message);
                     }
                     (_, Ok(pending)) if pending.plan.items.is_empty() => {
                         this.connection_bundle.encrypted = None;
@@ -320,10 +320,12 @@ impl GridView {
                 .await;
             this.update(cx, |this, cx| {
                 this.connection_bundle.busy = false;
-                this.status = match result {
-                    Ok(count) => format!("Exported {count} connection(s); passwords and SSH secrets were omitted"),
-                    Err(message) => format!("Could not export connections: {message}"),
-                };
+                match result {
+                    Ok(count) => {
+                        this.status = format!("Exported {count} connection(s); passwords and SSH secrets were omitted")
+                    }
+                    Err(message) => this.report_failure("export connections", &message),
+                }
                 cx.notify();
             })
             .ok();
