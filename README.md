@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-BookiE is a free, open-source database client focused on Linux first, built for data analysts, database administrators, and developers. Browse tables, write SQL, investigate results, and review changes in a native desktop workspace. A modern cross-platform GPUI frontend is in active parallel development ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
+BookiE is a free, open-source database client for data analysts, database administrators, and developers. Browse tables, write SQL, investigate results, and review changes in a native desktop workspace. The GPUI frontend is the primary frontend for new work. The GTK app is historical and remains the supported Linux release until GPUI passes its release gate ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)).
 
 <p align="center">
   <picture>
@@ -40,7 +40,7 @@ BookiE is a free, open-source database client focused on Linux first, built for 
 
 | | |
 |---|---|
-| Platform | Linux first, with a GTK4 desktop interface. Cross-platform GPUI desktop frontend in active parallel development. |
+| Platform | Linux. The supported release is the GTK4 desktop app. Tagged releases also include an unsupported GPUI Linux x86_64 preview. |
 | Databases | **11 engines**: PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and ClickHouse. DuckDB, MongoDB, and Redis. Read-only Oracle Database and Cassandra / ScyllaDB drivers (Experimental). See the [driver maturity table](docs/adding-drivers.md#driver-maturity). |
 | Cost | Free and open source under [AGPL-3.0-or-later](LICENSE). No accounts, subscriptions, license keys, paid tiers, or remote entitlement checks. |
 | Credentials | Securely stored in the system keyring (Secret Service via `oo7`). Plaintext files never hold passwords or passphrases. |
@@ -73,7 +73,7 @@ To build from source, see [Build and run](#build-and-run).
 
 ![BookiE Quickstart Workflow](docs/images/quickstart-flow.svg)
 
-1. Click the `+` in the window header, choose the database type and fill in the connection.
+1. In the GTK app, click the `+` in the window header, choose the database type and fill in the connection.
 2. Click **Test**, then **Connect**.
 3. Click a table in the sidebar to browse it, or press Ctrl+E to open a SQL editor.
 
@@ -89,23 +89,23 @@ Open source makes this project possible. BookiE is an independent database clien
 
 ## Status
 
-The documentation describes current source behavior; a merged change may not be in a published package yet. See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts and [release finishing work](docs/backlog.md) for the path to 0.2.8. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
+The documentation describes current source behavior; a merged change may not be in a published package yet. See the [release page](https://github.com/cozyGarage/BookiE/releases) for published artifacts and [current release work](docs/backlog.md#current-release-work) for the next release. [Project #3](https://github.com/users/cozyGarage/projects/3) lists selected work. Use the [driver maturity table](docs/adding-drivers.md#driver-maturity), [platform guide](docs/platforms.md), and [known limitations](docs/known-limitations.md) for current engine support, installation requirements, and behavior limits.
 
 ## Supported platforms
 
-BookiE is focused on Linux first with its flagship GTK4 and libadwaita desktop application, and cross-platform desktop development is actively underway via GPUI ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)). The [platform guide](docs/platforms.md) lists the current native-library floor and published Linux artifacts.
+The supported release is the Linux GTK4 and libadwaita desktop application. GPUI is the primary frontend for new work and ships only as an unsupported Linux x86_64 preview until it passes the release gate on each platform ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)). The [platform guide](docs/platforms.md) lists the current native-library floor and published Linux artifacts.
 
 ## Architecture
 
 ![BookiE architecture overview: the desktop app and the headless MCP host reach every database through one PolicyGuard, then routing and static drivers](docs/images/architecture-overview.svg)
 
-Every database handle that the desktop app, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time and frontends (flagship native GTK4/libadwaita for Linux and cross-platform GPUI) run with no embedded browser. Applications use `bookie-app-services` and `bookie-core` for UI-agnostic application state and service logic.
+Every database handle that the desktop apps, the MCP tools and `bookie-agentd` receive is a `PolicyGuard`. Token scopes and connection allowlists do not replace it. Drivers are linked at build time, and both frontends (GPUI, and the historical GTK4/libadwaita app) run with no embedded browser. Both use `bookie-app-services` and `bookie-core` for UI-agnostic application state and service logic.
 
 [`ARCHITECTURE.md`](ARCHITECTURE.md) has the crate map, the request pipeline, trait boundaries and deliberate limits.
 
 ## Development
 
-The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `main` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, Relm4, and GPUI. The root Cargo workspace contains `crates/` and `apps/linux/` and requires Rust 1.98. The GPUI application has a separate workspace in `apps/gpui/`.
+The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE), and current development is on the `main` branch. BookiE is built with Rust, GTK4, libadwaita, GtkSourceView, Relm4, and GPUI. The root Cargo workspace contains `crates/`, `apps/linux/` and `tests/` and requires Rust 1.98. The GPUI application has a separate workspace in `apps/gpui/`.
 
 Start with the [documentation map](docs/README.md) and [Project #3](https://github.com/users/cozyGarage/projects/3) for selected work and acceptance criteria.
 
@@ -113,7 +113,7 @@ Start with the [documentation map](docs/README.md) and [Project #3](https://gith
 
 BookiE is an independent, standalone database client with a Linux-first focus, its own autonomous architecture, development lifecycle, and product roadmap.
 
-Installed commands are `bookie`, `bookie-agentd` and `bookie-askpass`. The app ID is `com.bookie.linux` and state lives under `~/.config/bookie/` and `~/.local/share/bookie/`. On first start the app copies state from the legacy `tablepro` locations and keyring entries and leaves the originals in place for rollback ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)). Cargo packages are `bookie-*`.
+Installed commands are `bookie`, `bookie-agentd` and `bookie-askpass`. The app ID is `com.bookie.linux` and state lives under `~/.config/bookie/` and `~/.local/share/bookie/`. The GPUI app also keeps its settings and window size in `~/.config/bookie-gpui/`. On first start the app copies state from the legacy `tablepro` locations and keyring entries and leaves the originals in place for rollback ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)). Cargo packages are `bookie-*`.
 
 
 ## Build requirements
@@ -146,16 +146,16 @@ rustc --version
 From the repository root:
 
 ```bash
-# Flagship Linux GTK application
+# GTK application (historical, current Linux release)
 cargo run -p bookie-app
 
-# Cross-platform GPUI application
+# GPUI application (primary frontend)
 scripts/gpui-cargo.sh run --locked
 ```
 
 The GPUI wrapper shares Cargo output across linked BookiE worktrees and uses `sccache` for Rust and DuckDB C/C++ compilation when installed. The first build compiles the bundled DuckDB engine; later builds reuse it while its inputs stay unchanged.
 
-A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/bookie-devel` and its own keyring schema:
+A plain `cargo run` shares settings, saved connections, the keyring entries and the single-instance lock with an installed BookiE. To keep test data apart, build with the development profile, which uses `~/.config/bookie-devel` and its own keyring schema. GPUI settings in `~/.config/bookie-gpui/` are shared across profiles:
 
 ```bash
 BOOKIE_PROFILE=development cargo run -p bookie-app
