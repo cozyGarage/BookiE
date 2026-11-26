@@ -7,7 +7,9 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader as XmlReader;
 use zip::ZipArchive;
 
-use super::csv_import::{ImportError, MAX_COLUMNS, MAX_FIELD_BYTES, MAX_FILE_BYTES, MAX_IMPORT_ROWS};
+use super::csv_import::{
+    CsvSheet, ImportError, MAX_COLUMNS, MAX_FIELD_BYTES, MAX_FILE_BYTES, MAX_IMPORT_ROWS, finish_sheet,
+};
 
 const ZIP_MAGIC: &[u8] = b"PK\x03\x04";
 const MAX_SHARED_STRINGS_BYTES: u64 = MAX_FILE_BYTES;
@@ -17,6 +19,34 @@ pub fn is_xlsx(bytes: &[u8]) -> bool {
 }
 
 pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
+    let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
+    visit_xlsx_rows(bytes, |row| {
+        writer.write_record(row.iter()).map_err(|_| ImportError::NotSpreadsheet)
+    })?;
+    writer.into_inner().map_err(|_| ImportError::NotSpreadsheet)
+}
+
+pub fn read_xlsx(bytes: &[u8], row_limit: usize) -> Result<CsvSheet, ImportError> {
+    let mut headers = None;
+    let mut rows = Vec::new();
+    let mut truncated = false;
+    visit_xlsx_rows(bytes, |row| {
+        if headers.is_none() {
+            headers = Some(std::mem::take(row));
+        } else if rows.len() < row_limit {
+            rows.push(std::mem::take(row));
+        } else {
+            truncated = true;
+        }
+        Ok(())
+    })?;
+    finish_sheet(headers.ok_or(ImportError::NoColumns)?, rows, truncated)
+}
+
+fn visit_xlsx_rows(
+    bytes: &[u8],
+    mut visit: impl FnMut(&mut Vec<String>) -> Result<(), ImportError>,
+) -> Result<(), ImportError> {
     check_output_size(0, bytes.len())?;
     check_workbook_xml_bounds(bytes)?;
     let mut workbook: Xlsx<_> = open_workbook_from_rs(Cursor::new(bytes)).map_err(|_| ImportError::NotSpreadsheet)?;
@@ -24,7 +54,6 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
         let mut cells = workbook
             .worksheet_cells_reader(&name)
             .map_err(|_| ImportError::NotSpreadsheet)?;
-        let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
         let mut row: Vec<String> = Vec::new();
         let mut row_payload_bytes = 0usize;
         let mut output_bytes = 0u64;
@@ -38,16 +67,16 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
             });
             check_row_order(current_row, row_index)?;
             if row_index != current_row {
-                write_row(
-                    &mut writer,
+                emit_row(
+                    &mut visit,
                     &mut row,
                     &mut rows_written,
                     &mut output_bytes,
                     &mut row_payload_bytes,
                 )?;
                 for _ in current_row + 1..row_index {
-                    write_row(
-                        &mut writer,
+                    emit_row(
+                        &mut visit,
                         &mut row,
                         &mut rows_written,
                         &mut output_bytes,
@@ -66,14 +95,14 @@ pub fn xlsx_to_csv(bytes: &[u8]) -> Result<Vec<u8>, ImportError> {
             )?;
         }
         if current.is_some() {
-            write_row(
-                &mut writer,
+            emit_row(
+                &mut visit,
                 &mut row,
                 &mut rows_written,
                 &mut output_bytes,
                 &mut row_payload_bytes,
             )?;
-            return writer.into_inner().map_err(|_| ImportError::NotSpreadsheet);
+            return Ok(());
         }
     }
     Err(ImportError::NoColumns)
@@ -116,8 +145,8 @@ fn set_cell(
     Ok(())
 }
 
-fn write_row(
-    writer: &mut csv::Writer<Vec<u8>>,
+fn emit_row(
+    visit: &mut impl FnMut(&mut Vec<String>) -> Result<(), ImportError>,
     row: &mut Vec<String>,
     rows_written: &mut usize,
     output_bytes: &mut u64,
@@ -128,9 +157,7 @@ fn write_row(
     }
     let row_bytes = row_csv_bytes(*row_payload_bytes, row.len());
     check_output_size(*output_bytes, row_bytes)?;
-    writer
-        .write_record(row.iter())
-        .map_err(|_| ImportError::NotSpreadsheet)?;
+    visit(row)?;
     *output_bytes += row_bytes as u64;
     *row_payload_bytes = 0;
     row.clear();
@@ -270,14 +297,14 @@ mod tests {
 
     #[test]
     fn keeps_room_for_a_header_before_refusing_rows_after_the_import_limit() {
-        let mut writer = csv::WriterBuilder::new().flexible(true).from_writer(Vec::new());
+        let mut visit = |_: &mut Vec<String>| Ok(());
         let mut row = vec!["value".to_owned()];
         let mut rows_written = MAX_IMPORT_ROWS;
         let mut output_bytes = 0;
         let mut row_payload_bytes = 5;
 
-        write_row(
-            &mut writer,
+        emit_row(
+            &mut visit,
             &mut row,
             &mut rows_written,
             &mut output_bytes,
@@ -286,8 +313,8 @@ mod tests {
         .unwrap();
         assert_eq!(rows_written, MAX_IMPORT_ROWS + 1);
         assert_eq!(
-            write_row(
-                &mut writer,
+            emit_row(
+                &mut visit,
                 &mut row,
                 &mut rows_written,
                 &mut output_bytes,
@@ -312,6 +339,14 @@ mod tests {
         assert!(is_xlsx(&bytes));
         let csv = String::from_utf8(xlsx_to_csv(&bytes).unwrap()).unwrap();
         assert_eq!(csv, "id,note\n7,\"a,b\"\n\"\"\n1.5\n");
+
+        let parsed = read_xlsx(&bytes, 3).unwrap();
+        assert_eq!(parsed.headers, ["id", "note"]);
+        assert_eq!(parsed.rows, [["7", "a,b"], ["", ""], ["1.5", ""]]);
+        assert!(!parsed.truncated);
+        let preview = read_xlsx(&bytes, 2).unwrap();
+        assert_eq!(preview.rows, [["7", "a,b"], ["", ""]]);
+        assert!(preview.truncated);
     }
 
     #[test]
