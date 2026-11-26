@@ -145,3 +145,29 @@ fn a_query_can_show_its_result_after_the_last_older_result_is_closed(cx: &mut Te
         assert_eq!(view.source.row(0), [bookie_gpui::model::Cell::Int(7)])
     });
 }
+
+#[gpui::test]
+fn a_query_finishing_behind_another_result_replaces_the_running_status(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    for (sql, failed) in [("SELECT 7", false), ("SELECT nope FROM orders", true)] {
+        let running = cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.tabs.open_query();
+                view.sync_grid_owner();
+                view.add_run(None);
+                view.add_run(None);
+                view.sql_input.update(cx, |input, cx| input.set_value(sql, window, cx));
+                view.run_query(cx);
+                let running = view.status.clone();
+                view.select_run(0);
+                running
+            })
+        });
+        cx.run_until_parked();
+        view.read_with(cx, |view, _| {
+            assert_ne!(view.status, running, "{sql} left the running status");
+            assert!(!view.status.is_empty());
+            assert_eq!(view.status.contains("nope"), failed, "{}", view.status);
+        });
+    }
+}

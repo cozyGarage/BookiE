@@ -2,6 +2,8 @@ use super::*;
 
 const MAX_RESULT_TABS: usize = 64;
 const MAX_RETAINED_RESULT_BYTES: usize = 256 * 1024 * 1024;
+const RUNNING_STATUS: &str = "Running…";
+const FINISHED_STATUS: &str = "Query finished";
 
 pub(crate) struct RunSlot {
     pub run: Run,
@@ -176,7 +178,7 @@ impl GridView {
             }
             self.panel.error_location = None;
             self.sql_input.update(cx, Self::clear_sql_diagnostics);
-            self.status = "Running…".into();
+            self.status = RUNNING_STATUS.into();
             let explaining = crate::plan_view::typed_explain(&sql);
             let current_session = session.clone();
             let selected = self
@@ -191,6 +193,9 @@ impl GridView {
                 move |this, outcomes, cx| {
                     if !this.is_current_session(&current_session) {
                         this.invalidate_query();
+                        if this.status == RUNNING_STATUS {
+                            this.status = FINISHED_STATUS.into();
+                        }
                         return;
                     }
                     this.panel.running = None;
@@ -210,6 +215,8 @@ impl GridView {
                         if let Some(message) = error_status {
                             this.status = message;
                         }
+                    } else if !activate || this.status == RUNNING_STATUS {
+                        this.status = error_status.unwrap_or_else(|| FINISHED_STATUS.into());
                     }
                 },
             );
