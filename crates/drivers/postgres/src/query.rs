@@ -761,6 +761,7 @@ mod tests {
 
     #[test]
     fn column_origins_become_typed_integer_array_literals() {
+        use super::{bigint_array, smallint_array};
         assert_eq!(
             bigint_array([Some(16385_i64), None, Some(-1)].into_iter()),
             "ARRAY[16385,NULL,-1]::bigint[]"
