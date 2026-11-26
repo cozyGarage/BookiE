@@ -7,7 +7,7 @@ on:
       - Linux Security
       - Linux CI contracts
       - PR title
-      - Release note
+      - GPUI macOS build
     types: [completed]
 
 permissions: {}
@@ -22,6 +22,7 @@ jobs:
       checks: write
       contents: read
       pull-requests: read
+      statuses: read
     concurrency:
       group: linux-pr-readiness-rerun-${{ github.event.workflow_run.pull_requests[0].number }}
       cancel-in-progress: false

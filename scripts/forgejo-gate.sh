@@ -9,6 +9,8 @@ remote_url="$(git remote get-url "$remote")"
 default_api="$(printf '%s' "$remote_url" | sed -E 's#^(https?://)([^/@]*@)?([^/]+)/(.+)\.git$#\1\3/api/v1/repos/\4#')"
 api="${FORGEJO_API:-$default_api}"
 timeout_minutes="${FORGEJO_GATE_TIMEOUT_MINUTES:-60}"
+github_status_repo="${FORGEJO_GATE_GITHUB_REPO-cozyGarage/BookiE}"
+web="${FORGEJO_WEB_URL:-${api/\/api\/v1\/repos\//\/}}"
 
 export GIT_ASKPASS="${GIT_ASKPASS:-$HOME/.config/forgejo/askpass.sh}"
 sha="$(git rev-parse "$branch")"
@@ -21,6 +23,20 @@ api_get() {
 api_post() {
   curl -fsS --max-time 60 \
     --config <(printf 'header = "Authorization: token %s"\n' "$token") "$@"
+}
+
+report_github_status() {
+  local state="$1" description="$2" run_number="$3"
+  [ -n "$github_status_repo" ] || return 0
+  if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
+    echo "warning: gh is missing or not signed in; the Forgejo gate result was not posted to GitHub" >&2
+    return 0
+  fi
+  if ! gh api --method POST "repos/$github_status_repo/statuses/$sha" \
+    -f state="$state" -f context="Forgejo regression gate" \
+    -f target_url="$web/actions/runs/$run_number" -f description="$description" >/dev/null 2>&1; then
+    echo "warning: could not post the Forgejo gate result to GitHub for $sha" >&2
+  fi
 }
 
 docs_only() {
@@ -137,7 +153,10 @@ while true; do
     observed_run_number="$run_number"
   fi
   case "$status" in
-    success) echo "forgejo run $run_number (API id $run_id) passed for $sha"; exit 0 ;;
+    success)
+      echo "forgejo run $run_number (API id $run_id) passed for $sha"
+      report_github_status success "Forgejo run $run_number passed" "$run_number"
+      exit 0 ;;
     failure|cancelled)
       report="$(api_get "$api/actions/runs/$run_id/jobs" | python3 -c '
 import json, sys
@@ -172,6 +191,7 @@ else:
             echo "could not retrieve the job log"
           fi
         done <<< "$report"
+        report_github_status failure "Forgejo run $run_number $status" "$run_number"
         exit 1
       fi ;;
   esac

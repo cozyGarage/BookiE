@@ -222,7 +222,7 @@ Changing this table also updates `scripts/check-ci-jobs.py` and `scripts/tests/t
 
 These pull-request checks provide fast feedback for the exact revision and need no database or GTK. Passing them does not certify acceptance tiers they did not run.
 
-`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. The `protect main` ruleset does not require it: GitHub Actions is too slow to gate every pull request, so code changes are accepted through the Forgejo train and `scripts/forgejo-gate.sh`. A maintainer may still wait for the readiness report on a risky pull request. CodeQL and SonarCloud stay reference scans.
+`Linux PR readiness` ([workflow](../.github/workflows/linux-pr-readiness.yml), `scripts/check-pr-readiness.py`) waits for the exact head's applicable check runs. It treats absent, pending, skipped, cancelled, timed-out and failed checks as not ready. A successful `Forgejo regression gate` commit status on the exact head also satisfies `Linux regression gate`; `scripts/forgejo-gate.sh` posts that status (success or failure) through `gh` when `gh` is signed in, and only warns when it cannot. Set `FORGEJO_GATE_GITHUB_REPO=` to skip posting. The `protect main` ruleset does not require it: GitHub Actions is too slow to gate every pull request, so code changes are accepted through the Forgejo train and `scripts/forgejo-gate.sh`. A maintainer may still wait for the readiness report on a risky pull request. CodeQL and SonarCloud stay reference scans.
 
 | Check | What it enforces |
 |---|---|

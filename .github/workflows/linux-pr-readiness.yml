@@ -9,6 +9,7 @@ permissions:
   checks: read
   contents: read
   pull-requests: read
+  statuses: read
 
 concurrency:
   group: linux-pr-readiness-${{ github.event.pull_request.number }}
