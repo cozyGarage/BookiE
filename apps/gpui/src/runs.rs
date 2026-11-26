@@ -1,10 +1,14 @@
 use super::*;
 
+const MAX_RESULT_TABS: usize = 64;
+const MAX_RETAINED_RESULT_BYTES: usize = 256 * 1024 * 1024;
+
 pub(crate) struct RunSlot {
     pub run: Run,
     pub edits: grid_edit::Edits,
     pub source: Option<Source>,
     pub failure: Option<String>,
+    pub estimated_bytes: usize,
     pub cancel_process: bool,
 }
 
@@ -12,12 +16,40 @@ impl RunSlot {
     pub fn new(run: Run, source: Option<Source>) -> Self {
         Self {
             run,
+            estimated_bytes: source.as_ref().map_or(0, |source| source.estimated_retained_bytes()),
             edits: grid_edit::Edits::new(),
             source,
             failure: None,
             cancel_process: false,
         }
     }
+}
+
+fn result_evictions(tabs: &panel_state::RunTabs, incoming_bytes: usize) -> Option<Vec<usize>> {
+    let mut count = tabs.slots.len() + 1;
+    let mut bytes = tabs
+        .slots
+        .iter()
+        .fold(incoming_bytes, |total, slot| total.saturating_add(slot.estimated_bytes));
+    let mut evictions = Vec::new();
+    for (index, slot) in tabs.slots.iter().enumerate() {
+        if count <= MAX_RESULT_TABS && bytes <= MAX_RETAINED_RESULT_BYTES {
+            break;
+        }
+        if index == tabs.active
+            || !slot.edits.is_empty()
+            || slot
+                .source
+                .as_ref()
+                .is_some_and(|source| std::sync::Arc::strong_count(source) > 1)
+        {
+            continue;
+        }
+        count -= 1;
+        bytes -= slot.estimated_bytes;
+        evictions.push(index);
+    }
+    (count <= MAX_RESULT_TABS && bytes <= MAX_RETAINED_RESULT_BYTES).then_some(evictions)
 }
 
 fn original_error_location(
@@ -162,10 +194,11 @@ impl GridView {
                         .last()
                         .and_then(|outcome| outcome.result.as_ref().err())
                         .map(|error| error.message.clone());
+                    let first_new_number = this.run_tabs.next_number;
                     for outcome in outcomes {
                         this.apply_query_outcome(outcome, &original, cancel_process, activate, cx);
                     }
-                    if activate && !this.run_tabs.slots.is_empty() {
+                    if activate && this.run_tabs.next_number != first_new_number {
                         this.activate_run(this.run_tabs.slots.len() - 1);
                         if let Some(message) = error_status {
                             this.status = message;
@@ -200,8 +233,7 @@ impl GridView {
                     let truncated = bookie_gpui::source::ResultSource::is_partial(&table);
                     self.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                     self.panel.messages.server_messages(&table.messages);
-                    self.append_run(Some(std::sync::Arc::new(table)), cancel_process, false);
-                    if let Some(slot) = self.run_tabs.slots.last_mut() {
+                    if let Some(slot) = self.append_run(Some(std::sync::Arc::new(table)), cancel_process, false) {
                         slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                     }
                 }
@@ -293,8 +325,7 @@ impl GridView {
             },
             |this, (elapsed, result)| match result {
                 Ok(table) => {
-                    this.add_run(Some(std::sync::Arc::new(table)));
-                    if let Some(slot) = this.run_tabs.slots.last_mut() {
+                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, true) {
                         slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                     }
                 }
@@ -317,37 +348,64 @@ impl GridView {
                 == selected
     }
 
-    fn append_run(&mut self, source: Option<Source>, cancel_process: bool, activate: bool) {
+    fn append_run(&mut self, source: Option<Source>, cancel_process: bool, activate: bool) -> Option<&mut RunSlot> {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
         }
-        self.run_tabs.next_number += 1;
         let mut slot = RunSlot::new(run, source);
         slot.cancel_process = cancel_process;
-        self.run_tabs.slots.push(slot);
+        if !self.retain_result(slot) {
+            return None;
+        }
         if activate {
             self.activate_run(self.run_tabs.slots.len() - 1);
         }
+        self.run_tabs.slots.last_mut()
+    }
+
+    fn retain_result(&mut self, slot: RunSlot) -> bool {
+        let Some(evictions) = result_evictions(&self.run_tabs, slot.estimated_bytes) else {
+            let message = "Result could not be kept. Close unused result tabs and try again.".to_string();
+            self.notices.push(message.clone(), notifications::NoticeKind::Error);
+            self.status = message;
+            return false;
+        };
+        if !evictions.is_empty() {
+            self.notices.push(
+                format!(
+                    "Closed {} older result tab(s) to stay within the retention limit",
+                    evictions.len()
+                ),
+                notifications::NoticeKind::Success,
+            );
+        }
+        for index in evictions.into_iter().rev() {
+            self.run_tabs.slots.remove(index);
+            if index < self.run_tabs.active {
+                self.run_tabs.active -= 1;
+            }
+        }
+        self.run_tabs.slots.push(slot);
+        self.run_tabs.next_number += 1;
+        true
     }
 
     #[cfg(test)]
     pub(crate) fn add_failed_run(&mut self, detail: String, elapsed: std::time::Duration) {
-        self.append_failed_run(detail, elapsed);
-        if self.cell_edit.active.is_none() {
+        if self.append_failed_run(detail, elapsed) && self.cell_edit.active.is_none() {
             self.activate_run(self.run_tabs.slots.len() - 1);
         }
     }
 
-    fn append_failed_run(&mut self, detail: String, elapsed: std::time::Duration) {
+    fn append_failed_run(&mut self, detail: String, elapsed: std::time::Duration) -> bool {
         let mut run = next_run(self.run_tabs.next_number);
         run.rows = 0;
         run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
-        self.run_tabs.next_number += 1;
         let source: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Failed query".into()));
         let mut slot = RunSlot::new(run, Some(source));
         slot.failure = Some(detail);
-        self.run_tabs.slots.push(slot);
+        self.retain_result(slot)
     }
 
     pub(crate) fn close_tab(&mut self, index: usize, cx: &gpui::App) {
@@ -535,5 +593,38 @@ impl GridView {
         }
         let next = index.min(self.run_tabs.slots.len() - 1);
         self.show_run(next, self.run_tabs.slots[next].run);
+    }
+}
+
+#[cfg(test)]
+mod retention_tests {
+    use super::*;
+
+    #[test]
+    fn result_retention_protects_the_selected_result_and_in_flight_sources() {
+        let held: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Held".into()));
+        let mut tabs = panel_state::RunTabs::new(RunSlot::new(next_run(1), None));
+        tabs.slots[0].estimated_bytes = MAX_RETAINED_RESULT_BYTES / 2;
+        let mut owned = RunSlot::new(next_run(2), Some(held.clone()));
+        owned.estimated_bytes = MAX_RETAINED_RESULT_BYTES / 4;
+        tabs.slots.push(owned);
+        let mut idle = RunSlot::new(next_run(3), None);
+        idle.estimated_bytes = MAX_RETAINED_RESULT_BYTES / 4;
+        tabs.slots.push(idle);
+
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 4), Some(vec![2]));
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 2), None);
+        drop(held);
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 2), Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn result_retention_bounds_even_empty_results() {
+        let mut tabs = panel_state::RunTabs::new(RunSlot::new(next_run(1), None));
+        for number in 2..=MAX_RESULT_TABS {
+            tabs.slots.push(RunSlot::new(next_run(number), None));
+        }
+        tabs.active = 1;
+        assert_eq!(result_evictions(&tabs, 0), Some(vec![0]));
     }
 }

@@ -1795,6 +1795,10 @@ fn numeric_type(data_type: &str) -> bool {
 }
 
 impl ResultSource for LiveTable {
+    fn estimated_retained_bytes(&self) -> usize {
+        self.result.estimated_row_bytes()
+    }
+
     fn load_elapsed(&self) -> Option<Duration> {
         Some(self.load_elapsed)
     }

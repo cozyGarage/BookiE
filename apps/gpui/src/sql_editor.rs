@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, Weak};
 
 use bookie_app_services::completion::{SchemaIndex, referenced_tables};
 use bookie_app_services::completion_proposals::candidates;
@@ -17,7 +17,31 @@ const MAX_COMPLETION_BYTES: usize = 256 * 1024;
 const MAX_COMPLETION_ITEMS: usize = 50;
 const MAX_METADATA_TABLES: usize = 4;
 
-struct SqlCompletion(WeakEntity<GridView>);
+#[derive(Default)]
+struct CompletionIndex {
+    session: Weak<LiveSession>,
+    index: SchemaIndex,
+}
+
+impl CompletionIndex {
+    fn prepare(&mut self, session: &Arc<LiveSession>, grammar: bookie_core::sql_syntax::SqlGrammar) {
+        let identity = Arc::downgrade(session);
+        if !self.session.ptr_eq(&identity) {
+            self.session = identity;
+            self.index.grammar = Some(grammar);
+            self.index.set_tables(
+                session
+                    .tables
+                    .iter()
+                    .map(|table| qualified_table(&session.driver_id, table.schema.as_deref(), &table.name))
+                    .collect(),
+            );
+        }
+        self.index.invalidate_columns();
+    }
+}
+
+struct SqlCompletion(WeakEntity<GridView>, Arc<Mutex<CompletionIndex>>);
 
 impl CompletionProvider for SqlCompletion {
     fn completions(
@@ -36,6 +60,7 @@ impl CompletionProvider for SqlCompletion {
         }
         let text = text.clone();
         let view = self.0.clone();
+        let cache = self.1.clone();
         cx.spawn(async move |cx| {
             let context = view
                 .read_with(cx, |view, _| Some((view.live.clone()?, view.schema_context.clone())))
@@ -48,7 +73,12 @@ impl CompletionProvider for SqlCompletion {
             let current_schema = schema.clone();
             let items = cx
                 .background_executor()
-                .spawn(async move { completion_items(&text, offset, &session, schema.as_deref()) })
+                .spawn(async move {
+                    let Ok(mut cache) = cache.try_lock() else {
+                        return Vec::new();
+                    };
+                    completion_items(&text, offset, &session, schema.as_deref(), &mut cache)
+                })
                 .await;
             let still_current = view
                 .read_with(cx, |view, _| {
@@ -92,20 +122,13 @@ fn completion_items(
     offset: usize,
     session: &Arc<LiveSession>,
     schema: Option<&str>,
+    cache: &mut CompletionIndex,
 ) -> Vec<CompletionItem> {
     let Some(grammar) = grammar_for_driver(&session.driver_id) else {
         return Vec::new();
     };
     let sql = text.to_string();
-    let mut index = SchemaIndex::default();
-    index.grammar = Some(grammar);
-    index.set_tables(
-        session
-            .tables
-            .iter()
-            .map(|table| qualified_table(&session.driver_id, table.schema.as_deref(), &table.name))
-            .collect(),
-    );
+    cache.prepare(session, grammar);
     for reference in referenced_tables(&sql, offset, Some(grammar))
         .into_iter()
         .take(MAX_METADATA_TABLES)
@@ -123,10 +146,12 @@ fn completion_items(
             && matches.next().is_none()
             && let Ok(columns) = session.completion_columns(table)
         {
-            index.set_columns(&reference, columns.into_iter().map(|column| column.name).collect());
+            cache
+                .index
+                .set_columns(&reference, columns.into_iter().map(|column| column.name).collect());
         }
     }
-    let result = candidates(&sql, offset, &index);
+    let result = candidates(&sql, offset, &cache.index);
     let range = Range::new(
         text.offset_to_position(result.range.start),
         text.offset_to_position(result.range.end),
@@ -145,7 +170,7 @@ fn completion_items(
 
 impl GridView {
     pub(crate) fn install_sql_completion(editor: &mut EditorState, view: WeakEntity<Self>) {
-        editor.lsp_mut().completion_provider = Some(Rc::new(SqlCompletion(view)));
+        editor.lsp_mut().completion_provider = Some(Rc::new(SqlCompletion(view, Arc::default())));
     }
 
     pub(crate) fn clear_sql_diagnostics(editor: &mut EditorState, cx: &mut Context<EditorState>) {
