@@ -1,5 +1,7 @@
 use gpui::TestAppContext;
 
+use crate::ui_tests::test_kit::{NARROW, WIDE};
+
 #[gpui::test]
 fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppContext) {
     let (view, cx) = crate::ui_tests::open(cx);
@@ -26,7 +28,7 @@ fn hiding_results_cancels_explain_and_drops_its_late_result(cx: &mut TestAppCont
 
 #[gpui::test]
 fn format_rewrites_the_editor_with_the_shared_formatter_and_leaves_empty_text_alone(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     let original = "select id, customer from orders where total > 1 order by id";
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -59,7 +61,7 @@ fn format_rewrites_the_editor_with_the_shared_formatter_and_leaves_empty_text_al
 
 #[gpui::test]
 fn a_blocked_explain_cannot_cancel_the_query_already_running(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.sql_input
@@ -78,7 +80,7 @@ fn a_blocked_explain_cannot_cancel_the_query_already_running(cx: &mut TestAppCon
 
 #[gpui::test]
 fn replacement_load_does_not_inherit_explain_cancellation(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.sql_input
@@ -98,7 +100,7 @@ fn replacement_load_does_not_inherit_explain_cancellation(cx: &mut TestAppContex
 
 #[gpui::test]
 fn selecting_an_older_result_leaves_the_query_running(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     let selected = cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -126,7 +128,7 @@ fn selecting_an_older_result_leaves_the_query_running(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_query_can_show_its_result_after_the_last_older_result_is_closed(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -148,7 +150,7 @@ fn a_query_can_show_its_result_after_the_last_older_result_is_closed(cx: &mut Te
 
 #[gpui::test]
 fn a_query_finishing_behind_another_result_replaces_the_running_status(cx: &mut TestAppContext) {
-    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let (view, cx, _orders) = crate::live_ui_tests::open_live(cx);
     for (sql, failed) in [("SELECT 7", false), ("SELECT nope FROM orders", true)] {
         let running = cx.update(|window, cx| {
             view.update(cx, |view, cx| {
@@ -178,7 +180,7 @@ fn the_query_toolbar_keeps_its_tools_in_place_while_a_query_runs(cx: &mut TestAp
     let (view, cx) = crate::ui_tests::open(cx);
     cx.simulate_keystrokes("ctrl-t");
     cx.run_until_parked();
-    for (width, tools) in [(760.0, "Editor tools"), (1500.0, "Tools")] {
+    for (width, tools) in [(NARROW, "Editor tools"), (WIDE, "Tools")] {
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         let mut positions = Vec::new();
         for (running, selected) in [(false, false), (true, false), (false, true)] {

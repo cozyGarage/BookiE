@@ -1,20 +1,8 @@
 use gpui::TestAppContext;
 
-use crate::GridView;
 use crate::row_inspector_ui::{TableKeys, count_label, foreign_key_columns, pretty_single_row};
-use crate::save_ui_tests::{fixture_copy, saving_view, write_session};
-
-fn wait_for(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, ready: impl Fn(&GridView) -> bool) {
-    for _ in 0..200 {
-        cx.run_until_parked();
-        cx.update(|window, _| window.refresh());
-        cx.run_until_parked();
-        if view.read_with(cx, |view, _| ready(view)) {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(25));
-    }
-}
+use crate::save_ui_tests::{saving_view, write_session};
+use crate::ui_tests::test_kit::{orders, until};
 
 fn add_notes(path: &std::path::Path) {
     let write = write_session(path, false);
@@ -45,7 +33,7 @@ fn add_notes(path: &std::path::Path) {
 
 #[gpui::test]
 fn row_details_count_the_rows_that_reference_the_active_row(cx: &mut TestAppContext) {
-    let path = fixture_copy("row-references");
+    let path = orders();
     add_notes(&path);
     let (view, cx) = saving_view(cx, &path);
     view.update(cx, |view, cx| {
@@ -53,7 +41,9 @@ fn row_details_count_the_rows_that_reference_the_active_row(cx: &mut TestAppCont
         view.row_detail_open = true;
         cx.notify();
     });
-    wait_for(&view, cx, |view| !view.row_inspector.references.is_empty());
+    until(&view, cx, "the row details load", |view| {
+        !view.row_inspector.references.is_empty()
+    });
     let references = view.read_with(cx, |view, _| view.row_inspector.references.clone());
     assert_eq!(references.len(), 1, "{references:?}");
     assert!(references[0].label.starts_with("notes"), "{references:?}");
@@ -61,14 +51,15 @@ fn row_details_count_the_rows_that_reference_the_active_row(cx: &mut TestAppCont
     assert!(cx.debug_bounds("row-detail-referenced-by").is_some());
 
     view.update(cx, |view, cx| view.open_reference(0, cx));
-    wait_for(&view, cx, |view| view.grid_is_query && view.dataset_count() == 2);
+    until(&view, cx, "the row details load", |view| {
+        view.grid_is_query && view.dataset_count() == 2
+    });
     view.read_with(cx, |view, _| assert_eq!(view.dataset_count(), 2));
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn row_details_switch_to_a_json_view_of_the_row(cx: &mut TestAppContext) {
-    let path = fixture_copy("row-json");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.update(cx, |view, cx| {
         view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
@@ -84,12 +75,11 @@ fn row_details_switch_to_a_json_view_of_the_row(cx: &mut TestAppContext) {
     assert_eq!(parsed["id"], serde_json::json!(1), "{json}");
     assert!(json.contains('\n'), "pretty printed: {json}");
     assert!(cx.debug_bounds("row-detail-json").is_some());
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn alt_enter_opens_the_full_value_editor_for_a_short_value(cx: &mut TestAppContext) {
-    let path = fixture_copy("alt-enter");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     view.update(cx, |view, cx| {
         view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 1 });
@@ -101,12 +91,11 @@ fn alt_enter_opens_the_full_value_editor_for_a_short_value(cx: &mut TestAppConte
         assert!(editing.full_value, "Alt+Enter opens the full value editor");
         assert_eq!(editing.column, 1);
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[gpui::test]
 fn wrap_text_toggles_from_the_palette_and_foreign_key_columns_are_links(cx: &mut TestAppContext) {
-    let path = fixture_copy("wrap-links");
+    let path = orders();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("wrap-text", window, cx)));
     view.read_with(cx, |view, _| assert!(view.wrap_text));
@@ -132,7 +121,6 @@ fn wrap_text_toggles_from_the_palette_and_foreign_key_columns_are_links(cx: &mut
         assert!(!view.follows_link(0, control));
         assert!(!view.follows_link(1, gpui::Modifiers::default()));
     });
-    std::fs::remove_file(path).ok();
 }
 
 #[test]
@@ -155,16 +143,16 @@ fn helpers_dedupe_key_columns_pretty_print_one_row_and_cap_counts() {
 
 #[gpui::test]
 fn the_inspector_shows_the_keys_of_the_new_file_when_the_table_name_is_the_same(cx: &mut TestAppContext) {
-    let with_child = fixture_copy("inspector-with-child");
+    let with_child = orders();
     add_notes(&with_child);
-    let without_child = fixture_copy("inspector-without-child");
+    let without_child = orders();
     let (view, cx) = saving_view(cx, &with_child);
     view.update(cx, |view, cx| {
         view.cell_cursor = Some(bookie_results::grid_cursor::Cursor { row: 0, column: 0 });
         view.row_detail_open = true;
         cx.notify();
     });
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the row details load", |view| {
         view.row_inspector
             .keys
             .as_ref()
@@ -178,10 +166,14 @@ fn the_inspector_shows_the_keys_of_the_new_file_when_the_table_name_is_the_same(
     let orders = bookie_gpui::shell::table_info("orders");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.connect_preferring(bookie_gpui::live::Origin::File(without_child.clone()), Some(orders), cx)
+            view.connect_preferring(
+                bookie_gpui::live::Origin::File(without_child.to_path_buf()),
+                Some(orders),
+                cx,
+            )
         })
     });
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the row details load", |view| {
         view.live
             .as_ref()
             .is_some_and(|live| live.tables.iter().all(|table| table.name != "notes"))
@@ -195,6 +187,4 @@ fn the_inspector_shows_the_keys_of_the_new_file_when_the_table_name_is_the_same(
             "the second file has no table that references orders: {keys:?}"
         );
     });
-    std::fs::remove_file(with_child).ok();
-    std::fs::remove_file(without_child).ok();
 }

@@ -10,6 +10,7 @@ use gpui_kit::test::{TestQueryExt, TestWindowExt};
 use crate::GridView;
 use crate::text_input;
 use crate::ui_tests::open;
+use crate::ui_tests::test_kit::{NARROW, WIDE, orders, until};
 use bookie_core::TableInfo;
 use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
 use bookie_gpui::shell::table_info;
@@ -55,11 +56,6 @@ impl ResultSource for BorrowedDetailSource {
     fn compare(&self, _: bool, _: &CancellationToken) -> Result<Diff, &'static str> {
         Err("unused")
     }
-}
-
-fn orders_fixture() -> std::path::PathBuf {
-    std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"))
-        .join("tests/fixtures/orders.sqlite")
 }
 
 #[gpui::test]
@@ -161,8 +157,9 @@ fn a_rebound_shortcut_replaces_the_default_one(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -216,10 +213,11 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
 
 #[gpui::test]
 fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
     let table = std::sync::Arc::new(
         LiveTable::load(
-            &Origin::File(orders_fixture()),
+            &Origin::File(orders_copy.to_path_buf()),
             &TableInfo {
                 schema: None,
                 name: "orders".into(),
@@ -429,11 +427,12 @@ fn row_inspector_filter_and_hide_null_are_keyboard_accessible_and_follow_the_act
 
 #[gpui::test]
 fn a_selected_table_row_copies_as_tsv_csv_json_and_insert(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_app_services::result_copy::CopyFormat;
     use bookie_gpui::live::{LiveTable, Origin};
     let table = std::sync::Arc::new(
         LiveTable::load(
-            &Origin::File(orders_fixture()),
+            &Origin::File(orders_copy.to_path_buf()),
             &TableInfo {
                 schema: None,
                 name: "orders".into(),
@@ -469,10 +468,11 @@ fn a_selected_table_row_copies_as_tsv_csv_json_and_insert(cx: &mut TestAppContex
 
 #[gpui::test]
 fn table_row_palette_lists_the_copy_formats(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
     let table = std::sync::Arc::new(
         LiveTable::load(
-            &Origin::File(orders_fixture()),
+            &Origin::File(orders_copy.to_path_buf()),
             &TableInfo {
                 schema: None,
                 name: "orders".into(),
@@ -496,8 +496,9 @@ fn table_row_palette_lists_the_copy_formats(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -567,10 +568,11 @@ fn a_live_connection_runs_typed_sql_into_a_result_tab_and_refuses_writes(cx: &mu
 
 #[gpui::test]
 fn live_sqlite_selection_copies_exact_typed_values(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_core::Value;
     use bookie_gpui::live::{LiveSession, Origin};
 
-    let session = LiveSession::open(&Origin::File(orders_fixture())).expect("open SQLite fixture");
+    let session = LiveSession::open(&Origin::File(orders_copy.to_path_buf())).expect("open SQLite fixture");
     let result = std::sync::Arc::new(
         session
             .run_query(
@@ -604,7 +606,8 @@ fn live_sqlite_selection_copies_exact_typed_values(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut TestAppContext) {
-    let origin = bookie_gpui::live::Origin::File(orders_fixture());
+    let orders_copy = orders();
+    let origin = bookie_gpui::live::Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         bookie_gpui::live::LiveTable::load(
             &origin,
@@ -656,8 +659,9 @@ fn query_results_do_not_copy_inserts_to_the_previously_browsed_table(cx: &mut Te
 
 #[gpui::test]
 fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -708,10 +712,11 @@ fn copy_as_uses_the_live_tables_columns_driver_and_name(cx: &mut TestAppContext)
 
 #[gpui::test]
 fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
     use bookie_gpui::messages::MessageKind;
     use bookie_gpui::shell::ResultView;
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -779,13 +784,14 @@ fn every_statement_is_logged_and_a_refused_one_opens_the_messages_view(cx: &mut 
 
 #[gpui::test]
 fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);
     view.read_with(cx, |view, _| {
         assert!(view.live.is_none());
         assert_eq!(view.catalog.grid_table, table_info("synthetic_rows"));
     });
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     cx.update(|_, cx| view.update(cx, |view, cx| view.connect(origin, cx)));
     cx.executor().advance_clock(std::time::Duration::from_secs(1));
     cx.run_until_parked();
@@ -807,9 +813,10 @@ fn connecting_from_the_home_page_swaps_the_synthetic_grid_for_the_first_table(cx
 
 #[gpui::test]
 fn failed_connection_switch_preserves_the_current_reconnect_target(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::Origin;
     let (view, cx) = open(cx);
-    let path = orders_fixture();
+    let path = orders_copy.to_path_buf();
     connect_and_settle(&view, cx, path.clone());
     let missing = std::path::PathBuf::from("/nonexistent/none.sqlite");
     connect_and_settle(&view, cx, missing);
@@ -831,7 +838,7 @@ pub(crate) fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
     let path = std::env::temp_dir().join(format!("bookie-empty-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::File::create(&path).expect("create database");
     let fixture = SqliteFixture(path);
-    tokio::runtime::Runtime::new().expect("runtime").block_on(async {
+    bookie_app_services::service_runtime::block_on(async {
         let registry = drivers_registry::default_registry();
         let driver = registry.get("sqlite").expect("sqlite driver");
         let connection = driver
@@ -844,8 +851,9 @@ pub(crate) fn sqlite_fixture(statements: &[&str]) -> SqliteFixture {
         for statement in statements {
             connection.execute(statement).await.expect("prepare database");
         }
-        connection.close().await.expect("close database");
-    });
+        connection.close().await.map_err(|error| error.to_string())
+    })
+    .expect("prepare database");
     fixture
 }
 
@@ -1214,10 +1222,11 @@ fn closing_a_result_with_pending_edits_requires_explicit_discard(cx: &mut TestAp
 
 #[gpui::test]
 fn buffered_result_load_time_is_not_reported_as_time_to_first_row(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
 
-    let source =
-        LiveTable::load(&Origin::File(orders_fixture()), &table_info("orders"), 100).expect("load SQLite fixture");
+    let source = LiveTable::load(&Origin::File(orders_copy.to_path_buf()), &table_info("orders"), 100)
+        .expect("load SQLite fixture");
     assert!(bookie_gpui::source::ResultSource::load_elapsed(&source).is_some());
 
     let (view, cx) = open(cx);
@@ -1254,8 +1263,9 @@ fn a_connection_that_cannot_be_opened_keeps_the_synthetic_view_and_says_why(cx: 
 
 #[gpui::test]
 fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1304,8 +1314,9 @@ fn the_sql_editor_takes_several_lines_and_ctrl_enter_runs_them(cx: &mut TestAppC
 
 #[gpui::test]
 fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1346,7 +1357,7 @@ fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestApp
 #[gpui::test]
 fn the_selected_run_owns_the_plan_and_closing_it_clears_the_pane(cx: &mut TestAppContext) {
     use bookie_gpui::shell::ResultView;
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let run = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, explain: bool| {
         cx.update(|window, cx| {
             view.update(cx, |view, cx| {
@@ -1402,7 +1413,7 @@ fn the_selected_run_owns_the_plan_and_closing_it_clears_the_pane(cx: &mut TestAp
 
 #[gpui::test]
 fn a_named_parameter_asks_for_its_value_first_and_then_runs_the_query_bound(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let settle = |cx: &mut gpui::VisualTestContext| {
         cx.executor().advance_clock(std::time::Duration::from_secs(1));
         cx.run_until_parked();
@@ -1444,7 +1455,7 @@ fn a_named_parameter_asks_for_its_value_first_and_then_runs_the_query_bound(cx: 
 
 #[gpui::test]
 fn parameter_enter_runs_the_original_selection_after_the_editor_changes(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let selected = "SELECT :value";
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -1472,7 +1483,7 @@ fn parameter_enter_runs_the_original_selection_after_the_editor_changes(cx: &mut
 
 #[gpui::test]
 fn run_all_keeps_each_statement_result(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let before = cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -1496,7 +1507,7 @@ fn run_all_keeps_each_statement_result(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn run_all_stops_at_the_first_failing_statement_and_names_it(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let before = cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -1523,7 +1534,7 @@ fn run_all_stops_at_the_first_failing_statement_and_names_it(cx: &mut TestAppCon
 fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_number(cx: &mut TestAppContext) {
     use bookie_core::ParameterKind;
     use bookie_gpui::model::CellText;
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let settle = |cx: &mut gpui::VisualTestContext| {
         cx.executor().advance_clock(std::time::Duration::from_secs(1));
         cx.run_until_parked();
@@ -1571,7 +1582,7 @@ fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_
 #[gpui::test]
 fn a_typed_explain_opens_in_the_plan_view(cx: &mut TestAppContext) {
     use bookie_gpui::shell::ResultView;
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -1592,7 +1603,7 @@ fn a_typed_explain_opens_in_the_plan_view(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn explain_refuses_a_statement_with_parameters_instead_of_sending_a_literal_name(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -1613,9 +1624,16 @@ fn explain_refuses_a_statement_with_parameters_instead_of_sending_a_literal_name
     });
 }
 
-pub(crate) fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext) {
+pub(crate) fn open_live(
+    cx: &mut TestAppContext,
+) -> (
+    gpui::Entity<GridView>,
+    &mut gpui::VisualTestContext,
+    crate::ui_tests::test_kit::Orders,
+) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let orders_copy = orders();
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1637,12 +1655,12 @@ pub(crate) fn open_live(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mu
         let focus = view.read(cx).focus.clone();
         window.focus(&focus, cx);
     });
-    (view, cx)
+    (view, cx, orders_copy)
 }
 
 #[gpui::test]
 fn running_a_query_with_ctrl_enter_does_not_add_a_line(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|window, cx| {
         let editor = view.read(cx).sql_input.clone();
@@ -1679,7 +1697,7 @@ fn stop_targets_only_the_current_sql_run(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn escape_in_the_sql_editor_stops_a_running_query(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -1694,7 +1712,7 @@ fn escape_in_the_sql_editor_stops_a_running_query(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn the_palette_stop_command_cancels_the_run_and_marks_it_cancelled_not_failed(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let sql =
         "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 500000000) SELECT count(*) FROM n";
     cx.update(|window, cx| {
@@ -1716,14 +1734,7 @@ fn the_palette_stop_command_cancels_the_run_and_marks_it_cancelled_not_failed(cx
         );
     });
     cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("stop-query", window, cx)));
-    for _ in 0..300 {
-        cx.executor().advance_clock(std::time::Duration::from_millis(100));
-        cx.run_until_parked();
-        if view.read_with(cx, |view, _| view.panel.running.is_none()) {
-            break;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(20));
-    }
+    until(&view, cx, "the stopped query ends", |view| view.panel.running.is_none());
     view.read_with(cx, |view, _| {
         let slot = view.run_tabs.slots.last().expect("the stopped run has a tab");
         assert!(slot.cancelled, "{}", view.status);
@@ -1787,8 +1798,9 @@ fn the_redis_listen_command_is_not_offered_on_other_engines(cx: &mut TestAppCont
 
 #[gpui::test]
 fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1821,8 +1833,9 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
 
 #[gpui::test]
 fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1870,6 +1883,7 @@ fn a_new_query_tab_focuses_its_editor_so_typing_lands_there(cx: &mut TestAppCont
 
 #[gpui::test]
 fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_buffer(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     use bookie_gpui::live::{LiveTable, Origin};
     #[cfg(target_os = "macos")]
     let add_cursor_below = "cmd-alt-down";
@@ -1877,7 +1891,7 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
     let add_cursor_below = "ctrl-alt-down";
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
     let add_cursor_below = "alt-shift-down";
-    let origin = Origin::File(orders_fixture());
+    let origin = Origin::File(orders_copy.to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
@@ -1945,7 +1959,7 @@ fn the_sql_editor_edits_at_several_carets_and_ctrl_enter_still_runs_the_whole_bu
 
 #[gpui::test]
 fn follow_palette_uses_the_connected_engine_limits(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     view.update(cx, |view, _| {
         view.live = Some(view.live.as_ref().unwrap().with_driver_id("redis"));
     });
@@ -1969,7 +1983,7 @@ fn follow_palette_uses_the_connected_engine_limits(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
 
     view.update(cx, |view, _| {
         let session = view.live.as_ref().unwrap().with_driver_id("postgres");
@@ -2028,7 +2042,7 @@ fn activity_palette_queries_reflect_driver_capabilities(cx: &mut TestAppContext)
 
 #[gpui::test]
 fn activity_query_execution_sets_sql_and_switches_tab(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     view.update(cx, |view, _| {
         let session = view.live.as_ref().unwrap().with_driver_id("postgres");
         view.live = Some(session);
@@ -2052,7 +2066,7 @@ fn activity_query_execution_sets_sql_and_switches_tab(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn process_cancellation_is_available_only_for_marked_activity_results(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     view.update(cx, |view, _| {
         view.add_run(None);
         let session = view.live.as_ref().unwrap().with_driver_id("postgres");
@@ -2147,7 +2161,7 @@ fn following_a_foreign_key_cannot_run_on_a_replacement_connection(cx: &mut TestA
 
 #[gpui::test]
 fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     view.update(cx, |view, _| {
         let session = view.live.as_ref().unwrap().clone();
         let table = view.catalog.grid_table.clone();
@@ -2176,7 +2190,7 @@ fn clearing_a_foreign_key_peek_cancels_work_and_rejects_stale_context(cx: &mut T
 
 #[gpui::test]
 fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
 
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -2209,7 +2223,7 @@ fn export_selection_or_page_copies_csv_to_clipboard(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
 
     view.update(cx, |view, _| {
         view.palette.delimiter = bookie_gpui::csv_delimiter::parse_command("csv delimiter ||");
@@ -2266,7 +2280,7 @@ fn the_csv_delimiter_command_changes_exports_until_it_is_reset(cx: &mut TestAppC
 
 #[gpui::test]
 fn the_export_limit_command_stops_the_csv_export_until_it_is_removed(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
 
     view.update(cx, |view, _| {
         view.palette.limit = bookie_gpui::export_limit::parse_command("export limit 1");
@@ -2308,7 +2322,7 @@ fn the_export_limit_command_stops_the_csv_export_until_it_is_removed(cx: &mut Te
 
 #[gpui::test]
 fn exporting_the_page_writes_every_row_of_the_page_from_the_first(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|_, cx| view.update(cx, |view, cx| view.export_selection_or_page(cx)));
     view.read_with(cx, |view, cx| {
         let text = cx.read_from_clipboard().expect("clipboard text").text().expect("text");
@@ -2326,7 +2340,7 @@ fn exporting_the_page_writes_every_row_of_the_page_from_the_first(cx: &mut TestA
 
 #[gpui::test]
 fn header_collapse_all_and_feedback_actions(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
 
     view.update(cx, |view, _| {
         assert!(view.sidebar.connection_open && view.sidebar.database_open);
@@ -2356,8 +2370,9 @@ fn connect_and_settle(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCo
 
 #[gpui::test]
 fn switching_connection_drops_the_previous_sidebar_fields(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     let customers = table_info("customers");
     cx.update(|_, cx| view.update(cx, |view, cx| view.toggle_fields(&customers, cx)));
     cx.run_until_parked();
@@ -2545,8 +2560,9 @@ fn a_prompt_the_sink_gave_up_on_disappears_and_the_next_one_is_shown(cx: &mut Te
 
 #[gpui::test]
 fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     view.update(cx, |view, _| view.sidebar.collapsed_schemas.toggle("main"));
     view.read_with(cx, |view, _| {
         assert!(view.sidebar.collapsed_schemas.is_collapsed("main"))
@@ -2563,11 +2579,12 @@ fn switching_connection_expands_every_sidebar_schema_again(cx: &mut TestAppConte
 
 #[gpui::test]
 fn the_labelled_add_row_button_is_absent_without_a_writable_table(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
     assert!(cx.debug_bounds("add-row").is_none(), "no live table, nothing to add to");
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     assert!(
         cx.debug_bounds("add-row").is_none(),
         "a file opened read-only offers no Add row"
@@ -2576,6 +2593,7 @@ fn the_labelled_add_row_button_is_absent_without_a_writable_table(cx: &mut TestA
 
 #[gpui::test]
 fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_connection(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
@@ -2583,7 +2601,7 @@ fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_conn
         cx.debug_bounds("refresh-table").is_none(),
         "no live table, nothing to refresh"
     );
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     let button = cx
         .debug_bounds("refresh-table")
         .expect("a live table shows the Refresh button");
@@ -2595,8 +2613,9 @@ fn the_labelled_refresh_button_reloads_a_live_table_and_is_absent_without_a_conn
 
 #[gpui::test]
 fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     cx.simulate_keystrokes("ctrl-t");
     cx.run_until_parked();
     assert!(cx.debug_bounds("query-connection-chip").is_some());
@@ -2608,6 +2627,7 @@ fn the_schema_chip_is_offered_only_where_the_engine_has_a_schema_context(cx: &mu
 
 #[gpui::test]
 fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
@@ -2615,7 +2635,7 @@ fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAp
         cx.debug_bounds("pager-prev").is_some(),
         "the synthetic result spans many pages"
     );
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     assert!(
         cx.debug_bounds("pager-prev").is_none(),
         "a one-page table has nothing to page through"
@@ -2625,10 +2645,11 @@ fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAp
 
 #[gpui::test]
 fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
     cx.run_until_parked();
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     let before = cx.debug_bounds("grid-actions").expect("the strip is drawn");
     assert!(cx.debug_bounds("bar-dialog").is_none());
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
@@ -2759,7 +2780,7 @@ fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppCo
 #[gpui::test]
 fn a_large_sequential_scan_shows_a_full_scan_chip_in_the_plan_view(cx: &mut TestAppContext) {
     use bookie_gpui::shell::ResultView;
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(900.0)));
     view.update(cx, |view, cx| {
         view.tabs.open_query();
@@ -2783,7 +2804,7 @@ fn every_control_in_a_bar_has_the_bar_height(cx: &mut TestAppContext) {
     use bookie_gpui::theme::size;
     use gpui::px;
     let (_view, cx) = open(cx);
-    for width in [1500.0, 760.0] {
+    for width in [WIDE, NARROW] {
         cx.simulate_resize(gpui::size(px(width), px(800.0)));
         cx.run_until_parked();
         let toolbar = cx.debug_bounds("main-toolbar").expect("the toolbar is drawn");
@@ -2858,7 +2879,7 @@ fn canceling_export_file_setup_preserves_the_previous_status(cx: &mut TestAppCon
 
 #[gpui::test]
 fn cancelling_a_process_asks_first_and_escape_keeps_it_running(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|_, cx| view.update(cx, |view, cx| view.ask_to_cancel_process(1, cx)));
     view.read_with(cx, |view, _| {
         assert!(view.cancel_confirm.is_none(), "an engine without cancel never asks");
@@ -2894,8 +2915,9 @@ fn cancelling_a_process_asks_first_and_escape_keeps_it_running(cx: &mut TestAppC
 
 #[gpui::test]
 fn switching_between_the_tool_tabs_does_not_cancel_running_work(cx: &mut TestAppContext) {
+    let orders_copy = orders();
     let (view, cx) = open(cx);
-    connect_and_settle(&view, cx, orders_fixture());
+    connect_and_settle(&view, cx, orders_copy.to_path_buf());
     let (generation, token) = view.read_with(cx, |view, _| (view.loads.generation, view.loads.cancel.clone()));
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
