@@ -87,8 +87,7 @@ impl GridView {
     pub(crate) fn load_favorite(&mut self, sql: &str, window: &mut Window, cx: &mut Context<Self>) {
         self.tabs.open_query();
         self.sync_grid_owner();
-        self.sql_input
-            .update(cx, |input, cx| input.set_value(sql.to_owned(), window, cx));
+        self.set_sql_text(sql.to_owned(), window, cx);
         self.status = "Loaded the favorite into the editor".into();
     }
 

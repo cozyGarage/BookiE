@@ -145,9 +145,7 @@ impl GridView {
         );
         self.tabs.open_query();
         self.sync_grid_owner();
-        self.sql_input.update(cx, |input, cx| {
-            input.set_value(&sql, window, cx);
-            input.focus(window, cx);
-        });
+        self.set_sql_text(&sql, window, cx);
+        self.sql_input.update(cx, |input, cx| input.focus(window, cx));
     }
 }
