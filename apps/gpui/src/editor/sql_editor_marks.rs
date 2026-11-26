@@ -376,14 +376,27 @@ mod tests {
     fn rapid_large_sql_replacements_build_one_mark_plan_and_cursor_moves_reuse_it(cx: &mut TestAppContext) {
         let (view, cx) = crate::ui_tests::open(cx);
         let comment = "x".repeat(200 * 1024);
-        cx.update(|window, cx| {
-            view.update(cx, |view, cx| {
-                view.set_sql_text(format!("SELECT 1; -- {comment}\n"), window, cx);
-                view.set_sql_text(format!("SELECT 2; -- {comment}\n"), window, cx);
-                view.set_sql_text(format!("SELECT 3; -- {comment}\n"), window, cx);
+        for (index, statement) in ["SELECT 1", "SELECT 2", "SELECT 3"].into_iter().enumerate() {
+            cx.update(|window, cx| {
+                view.update(cx, |view, cx| {
+                    view.set_sql_text(format!("{statement}; -- {comment}\n"), window, cx);
+                });
             });
-        });
+            cx.run_until_parked();
+            if index < 2 {
+                cx.executor().advance_clock(Duration::from_millis(25));
+                cx.run_until_parked();
+            }
+        }
+        cx.executor().advance_clock(EDIT_DEBOUNCE);
         cx.run_until_parked();
+        view.read_with(cx, |view, _| {
+            assert_eq!(
+                view.sql_mark_revision.plan_builds(),
+                0,
+                "stale edits restart the debounce"
+            );
+        });
         cx.executor().advance_clock(EDIT_DEBOUNCE);
         cx.run_until_parked();
         view.read_with(cx, |view, _| {
