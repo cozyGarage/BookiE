@@ -143,7 +143,7 @@ fn a_read_only_transaction_refuses_the_write_and_changes_nothing(cx: &mut TestAp
 }
 
 #[gpui::test]
-fn replacing_a_load_does_not_leave_a_transaction_statement_running(cx: &mut TestAppContext) {
+fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction-replaced-load");
     let (view, cx) = saving_view(cx, &path);
     let original = saved_customer(&path, 1);
@@ -164,12 +164,94 @@ fn replacing_a_load_does_not_leave_a_transaction_statement_running(cx: &mut Test
         assert!(
             view.transaction
                 .as_ref()
-                .is_some_and(|transaction| !transaction.running)
+                .is_some_and(|transaction| transaction.statements == 1),
+            "the statement should finish despite the unrelated invalidation"
         );
+        assert_eq!(view.status, "Ran in the transaction (not committed yet)");
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
     assert_eq!(saved_customer(&path, 1), original);
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn grid_save_requests_are_refused_inside_a_manual_transaction(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-blocks-save-request");
+    let original = saved_customer(&path, 1);
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            let index = view
+                .tabs
+                .items
+                .iter()
+                .position(|tab| matches!(tab, bookie_gpui::shell::Tab::Table(_)))
+                .expect("the table tab remains open");
+            view.tabs.active = index;
+            view.sync_grid_owner();
+            cx.notify();
+        })
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Blocked".into()));
+            view.request_save(cx);
+        })
+    });
+    wait_for(&view, cx, |view| !view.save.busy);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none());
+        assert!(view.status.contains("transaction"), "{}", view.status);
+    });
+    assert_eq!(saved_customer(&path, 1), original);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-blocks-reviewed-save");
+    let original = saved_customer(&path, 1);
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Blocked".into()));
+            view.request_save(cx);
+        })
+    });
+    wait_for(&view, cx, |view| view.save.pending.is_some());
+
+    let write = write_session(&path, false);
+    let shared = write.begin_transaction().expect("begin a transaction");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.transaction = Some(crate::transaction_ui::TransactionState {
+                write,
+                shared,
+                started: Instant::now(),
+                last_activity: Instant::now(),
+                statements: 0,
+                finishing: false,
+                running: false,
+            });
+        })
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+    wait_for(&view, cx, |view| !view.save.busy);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_some(), "the reviewed save stays pending");
+        assert!(view.status.contains("transaction"), "{}", view.status);
+    });
+    assert_eq!(saved_customer(&path, 1), original);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.status == "Transaction rolled back");
     std::fs::remove_file(path).ok();
 }
 
