@@ -6,6 +6,7 @@ use sqlx::pool::PoolConnection;
 use sqlx::postgres::{PgCancelToken, PgConnectOptions};
 use sqlx::{Connection as SqlxConnection, Pool, Postgres, Row};
 
+use bookie_core::sql_dialect::{qualified_table, quote_ident};
 use bookie_core::sql_syntax::script::LexicalSettings;
 use bookie_core::{
     CANCELLATION_DISPATCH_TIMEOUT, CONTROL_SETUP_TIMEOUT, ColumnInfo, CommitResolution, CommitToken, ConnectOptions,
@@ -1067,8 +1068,8 @@ fn confirms_cancellation(error: &DriverError) -> bool {
 }
 
 fn sequence_sync_query(schema: Option<&str>, table: &str, column: &str) -> (String, Vec<Value>) {
-    let target = qualified(schema, table);
-    let column_ident = quote_ident(column);
+    let target = qualified_table("postgres", schema, table);
+    let column_ident = quote_ident("postgres", column);
     let sql = format!(
         "WITH seq AS (
              SELECT pg_catalog.pg_get_serial_sequence($1, $2)::regclass AS name
@@ -1148,10 +1149,6 @@ fn rows_page_sql(schema: Option<&str>, table: &str, offset: u64, limit: u64) -> 
     bookie_core::sql_dialect::rows_page_sql("postgres", schema, table, offset, limit)
 }
 
-fn quote_ident(name: &str) -> String {
-    bookie_core::sql_dialect::quote_ident("postgres", name)
-}
-
 fn normalize_pg_default(raw: String) -> String {
     match raw.rsplit_once("::") {
         Some((operand, _)) if is_plain_literal(operand) => operand.to_string(),
@@ -1168,10 +1165,6 @@ fn is_quoted_literal(operand: &str) -> bool {
         return false;
     };
     !inner.replace("''", "").contains('\'')
-}
-
-fn qualified(schema: Option<&str>, table: &str) -> String {
-    bookie_core::sql_dialect::qualified_table("postgres", schema, table)
 }
 
 /// Map `pg_constraint.confdeltype` / `confupdtype` single-char codes

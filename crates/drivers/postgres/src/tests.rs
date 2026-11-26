@@ -316,10 +316,10 @@ fn driver_metadata() {
 
 #[test]
 fn quote_ident_doubles_embedded_quotes() {
-    assert_eq!(quote_ident("users"), "\"users\"");
-    assert_eq!(quote_ident("My Table"), "\"My Table\"");
+    assert_eq!(quote_ident("postgres", "users"), "\"users\"");
+    assert_eq!(quote_ident("postgres", "My Table"), "\"My Table\"");
     assert_eq!(
-        quote_ident("evil\"; DROP TABLE x; --"),
+        quote_ident("postgres", "evil\"; DROP TABLE x; --"),
         "\"evil\"\"; DROP TABLE x; --\""
     );
 }
