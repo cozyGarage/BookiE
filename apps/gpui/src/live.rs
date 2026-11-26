@@ -40,6 +40,7 @@ pub enum Origin {
 
 #[derive(Clone, Debug)]
 pub struct QueryFailure {
+    pub cancelled: bool,
     pub message: String,
     pub position: Option<usize>,
     pub hint: Option<String>,
@@ -54,6 +55,7 @@ impl From<&str> for QueryFailure {
 impl From<String> for QueryFailure {
     fn from(message: String) -> Self {
         Self {
+            cancelled: false,
             message,
             position: None,
             hint: None,
@@ -76,6 +78,10 @@ impl From<bookie_app_services::driver_error_presentation::DriverFailurePresentat
             _ => None,
         };
         Self {
+            cancelled: matches!(
+                failure,
+                bookie_app_services::driver_error_presentation::DriverFailurePresentation::Cancelled
+            ),
             message: driver_failure_message(&failure),
             position,
             hint,
@@ -311,7 +317,7 @@ impl LiveSession {
         self.runtime.block_on(async {
             tokio::select! {
                 biased;
-                _ = control.cancellation_token().cancelled() => Err(QueryFailure::from("Canceled the operation".to_owned())),
+                _ = control.cancellation_token().cancelled() => Err(QueryFailure::from(bookie_app_services::driver_error_presentation::DriverFailurePresentation::Cancelled)),
                 _ = tokio::time::sleep(PAGE_TIMEOUT) => Err(QueryFailure::from("Opening the query session timed out".to_owned())),
                 result = self.sessions.open_interactive(self.session_id) => result.map_err(QueryFailure::from),
             }
