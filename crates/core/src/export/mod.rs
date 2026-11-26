@@ -133,6 +133,7 @@ where
     } else {
         temporary.persist(path).map_err(|error| error.error)?;
     }
+    crate::atomic_file::sync_parent(path)?;
     Ok(())
 }
 

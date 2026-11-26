@@ -82,6 +82,13 @@ pub struct ReadSession {
     pub tables: Vec<TableInfo>,
 }
 
+pub(crate) async fn saved_connection(id: Uuid) -> Result<Option<SavedConnection>, bookie_storage::StorageError> {
+    Ok(bookie_storage::load_connections()
+        .await?
+        .into_iter()
+        .find(|saved| saved.id == id))
+}
+
 impl ReadSession {
     fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
         self.database
@@ -252,11 +259,9 @@ impl ReadSession {
         cancellation: CancellationToken,
     ) -> Result<Self, OpenFailure> {
         check_open_cancellation(&cancellation)?;
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(id)
             .await
             .map_err(|error| OpenFailure::Other(error.to_string()))?
-            .into_iter()
-            .find(|saved| saved.id == id)
             .ok_or_else(|| OpenFailure::Other(format!("connection {id} not found")))?;
         check_open_cancellation(&cancellation)?;
         Self::open_controlled(saved, registry, Arc::new(DatabaseService::new()), cancellation).await
@@ -604,11 +609,9 @@ impl ReadSession {
         Fut: std::future::Future<Output = Result<T, bookie_core::DriverError>>,
     {
         let guard = self.guard()?;
-        let saved = bookie_storage::load_connections()
+        let saved = crate::read_session::saved_connection(self.id)
             .await
             .map_err(|error| DriverFailurePresentation::Unsupported(error.to_string()))?
-            .into_iter()
-            .find(|saved| saved.id == self.id)
             .ok_or_else(|| {
                 DriverFailurePresentation::Unsupported("only a saved connection can be subscribed to".into())
             })?;
