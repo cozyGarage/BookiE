@@ -7,7 +7,7 @@ use bookie_app_services::completion_proposals::{Candidate, CandidateKind, ranked
 use bookie_app_services::result_editability::grammar_for_driver;
 use bookie_core::sql_dialect::qualified_table;
 use gpui::{App, Context, SharedString, Task, WeakEntity, Window};
-use gpui_component::input::{CompletionProvider, EditorState, Rope, RopeExt};
+use gpui_component::input::{CompletionProvider, EditorState, InputContent, Rope, RopeExt};
 use lsp_types::{
     CompletionContext, CompletionItem, CompletionItemKind, CompletionResponse, CompletionTextEdit, Range, TextEdit,
 };
@@ -195,6 +195,12 @@ fn completion_item(rank: usize, candidate: Candidate, range: Range, types: &Hash
 }
 
 impl GridView {
+    pub(crate) fn set_sql_text(&mut self, text: impl Into<InputContent>, window: &mut Window, cx: &mut Context<Self>) {
+        self.sql_input
+            .update(cx, |editor, cx| editor.set_value(text, window, cx));
+        self.sql_mark_revision.advance();
+    }
+
     pub(crate) fn install_sql_completion(editor: &mut EditorState, view: WeakEntity<Self>) {
         editor.lsp_mut().completion_provider = Some(Rc::new(SqlCompletion(view, Arc::default())));
     }

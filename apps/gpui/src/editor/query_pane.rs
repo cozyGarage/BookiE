@@ -36,8 +36,7 @@ impl GridView {
         let settings = bookie_core::sql_syntax::script::LexicalSettings::default_for(grammar);
         let formatted = bookie_core::sql_format::format_script(&text, grammar, settings);
         if formatted != text {
-            self.sql_input
-                .update(cx, |input, cx| input.set_value(formatted, window, cx));
+            self.set_sql_text(formatted, window, cx);
             self.status = "Formatted the SQL".into();
         }
     }

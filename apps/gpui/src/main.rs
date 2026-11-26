@@ -159,6 +159,7 @@ struct GridView {
     window_title_tab: Option<Tab>,
     tab_scroll: ScrollHandle,
     sql_input: Entity<EditorState>,
+    sql_mark_revision: std::rc::Rc<editor::sql_editor_marks::SqlMarkRevision>,
     run_tabs: panel_state::RunTabs,
     check_histories: Vec<(String, bookie_app_services::checks::History)>,
     palette: palette_state::PaletteState,
@@ -283,6 +284,7 @@ impl GridView {
         Entity<TextInput>,
         Entity<EditorState>,
         Entity<EditorState>,
+        std::rc::Rc<editor::sql_editor_marks::SqlMarkRevision>,
     ) {
         let find = cx.new(|cx| TextInput::new("Find in loaded rows", cx));
         let filter = cx.new(|cx| TextInput::new("label contains 7", cx));
@@ -341,9 +343,9 @@ impl GridView {
             },
         )
         .detach();
-        Self::observe_sql_marks(&sql_input, cx);
+        let sql_mark_revision = Self::observe_sql_marks(&sql_input, cx);
         let value_editor = cx.new(|cx| EditorState::new(window, cx).placeholder("Edit full value"));
-        (find, filter, editor, sql_input, value_editor)
+        (find, filter, editor, sql_input, value_editor, sql_mark_revision)
     }
 
     fn init_chrome_inputs(window: &mut Window, cx: &mut Context<Self>) -> (Entity<TextInput>, Entity<TextInput>) {
@@ -516,7 +518,7 @@ impl GridView {
             Self::persist_window_geometry(window, cx);
         }
         let total = source.total();
-        let (find, filter, editor, sql_input, value_editor) = Self::init_query_inputs(window, cx);
+        let (find, filter, editor, sql_input, value_editor, sql_mark_revision) = Self::init_query_inputs(window, cx);
         let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
         cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
             if matches!(event, InputEvent::Changed) {
@@ -542,6 +544,7 @@ impl GridView {
             mode: Mode::All,
             pager: Pager::new(total),
             sql_input,
+            sql_mark_revision,
             palette: palette_state::PaletteState::new(palette_input),
             favorites: favorites_ui::FavoritesState::default(),
             params: params_ui::ParamsState::default(),
