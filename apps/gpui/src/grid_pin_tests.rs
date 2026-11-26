@@ -221,13 +221,13 @@ fn query_widths_survive_same_query_and_do_not_follow_a_different_query(cx: &mut 
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.grid_is_query = true;
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             view.remember_grid_widths(&[gpui::px(180.0)], cx);
             view.source = source("select id from a");
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             assert_eq!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
             view.source = source("select id from b");
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
         })
     });
@@ -254,10 +254,10 @@ fn rendering_the_same_query_result_reuses_its_width_identity(cx: &mut TestAppCon
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.grid_is_query = true;
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             let before = reads.load(std::sync::atomic::Ordering::Relaxed);
             for _ in 0..5 {
-                view.sync_table(900.0, window, cx);
+                view.sync_table(window, cx);
             }
             assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), before);
         })
@@ -470,7 +470,7 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
         view.update(cx, |view, cx| {
             view.source = Arc::new(BinarySource(vec![0, 255, 65]));
             view.table_source = view.source.clone();
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
         })
     });
     view.update(cx, |view, cx| {
@@ -540,16 +540,11 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
     cx.run_until_parked();
 
     cx.update(|window, cx| window.render_frame(cx));
-    let header = cx.update(|window, _| {
-        window
-            .try_find(("col-header", 1usize))
-            .expect("second column header is rendered")
-            .bounds()
-    });
-    cx.simulate_click(
-        gpui::point(header.origin.x + header.size.width - gpui::px(12.0), header.center().y),
-        Default::default(),
-    );
+    let menu_bounds = cx.update(|window, _| window.find_by_label("Actions for column_1").bounds());
+    cx.simulate_click(menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    let pin_bounds = cx.update(|window, _| window.find_by_label("Pin through column_1").bounds());
+    cx.simulate_click(pin_bounds.center(), Default::default());
     cx.run_until_parked();
 
     view.update(cx, |view, cx| {
@@ -573,7 +568,7 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
             let table = view.catalog.grid_table.clone();
             view.tabs.close(view.tabs.active);
             view.tabs.open_table(&table);
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
         })
     });
     cx.run_until_parked();
@@ -586,7 +581,7 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &mut TestAppContext) {
+fn pinned_and_hidden_columns_keep_the_last_cell_inside_the_scroll_viewport(cx: &mut TestAppContext) {
     let source = Arc::new(WideSource(
         (0..41)
             .map(|index| ColumnMeta {
@@ -611,6 +606,8 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
     cx.simulate_click(pin_bounds.center(), Default::default());
     cx.run_until_parked();
 
+    cx.update(|window, cx| view.update(cx, |view, cx| view.hide_column(15, "column_15", window, cx)));
+    cx.run_until_parked();
     view.update(cx, |view, cx| {
         view.table.update(cx, |table, _| {
             let offset_past_scroll_end = gpui::point(gpui::px(-10_000.0), gpui::px(0.0));
@@ -631,8 +628,8 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
         .expect("vertical scrollbar gutter is rendered");
     cx.update(|window, _| {
         let pinned = window.find(("col-header", 0usize)).bounds();
-        let last_header = window.find(("col-header", 40usize)).bounds();
-        let last_cell = window.find("table-cell-0:40").bounds();
+        let last_header = window.find(("col-header", 39usize)).bounds();
+        let last_cell = window.find("table-cell-0:39").bounds();
         let visible_right = vertical_gutter.origin.x;
         assert!(
             pinned.origin.x >= viewport.origin.x
@@ -654,6 +651,89 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
             last_cell.origin.x + last_cell.size.width <= visible_right,
             "pinned leading column leaves the last cell clipped: {last_cell:?}, visible right edge: {visible_right:?}"
         );
+    });
+}
+
+#[gpui::test]
+fn a_small_result_keeps_fitted_width_and_wide_headers_keep_pin_in_the_menu(cx: &mut TestAppContext) {
+    let source = Arc::new(WideSource(vec![ColumnMeta {
+        name: "category".into(),
+        width: 150.0,
+        numeric: false,
+        data_type: "text".into(),
+        primary_key: false,
+    }]));
+    cx.update(text_input::bind_keys);
+    let (_, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(950.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let fitted = cx.debug_bounds("column-header-0").expect("fitted header");
+
+    cx.simulate_resize(gpui::size(gpui::px(1_400.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let header = cx.debug_bounds("column-header-0").expect("header after resize");
+    assert_eq!(header.size.width, fitted.size.width);
+    assert!(header.size.width < gpui::px(260.0));
+    assert!(cx.update(|window, _| window.try_find_by_label("Pin through category").is_none()));
+
+    let menu = cx.update(|window, _| window.find_by_label("Actions for category").bounds());
+    assert!(header.origin.x + header.size.width - (menu.origin.x + menu.size.width) <= gpui::px(2.0));
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.update(|window, _| window.try_find_by_label("Pin through category").is_some()));
+}
+
+#[gpui::test]
+fn grid_column_menu_applies_and_clears_sort(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    cx.run_until_parked();
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let descending = cx.update(|window, _| window.find_by_label("Sort descending").bounds());
+    cx.simulate_click(descending.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.local_sort
+                .as_ref()
+                .is_some_and(|sort| sort.column == "id" && !sort.ascending)
+        );
+    });
+
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("column-sort-direction-0").is_some());
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    let clear = cx.update(|window, _| window.find_by_label("Clear sort").bounds());
+    cx.simulate_click(clear.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert!(view.local_sort.is_none()));
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("column-sort-direction-0").is_none());
+}
+
+#[gpui::test]
+fn fitting_visible_columns_preserves_the_width_of_hidden_columns(cx: &mut TestAppContext) {
+    let (view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.remember_grid_widths(&[gpui::px(320.0); 4], cx);
+            view.hide_column(1, "label", window, cx);
+            view.fit_visible_grid_columns(window, cx);
+            view.show_all_hidden_columns(window, cx);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        let table = view.table.read(cx);
+        assert_eq!(table.col_width(1), Some(gpui::px(320.0)));
+        assert!(table.col_width(0).unwrap() < gpui::px(320.0));
     });
 }
 

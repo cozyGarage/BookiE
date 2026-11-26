@@ -440,6 +440,7 @@ impl GridView {
         let table = cx.new(|cx| {
             let delegate = grid_table::GridDelegate::new(owner);
             gpui_kit::component::table::TableState::new(delegate, window, cx)
+                .sortable(false)
                 .cell_selectable(true)
                 .row_header(false)
         });
