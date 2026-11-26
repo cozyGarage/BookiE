@@ -303,7 +303,7 @@ pub(crate) fn segmented(segments: impl IntoIterator<Item = Stateful<Div>>, theme
 
 pub(crate) fn scrim(theme: Theme) -> Div {
     let base = if theme.dark { theme.background } else { theme.foreground };
-    let mut colour = gpui::Rgba::from(rgb(base));
+    let mut colour = rgb(base);
     colour.a = 0.55;
     div()
         .absolute()

@@ -142,7 +142,7 @@ impl GridView {
                 &name,
                 settings.slot_of(column).is_some(),
             )
-            .debug_selector(move || format!("chart-value-{column}").into())
+            .debug_selector(move || format!("chart-value-{column}"))
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.edit_chart(
                     |s| {

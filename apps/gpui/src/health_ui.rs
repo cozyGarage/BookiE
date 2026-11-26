@@ -49,6 +49,7 @@ impl GridView {
             "recent-tab" => self.switch_to_previous_tab(window, cx),
             "export-all-tables" => self.open_tables_export_bar(cx),
             "schema-compare" => self.open_schema_compare(window, cx),
+            "compare-table-data" => self.open_data_compare_picker(window, cx),
             "open-sql-file" => self.open_sql_file_bar(false, cx),
             "save-sql-file" => self.open_sql_file_bar(true, cx),
             "restore-database" => self.open_backup_bar(true, cx),

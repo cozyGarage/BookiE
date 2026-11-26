@@ -1,4 +1,5 @@
 use bookie_app_services::connection_save::{self, ConnectionDraft};
+use bookie_app_services::service_runtime::block_on;
 use bookie_core::{AuthMode, DriverCapabilities, Environment, TlsMode};
 use gpui::{Context, Div, Entity, Focusable, Stateful, Window, div, prelude::*, px, rgb};
 use secrecy::SecretString;
@@ -844,12 +845,8 @@ impl GridView {
             let draft = cx
                 .background_executor()
                 .spawn(async move {
-                    let runtime = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .map_err(|error| error.to_string())?;
                     let registry = drivers_registry::default_registry();
-                    runtime.block_on(connection_save::load_draft(&registry, id))
+                    block_on(connection_save::load_draft(&registry, id))
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
@@ -996,13 +993,9 @@ impl GridView {
             let outcome = cx
                 .background_executor()
                 .spawn(async move {
-                    let runtime = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .map_err(|error| error.to_string())?;
                     let registry = drivers_registry::default_registry();
                     let audit = bookie_app_services::database_service::DatabaseService::new().transport_audit_factory();
-                    runtime.block_on(connection_save::test(
+                    block_on(connection_save::test(
                         &registry,
                         &draft,
                         tokio_util::sync::CancellationToken::new(),
@@ -1033,13 +1026,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let outcome = cx
                 .background_executor()
-                .spawn(async move {
-                    let runtime = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .map_err(|error| error.to_string())?;
-                    runtime.block_on(connection_save::delete(id))
-                })
+                .spawn(async move { block_on(connection_save::delete(id)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.finish_delete(outcome);
@@ -1087,24 +1074,20 @@ impl GridView {
             let result = cx
                 .background_executor()
                 .spawn(async move {
-                    let runtime = tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()
-                        .map_err(|error| error.to_string())?;
-                    let saved = runtime.block_on(connection_save::save(draft))?;
-                    let color_saved = runtime
-                        .block_on(bookie_app_services::read_session::set_connection_color(
-                            saved.id,
-                            color.as_deref(),
-                        ))
-                        .map_err(|error| {
-                            tracing::warn!(%error, "the connection colour was not saved");
-                        })
-                        .is_ok();
-                    let hops = saved.ssh.as_ref().map_or_else(Vec::new, |ssh| {
-                        ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
-                    });
-                    Ok::<_, String>((saved.id, saved.name, hops, color_saved))
+                    block_on(async move {
+                        let saved = connection_save::save(draft).await?;
+                        let color_saved =
+                            bookie_app_services::read_session::set_connection_color(saved.id, color.as_deref())
+                                .await
+                                .map_err(|error| {
+                                    tracing::warn!(%error, "the connection colour was not saved");
+                                })
+                                .is_ok();
+                        let hops = saved.ssh.as_ref().map_or_else(Vec::new, |ssh| {
+                            ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
+                        });
+                        Ok((saved.id, saved.name, hops, color_saved))
+                    })
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {

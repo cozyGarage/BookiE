@@ -165,7 +165,7 @@ async fn value_contract_custom_enum_array_preserves_boundary_whitespace_labels()
     let options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let mapping = [Some(0), Some(1)];
-    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &mapping, &source.columns, &options, 2).unwrap();
+    let imported = bookie_core::import::row_to_values(&sheet.rows.get(0).unwrap(), &mapping, &source.columns, &options, 2).unwrap();
     assert_eq!(imported, source.rows[0]);
 
     let rebound = connection

@@ -16,6 +16,7 @@ pub(crate) enum PaletteMode {
     NameFilter,
     SchemaContext,
     Themes,
+    CompareTarget,
 }
 
 impl PaletteMode {
@@ -33,6 +34,7 @@ impl PaletteMode {
             PaletteMode::NameFilter => "Type a name for this filter, then press Enter",
             PaletteMode::SchemaContext => "Type a target schema or database",
             PaletteMode::Themes => "Choose a color theme",
+            PaletteMode::CompareTarget => "Choose the table to compare with",
         }
     }
 }

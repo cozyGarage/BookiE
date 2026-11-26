@@ -32,6 +32,7 @@ impl GridView {
         self.live.as_ref().is_some_and(|live| live.writable.is_some()) && !self.resolve.open
     }
 
+    #[cfg(test)]
     pub(crate) fn resolve_panel_is_closed(&self) -> bool {
         !self.resolve.open && self.resolve.items.is_empty()
     }

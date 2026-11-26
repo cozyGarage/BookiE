@@ -186,7 +186,7 @@ impl GridView {
         let opened_with = session.stamp.clone();
         let writable = session.writable;
         let typed = path.read(cx).content().to_string();
-        let job = job_for(restore, &typed, confirm.read(cx).content().as_ref());
+        let job = job_for(restore, &typed, confirm.read(cx).content());
         let job = match job {
             Ok(job) => job,
             Err(message) => {

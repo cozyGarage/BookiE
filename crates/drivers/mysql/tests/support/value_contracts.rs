@@ -1051,7 +1051,8 @@ async fn value_contract_mysql_pad_char_mode_keeps_fixed_width_text_through_csv_a
     let options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let columns = connection.fetch_columns(None, "pad_char_bound").await.unwrap();
-    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let imported =
+        bookie_core::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     assert_eq!(imported, vec![Value::Text("x    ".into())]);
     connection
         .execute_params("INSERT INTO pad_char_bound VALUES (?)", &imported)

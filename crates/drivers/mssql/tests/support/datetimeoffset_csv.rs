@@ -23,7 +23,7 @@ pub(super) async fn assert_csv_round_trip(connection: &dyn Connection, source: &
 
     for (index, fields) in sheet.rows.iter().enumerate() {
         let values =
-            bookie_core::import::row_to_values(fields, &mapping, &source.columns, &options, index + 2).unwrap();
+            bookie_core::import::row_to_values(&fields, &mapping, &source.columns, &options, index + 2).unwrap();
         assert_eq!(
             values, source.rows[index],
             "CSV import must preserve the datetimeoffset text, including its original offset"
