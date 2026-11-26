@@ -1,6 +1,6 @@
 use std::sync::{Arc, Weak};
 
-use bookie_core::ColumnInfo;
+use bookie_core::{ColumnInfo, QualifiedTypeName};
 use bookie_gpui::model::Cell;
 use bookie_gpui::shell::Tab;
 use bookie_gpui::source::ResultSource;
@@ -17,6 +17,7 @@ struct ChoiceTarget {
     source: Weak<dyn ResultSource>,
     tab: Tab,
     generation: u64,
+    request: u64,
     row: u64,
     column: usize,
 }
@@ -25,6 +26,7 @@ impl ChoiceTarget {
     fn is_current(&self, view: &GridView) -> bool {
         self.tab == *view.tabs.current()
             && self.generation == view.save.generation
+            && self.request == view.cell_edit.choice_request
             && self
                 .source
                 .upgrade()
@@ -50,17 +52,19 @@ impl GridView {
         let Some(meta) = self.source.columns().get(column) else {
             return false;
         };
-        if !is_choice_candidate(&meta.data_type, cell) {
-            return false;
-        }
         let Some(live) = self.live.clone() else {
             return false;
         };
+        let possible_postgres_enum = live.driver_id == "postgres" && matches!(cell, Cell::Text(_) | Cell::Null);
+        if !possible_postgres_enum && !is_choice_candidate(&meta.data_type, cell) {
+            return false;
+        }
         let table = self.catalog.grid_table.clone();
         let target = ChoiceTarget {
             source: Arc::downgrade(&self.source),
             tab: self.tabs.current().clone(),
             generation: self.save.generation,
+            request: self.cell_edit.choice_request,
             row,
             column,
         };
@@ -113,12 +117,43 @@ impl GridView {
         let cell = self.cell_at(row, column);
         match choice_for(&meta.data_type, info, &cell) {
             Some(Choice::Toggle(next)) => self.stage_choice(row, column, next, cx),
-            Some(Choice::Members(labels)) => match info {
-                Some(info) => self.open_choice_menu(target, info.clone(), labels, window, cx),
-                None => self.start_edit_mode(row, column, EditMode::Inline, window, cx),
-            },
+            Some(Choice::Members(labels)) => self.open_choice_menu(target, labels, window, cx),
+            Some(Choice::PostgresEnum(type_name)) => self.read_choice_labels(target, type_name, window, cx),
             None => self.start_edit_mode(row, column, EditMode::Inline, window, cx),
         }
+    }
+
+    fn read_choice_labels(
+        &mut self,
+        target: ChoiceTarget,
+        type_name: QualifiedTypeName,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(live) = self.live.clone() else {
+            return;
+        };
+        cx.spawn_in(window, async move |this, cx| {
+            let labels = cx
+                .background_executor()
+                .spawn(async move { live.enum_labels(&type_name) })
+                .await;
+            this.update_in(cx, |this, window, cx| {
+                if !target.is_current(this) {
+                    return;
+                }
+                match labels {
+                    Ok(labels) if !labels.is_empty() => this.open_choice_menu(target, labels, window, cx),
+                    Ok(_) => this.start_edit_mode(target.row, target.column, EditMode::Inline, window, cx),
+                    Err(reason) => {
+                        this.status = format!("Could not load enum values: {reason}");
+                        cx.notify();
+                    }
+                }
+            })
+            .ok();
+        })
+        .detach();
     }
 
     fn stage_choice(&mut self, row: u64, column: usize, cell: Cell, cx: &mut Context<Self>) {
@@ -136,23 +171,17 @@ impl GridView {
         cx.notify();
     }
 
-    fn pick_member(&mut self, target: &ChoiceTarget, label: &str, info: &ColumnInfo, cx: &mut Context<Self>) {
-        if !target.is_current(self) {
-            return;
-        }
-        match member_cell(label, info) {
-            Ok(cell) => self.stage_choice(target.row, target.column, cell, cx),
-            Err(reason) => {
-                self.status = format!("Not applied: {reason}");
-                cx.notify();
-            }
+    fn pick_member(&mut self, target: &ChoiceTarget, label: &str, labels: &[String], cx: &mut Context<Self>) {
+        if target.is_current(self)
+            && let Some(cell) = member_cell(label, labels)
+        {
+            self.stage_choice(target.row, target.column, cell, cx);
         }
     }
 
     fn open_choice_menu(
         &mut self,
         target: ChoiceTarget,
-        info: ColumnInfo,
         labels: Vec<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -162,14 +191,15 @@ impl GridView {
             Cell::Text(text) => Some(text),
             _ => None,
         };
+        let labels: Arc<[String]> = labels.into();
         let menu = PopupMenu::build(window, cx, move |mut menu, _, _| {
             menu = menu.scrollable(true);
-            for label in &labels {
-                let (owner, target, info, picked) = (owner.clone(), target.clone(), info.clone(), label.clone());
+            for label in labels.iter() {
+                let (owner, target, labels, picked) = (owner.clone(), target.clone(), labels.clone(), label.clone());
                 let item = PopupMenuItem::new(label.clone())
                     .checked(current.as_deref() == Some(label.as_str()))
                     .on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| this.pick_member(&target, &picked, &info, cx));
+                        let _ = owner.update(cx, |this, cx| this.pick_member(&target, &picked, &labels, cx));
                     });
                 menu = menu.item(item);
             }

@@ -138,6 +138,7 @@ impl GridView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.cell_edit.choice_request = self.cell_edit.choice_request.wrapping_add(1);
         if self.form_open() {
             self.status = "Finish or cancel the open form before editing cells".into();
             cx.notify();

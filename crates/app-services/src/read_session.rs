@@ -330,6 +330,18 @@ impl ReadSession {
             .map_err(|error| classify(&error))
     }
 
+    pub async fn read_enum_labels(
+        &self,
+        type_name: &bookie_core::QualifiedTypeName,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverFailurePresentation> {
+        let guard = self.guard()?;
+        guard
+            .fetch_enum_labels_controlled(&type_name.schema, &type_name.name, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
     pub async fn server_version(
         &self,
         control: &OperationControl,

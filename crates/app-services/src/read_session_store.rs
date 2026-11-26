@@ -287,6 +287,16 @@ impl ReadSessionStore {
         session.open_interactive().await
     }
 
+    pub async fn read_enum_labels(
+        &self,
+        id: SessionId,
+        type_name: &bookie_core::QualifiedTypeName,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.read_enum_labels(type_name, control).await
+    }
+
     pub async fn server_version(
         &self,
         id: SessionId,
