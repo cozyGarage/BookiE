@@ -255,7 +255,7 @@ fn parse_bytes(text: &str) -> Result<Value, CellError> {
 pub trait CsvFields {
     fn field(&self, index: usize) -> Option<&str>;
 
-    fn native_value(&self, _index: usize, _column: &ColumnInfo, _driver_id: &str) -> Option<Value> {
+    fn native_value(&self, _index: usize, _column: &ColumnInfo, _driver_id: &str) -> Option<Result<Value, CellError>> {
         None
     }
 }
@@ -271,12 +271,12 @@ impl CsvFields for super::TextRow<'_> {
         self.get(index)
     }
 
-    fn native_value(&self, index: usize, column: &ColumnInfo, driver_id: &str) -> Option<Value> {
+    fn native_value(&self, index: usize, column: &ColumnInfo, driver_id: &str) -> Option<Result<Value, CellError>> {
         use super::text_rows::WorkbookValue;
 
         let value = self.workbook_value(index)?;
         let kind = crate::import::text_kind::column_kind_for(column, driver_id);
-        match (value, kind) {
+        let exact = match (value, kind) {
             (WorkbookValue::Bool(value), ColumnKind::Bool) => Some(Value::Bool(value)),
             (WorkbookValue::Int(value), ColumnKind::Int) => Some(Value::Int(value)),
             (WorkbookValue::FloatBits(bits), ColumnKind::Float) => Some(Value::Float(f64::from_bits(bits))),
@@ -285,7 +285,11 @@ impl CsvFields for super::TextRow<'_> {
                 Some(Value::Date(value.date()))
             }
             _ => None,
-        }
+        };
+        Some(exact.map_or_else(
+            || parse_non_null_cell(self.get(index).unwrap_or_default(), column, kind, driver_id),
+            Ok,
+        ))
     }
 }
 
@@ -321,14 +325,13 @@ pub(crate) fn row_to_values_for_driver(
             let Some(text) = row.field(*index) else {
                 return Ok(Value::Null);
             };
-            if let Some(value) = row.native_value(*index, column, driver_id) {
-                return Ok(value);
-            }
-            value_for(text, column, options, driver_id).map_err(|reason| CsvRowError {
-                line,
-                column: column.name.clone(),
-                reason,
-            })
+            row.native_value(*index, column, driver_id)
+                .unwrap_or_else(|| value_for(text, column, options, driver_id))
+                .map_err(|reason| CsvRowError {
+                    line,
+                    column: column.name.clone(),
+                    reason,
+                })
         })
         .collect()
 }
