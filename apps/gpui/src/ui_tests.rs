@@ -12,7 +12,13 @@ use crate::{GridView, Work};
 
 mod failed_runs;
 mod full_value_editor;
+pub(crate) mod icon_tooltip_tests;
+pub(crate) mod live_ui_tests;
+pub(crate) mod overlay_ui_tests;
+pub(crate) mod status_bar_tests;
+pub(crate) mod test_config;
 mod themes;
+pub(crate) mod window_identity_tests;
 
 #[gpui::test]
 fn the_grid_footer_owns_row_counts_and_paging(cx: &mut TestAppContext) {
