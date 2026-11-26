@@ -57,10 +57,9 @@ impl AsRef<Path> for Orders {
 }
 
 pub(crate) fn orders() -> Orders {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/orders.sqlite");
     let directory = tempfile::tempdir().expect("a private test directory");
     let path = directory.path().join("orders.sqlite");
-    std::fs::copy(source, &path).expect("copy the orders fixture");
+    std::fs::write(&path, include_bytes!("../../tests/fixtures/orders.sqlite")).expect("write the orders fixture");
     Orders {
         _directory: directory,
         path,

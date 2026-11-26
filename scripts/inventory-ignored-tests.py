@@ -42,6 +42,24 @@ def registered_modules(integration):
     return text + "".join(file.read_text() for file in nested if file.is_file())
 
 
+def directory_test_target(path):
+    current = path.parent
+    while current != root and current.parent.name != "tests":
+        current = current.parent
+    if current == root or not (current / "main.rs").is_file():
+        return None
+    module = [part for part in path.relative_to(current).with_suffix("").parts if part != "mod"]
+    return current.name, "::".join(module)
+
+
+def test_selector(path, name):
+    nested = directory_test_target(path)
+    if nested:
+        target, module = nested
+        return f"--test {target} {module}::{name}"
+    return f"--test {path.stem} {name}"
+
+
 def docker_activation(path, name, packages):
     package = package_owning(path, packages)
     relative = path.relative_to(root)
@@ -56,6 +74,8 @@ def docker_activation(path, name, packages):
         if not integration.is_file() or f"mod {module};" not in registered_modules(integration):
             raise RuntimeError(f"included Docker test source has no integration module: {relative}")
         selector = "--test integration"
+    elif nested := directory_test_target(path):
+        selector = f"--test {nested[0]} {nested[1]}::"
     elif relative.parts[-2] == "tests":
         selector = f"--test {path.stem}"
     elif "src" in relative.parts:
@@ -138,7 +158,7 @@ for path in sorted(
         elif smoke_env:
             package = package_owning(path, packages)
             tier = "Smoke"
-            enable = f"set {smoke_env}; cargo test -p {package} --test {path.stem} {name} -- --include-ignored"
+            enable = f"set {smoke_env}; cargo test -p {package} {test_selector(path, name)} -- --include-ignored"
         elif "Secret Service" in reason or "secret" in relative:
             if name not in mapped:
                 raise RuntimeError(f"unmapped keyring test: {name}")
@@ -154,7 +174,7 @@ for path in sorted(
         elif relative == "crates/mcp/tests/mysql_preview_engines.rs":
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
         elif (
-            relative == "crates/app-services/tests/browse_long_text_preview_engines.rs"
+            relative == "crates/app-services/tests/it/browse_long_text_preview_engines.rs"
             and name == "mysql_previews_a_huge_longtext_cell"
         ):
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
@@ -163,7 +183,7 @@ for path in sorted(
         elif reason.startswith("prints ") and "measured for #" in reason:
             package = package_owning(path, packages)
             tier = "Measurement"
-            enable = f"cargo test -p {package} --test {path.stem} {name} -- --ignored --nocapture"
+            enable = f"cargo test -p {package} {test_selector(path, name)} -- --ignored --nocapture"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
             targets = re.findall(r"--test\s+([\w-]+)", (root / "scripts/test-ssh.sh").read_text())
             if path.stem not in targets:
