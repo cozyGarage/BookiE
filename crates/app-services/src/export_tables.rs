@@ -9,9 +9,10 @@ use bookie_core::export::{
 };
 use bookie_core::{ColumnInfo, Connection, DatabaseDriver, DriverError, FilterSet, OperationControl, TableInfo};
 use bookie_policy::PolicyGuard;
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::sync::CancellationToken;
 
-use crate::export_pages::{PagePlan, PageRunner};
+use crate::export_pages::{PageFuture, PagePlan, PageRunner};
 use crate::snapshot_export::SnapshotPages;
 
 const MAX_FILE_STEM_CHARS: usize = 120;
@@ -224,6 +225,57 @@ pub async fn prepare_targets(
         });
     }
     Ok(targets)
+}
+
+pub(crate) async fn export_tables_to_csv(
+    guard: Arc<PolicyGuard>,
+    driver: Arc<dyn DatabaseDriver>,
+    targets: Vec<TableTarget>,
+    job: TablesExportJob,
+    cancel: CancellationToken,
+) -> Result<Vec<TableResult>, String> {
+    export_with_async_pages(move |run| {
+        let csv = CsvOptions::default();
+        let request = TableExportRequest {
+            driver_id: driver.id(),
+            tables: &targets,
+            directory: &job.directory,
+            format: ResultFormat::Csv,
+            extension: "csv",
+            csv: &csv,
+            max_rows_per_table: job.max_rows_per_table,
+            timeout_secs: job.timeout_secs,
+        };
+        export_tables(guard, driver.as_ref(), &request, &run, &cancel, |_, _| {})
+    })
+    .await
+}
+
+async fn export_with_async_pages(
+    write: impl FnOnce(PageRunner) -> Result<Vec<TableResult>, String> + Send + 'static,
+) -> Result<Vec<TableResult>, String> {
+    let (send, mut receive) = mpsc::channel::<(PageFuture, oneshot::Sender<_>)>(1);
+    let pages = tokio::spawn(async move {
+        while let Some((fetch, reply)) = receive.recv().await {
+            let result = fetch.await;
+            let _ = reply.send(result);
+        }
+    });
+    let written = tokio::task::spawn_blocking(move || {
+        let run: PageRunner = Arc::new(move |fetch| {
+            let (reply, result) = oneshot::channel();
+            let stopped = || ExportError::Source("The export page task stopped unexpectedly.".into());
+            send.blocking_send((fetch, reply)).map_err(|_| stopped())?;
+            result.blocking_recv().map_err(|_| stopped())?
+        });
+        write(run)
+    })
+    .await
+    .map_err(|_| "The export task stopped unexpectedly.".to_string())?;
+    pages
+        .await
+        .map_err(|_| "The export page task stopped unexpectedly.".to_string())?;
+    written
 }
 
 pub fn export_tables(

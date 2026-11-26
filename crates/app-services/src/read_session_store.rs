@@ -231,26 +231,7 @@ impl ReadSessionStore {
             .ok_or("The connection is closed")?;
         let control = crate::operation_control::bounded_with(job.timeout_secs, cancel.clone());
         let targets = crate::export_tables::prepare_targets(&guard, tables, &control).await?;
-        let guard = Arc::new(guard);
-        let handle = tokio::runtime::Handle::current();
-        let cancel = cancel.clone();
-        tokio::task::spawn_blocking(move || {
-            let csv = bookie_core::export::CsvOptions::default();
-            let request = crate::export_tables::TableExportRequest {
-                driver_id: &driver_id,
-                tables: &targets,
-                directory: &job.directory,
-                format: bookie_core::export::ResultFormat::Csv,
-                extension: "csv",
-                csv: &csv,
-                max_rows_per_table: job.max_rows_per_table,
-                timeout_secs: job.timeout_secs,
-            };
-            let run: crate::export_pages::PageRunner = Arc::new(move |future| handle.block_on(future));
-            crate::export_tables::export_tables(guard, driver.as_ref(), &request, &run, &cancel, |_, _| {})
-        })
-        .await
-        .unwrap_or_else(|_| Err("The export task stopped unexpectedly.".into()))
+        crate::export_tables::export_tables_to_csv(Arc::new(guard), driver, targets, job, cancel.clone()).await
     }
 
     pub async fn run_backup_job(
