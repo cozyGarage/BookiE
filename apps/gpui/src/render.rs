@@ -281,6 +281,7 @@ impl GridView {
                         }
                     })),
             )
+            .children(self.pending_marker(theme, cx))
             .when(!compact, |actions| {
                 actions
                     .children((self.live.is_some() && !self.grid_is_query).then(|| {
@@ -445,10 +446,10 @@ impl GridView {
         &self,
         theme: Theme,
         strip: Stateful<Div>,
-        bars: (Option<Div>, Option<Div>, Option<Div>, Option<Div>),
+        bars: (Option<Div>, Option<Div>, Option<Div>),
         cx: &mut Context<Self>,
     ) -> Div {
-        let (filter_row, compare_bar, save_bar, insert_form) = bars;
+        let (filter_row, compare_bar, insert_form) = bars;
         let grid = div()
             .flex_1()
             .flex()
@@ -458,7 +459,6 @@ impl GridView {
             .child(strip)
             .children(filter_row)
             .children(compare_bar)
-            .children(save_bar)
             .children(insert_form)
             .child(self.data_table(cx))
             .child(self.grid_pager(theme, cx));
@@ -611,14 +611,13 @@ impl Render for GridView {
             .or_else(|| self.save_bar(theme, cx))
             .or_else(|| self.insert_form(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
-        let save_bar = self.save.pending.is_none().then(|| self.edits_bar(theme, cx)).flatten();
         let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
             .structure_bar(theme, cx)
             .or_else(|| self.structure_info_panel(theme, cx))
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
-        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, save_bar, insert_form), cx);
+        let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, insert_form), cx);
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),

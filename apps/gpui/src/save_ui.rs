@@ -9,7 +9,7 @@ use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 
 use super::*;
 use crate::chrome::tip;
-use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
+use crate::surfaces::{ButtonKind, button, compact_button, task_bar_frame, task_title};
 
 type PreparedSave = (CellSavePlan, Option<ForeignKeyReview>);
 
@@ -647,35 +647,50 @@ impl GridView {
         }
     }
 
-    pub(crate) fn edits_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+    pub(crate) fn pending_marker(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let count = self.cell_edit.edits.len();
-        if count == 0 || self.compare.is_some() || self.save.busy {
+        if count == 0 || self.compare.is_some() || self.save.busy || self.save.pending.is_some() {
             return None;
         }
         let can_save = self.can_save_edits();
-        let label = if can_save {
-            format!("{count} change(s) pending")
+        let (label, explanation) = if can_save {
+            (format!("{count} pending"), "Changes not saved to the database yet")
         } else {
-            format!("{count} edit(s) in this view only; nothing is saved")
+            (
+                format!("{count} view only"),
+                "Edits in this view only; nothing is saved",
+            )
         };
         Some(
-            task_bar_frame(theme)
-                .debug_selector(|| "pending-edits-bar".into())
-                .child(div().flex_1().min_w_0().child(label))
-                .when(can_save, |bar| {
-                    bar.child(
-                        button(ButtonKind::Primary, "preview-pending-sql", "Preview SQL", theme)
+            div()
+                .flex()
+                .flex_none()
+                .items_center()
+                .gap_1()
+                .debug_selector(|| "pending-edits-marker".into())
+                .child(
+                    div()
+                        .id("pending-edits-count")
+                        .whitespace_nowrap()
+                        .text_color(rgb(theme.warning))
+                        .tooltip(tip(explanation))
+                        .child(label),
+                )
+                .when(can_save, |marker| {
+                    marker.child(
+                        compact_button(ButtonKind::Ghost, "save-pending-edits", "Save", theme)
+                            .debug_selector(|| "save-pending-edits".into())
                             .tooltip(tip("Review the statements, then save or cancel"))
                             .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
                 .child(
-                    button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme).on_click(cx.listener(
-                        |this, _, _, cx| {
+                    compact_button(ButtonKind::Ghost, "discard-pending-edits", "Discard", theme)
+                        .debug_selector(|| "discard-pending-edits".into())
+                        .on_click(cx.listener(|this, _, _, cx| {
                             this.discard_view_edits();
                             cx.notify();
-                        },
-                    )),
+                        })),
                 ),
         )
     }
