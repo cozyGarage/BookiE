@@ -2,8 +2,9 @@ use gpui::TestAppContext;
 use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
-use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
+use crate::save_ui_tests::{saving_view, settle_saving};
 use crate::ui::keys::Surface;
+use crate::ui_tests::test_kit::orders;
 use bookie_app_services::structure_change_plan::StructureChangeKind;
 
 type Opener = fn(&mut GridView, &mut gpui::Context<GridView>);
@@ -37,7 +38,8 @@ fn open_surface(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext,
 
 #[gpui::test]
 fn escape_closes_every_one_shot_dialog_and_changes_nothing(cx: &mut TestAppContext) {
-    let path = fixture_copy("dialog-escape");
+    let fixture = orders();
+    let path = fixture.to_path_buf();
     let (view, cx) = saving_view(cx, &path);
     for (surface, opener) in openers() {
         open_surface(&view, cx, opener);
@@ -59,7 +61,8 @@ fn escape_closes_every_one_shot_dialog_and_changes_nothing(cx: &mut TestAppConte
 
 #[gpui::test]
 fn one_shot_steps_open_centred_and_leave_the_grid_where_it_was(cx: &mut TestAppContext) {
-    let path = fixture_copy("dialog-centred");
+    let fixture = orders();
+    let path = fixture.to_path_buf();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|window, cx| window.render_frame(cx));
     let grid = cx.debug_bounds("grid-pager").expect("the grid is drawn");
@@ -77,7 +80,8 @@ fn one_shot_steps_open_centred_and_leave_the_grid_where_it_was(cx: &mut TestAppC
 
 #[gpui::test]
 fn enter_submits_a_safe_step(cx: &mut TestAppContext) {
-    let path = fixture_copy("dialog-enter");
+    let fixture = orders();
+    let path = fixture.to_path_buf();
     let (view, cx) = saving_view(cx, &path);
     let (_, opener) = openers()
         .into_iter()
@@ -101,7 +105,8 @@ fn enter_submits_a_safe_step(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn enter_does_not_confirm_a_destructive_review(cx: &mut TestAppContext) {
-    let path = fixture_copy("dialog-enter-drop");
+    let fixture = orders();
+    let path = fixture.to_path_buf();
     let (view, cx) = saving_view(cx, &path);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
@@ -133,7 +138,8 @@ fn enter_does_not_confirm_a_destructive_review(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn the_host_key_prompt_cancels_on_escape_and_has_no_enter_default(cx: &mut TestAppContext) {
-    let path = fixture_copy("dialog-host-key");
+    let fixture = orders();
+    let path = fixture.to_path_buf();
     let (view, cx) = saving_view(cx, &path);
     let (respond, mut answer) = tokio::sync::oneshot::channel();
     let pending = bookie_app_services::ssh_prompt::PendingHostKey {
