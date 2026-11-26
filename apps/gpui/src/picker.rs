@@ -24,6 +24,7 @@ pub(crate) enum Pick {
     NameFilter(String),
     SchemaContext(Option<String>),
     Theme(String),
+    CompareTarget(TableInfo),
 }
 
 impl GridView {
@@ -58,6 +59,7 @@ impl GridView {
             PaletteMode::NameFilter => self.name_filter_items(needle, cx),
             PaletteMode::SchemaContext => self.schema_context_items(needle),
             PaletteMode::Themes => theme_items(needle, cx),
+            PaletteMode::CompareTarget => self.compare_target_items(needle),
         }
     }
 
@@ -87,6 +89,25 @@ impl GridView {
                     title: item.title,
                     subtitle: item.subtitle,
                     pick: Pick::Table(table.clone()),
+                })
+            })
+            .collect()
+    }
+
+    fn compare_target_items(&self, needle: &str) -> Vec<PickerItem> {
+        let targets = self.data_compare_targets();
+        let items = relation_items(&targets, &[], "Table", "View");
+        quick_filter(&items, needle)
+            .into_iter()
+            .filter_map(|item| {
+                let QuickTarget::Relation { schema, name } = item.target else {
+                    return None;
+                };
+                let table = targets.iter().find(|t| t.schema == schema && t.name == name)?;
+                Some(PickerItem {
+                    title: item.title,
+                    subtitle: item.subtitle,
+                    pick: Pick::CompareTarget(table.clone()),
                 })
             })
             .collect()
@@ -265,6 +286,7 @@ impl GridView {
                 );
             }
             Pick::Theme(name) => self.choose_theme(&name, window, cx),
+            Pick::CompareTarget(table) => self.start_data_compare(table, cx),
             Pick::ChartValue(column) => self.edit_chart(
                 |settings| {
                     settings.toggle_value(column);

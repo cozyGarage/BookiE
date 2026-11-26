@@ -47,6 +47,11 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if self.search.data_compare.open && event.keystroke.key == "escape" {
+            self.close_data_compare(cx);
+            cx.stop_propagation();
+            return;
+        }
         if self.connection_form.open {
             if event.keystroke.key == "escape" {
                 self.close_connection_dialog(cx);
