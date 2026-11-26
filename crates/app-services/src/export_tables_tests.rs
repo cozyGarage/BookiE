@@ -81,6 +81,28 @@ fn request<'a>(
     }
 }
 
+#[tokio::test]
+async fn the_blocking_writer_gets_pages_and_errors_from_the_async_runtime() {
+    let async_thread = std::thread::current().id();
+    export_with_async_pages(move |run| {
+        assert_ne!(std::thread::current().id(), async_thread);
+        let rows = run(Box::pin(async move {
+            tokio::task::yield_now().await;
+            assert_eq!(std::thread::current().id(), async_thread);
+            Ok(vec![vec![bookie_core::Value::Int(42)]])
+        }))
+        .unwrap();
+        assert_eq!(rows, vec![vec![bookie_core::Value::Int(42)]]);
+        assert!(matches!(
+            run(Box::pin(async { Err(ExportError::Cancelled) })),
+            Err(ExportError::Cancelled)
+        ));
+        Ok(Vec::new())
+    })
+    .await
+    .unwrap();
+}
+
 #[test]
 fn file_names_are_safe_and_unique() {
     let mut used = HashSet::new();
