@@ -6,9 +6,12 @@ use bookie_core::{
 };
 use futures::{TryStreamExt, stream::StreamExt};
 use sqlx::pool::PoolConnection;
-use sqlx::postgres::{PgCancelToken, PgRow, PgTypeInfo, PgTypeKind};
-use sqlx::{Column, Connection, Either, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, TypeInfo, ValueRef};
+use sqlx::postgres::{PgCancelToken, PgRow, PgTypeInfo, PgTypeKind, PgValueFormat, PgValueRef};
+use sqlx::{
+    Column, Connection, Either, Executor, Pool, Postgres, Row, SqlSafeStr, Statement, Type, TypeInfo, ValueRef,
+};
 
+use super::decode::{PgColumnDecoder, PgColumnKind};
 use super::params::{bind_pg_params, describe_query_parameters, needs_text_type_inference, pg_parameter_type_infos};
 use super::{array, decode, map_sqlx_error, numeric, temporal};
 
@@ -535,7 +538,7 @@ where
     let mut columns = Vec::new();
     let mut type_infos = Vec::new();
     let mut column_origins = Vec::new();
-    let mut type_names = Vec::new();
+    let mut decoders = Vec::new();
     let (limit, max_bytes) = limits;
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
     let mut decoded = Vec::with_capacity(columns.len());
@@ -558,15 +561,10 @@ where
             columns = metadata.columns;
             type_infos = metadata.type_infos;
             column_origins = metadata.column_origins;
-            type_names = metadata.type_names;
+            decoders = metadata.decoders;
+            decoded = Vec::with_capacity(columns.len());
         }
-        let payload_bytes = pg_row_decoded_payload_bytes(&row, &type_names).unwrap_or(usize::MAX);
-        if !budget.decode_and_admit_row_into(row.len(), payload_bytes, &mut decoded, |values| {
-            for (index, type_name) in type_names.iter().enumerate() {
-                values.push(extract_value(&row, index, type_name)?);
-            }
-            Ok::<(), DriverError>(())
-        })? {
+        if !decode_and_admit_pg_row(&row, &decoders, &mut budget, &mut decoded)? {
             truncated = true;
             break;
         }
@@ -583,31 +581,53 @@ where
     ))
 }
 
-fn pg_row_decoded_payload_bytes(row: &PgRow, type_names: &[String]) -> Option<usize> {
-    (0..row.len()).try_fold(0usize, |total, index| {
-        let value = row.try_get_raw(index).ok()?;
-        if value.is_null() {
-            return Some(total);
+fn decode_and_admit_pg_row(
+    row: &PgRow,
+    decoders: &[PgColumnDecoder],
+    budget: &mut QueryResultBudget,
+    values: &mut Vec<Value>,
+) -> Result<bool, DriverError> {
+    values.clear();
+    if decoders.len() != row.len() {
+        return Ok(false);
+    }
+    let mut payload_bytes = 0usize;
+    for (index, decoder) in decoders.iter().enumerate() {
+        let raw = row.try_get_raw(index).map_err(map_sqlx_error)?;
+        if !raw.is_null() {
+            payload_bytes = payload_bytes.saturating_add(
+                raw.as_bytes()
+                    .ok()
+                    .map_or(usize::MAX, |bytes| decoder.decoded_payload_length(bytes)),
+            );
         }
-        let bytes = value.as_bytes().ok()?;
-        let type_name = type_names.get(index)?.as_str();
-        Some(total.saturating_add(decode::decoded_payload_length(type_name, bytes)))
-    })
+        if !budget.can_admit_row_payload(row.len(), payload_bytes) {
+            values.clear();
+            return Ok(false);
+        }
+        values.push(extract_value(index, &raw, decoder));
+    }
+    if budget.admit(values) {
+        Ok(true)
+    } else {
+        values.clear();
+        Ok(false)
+    }
 }
 
 struct PgColumnMetadata {
     columns: Vec<ColumnInfo>,
     type_infos: Vec<PgTypeInfo>,
     column_origins: Vec<Option<(i64, i16)>>,
-    type_names: Vec<String>,
+    decoders: Vec<PgColumnDecoder>,
 }
 
 fn stream_column_metadata(pg_columns: &[sqlx::postgres::PgColumn]) -> PgColumnMetadata {
     let type_infos = statement_type_infos(pg_columns);
     let column_origins = statement_column_origins(pg_columns);
-    let type_names = pg_columns
+    let decoders = pg_columns
         .iter()
-        .map(|column| column.type_info().name().to_ascii_uppercase())
+        .map(|column| PgColumnDecoder::new(column.type_info()))
         .collect();
     let columns = pg_columns
         .iter()
@@ -629,92 +649,105 @@ fn stream_column_metadata(pg_columns: &[sqlx::postgres::PgColumn]) -> PgColumnMe
         columns,
         type_infos,
         column_origins,
-        type_names,
+        decoders,
     }
 }
 
-fn extract_value(row: &PgRow, idx: usize, type_name: &str) -> Result<Value, DriverError> {
-    let raw = row.try_get_raw(idx).map_err(map_sqlx_error)?;
+fn extract_value(idx: usize, raw: &PgValueRef<'_>, decoder: &PgColumnDecoder) -> Value {
     if raw.is_null() {
-        return Ok(Value::Null);
+        return Value::Null;
     }
-    if type_name == "VOID" {
-        return Ok(Value::Text(String::new()));
+    if matches!(decoder.kind, PgColumnKind::Void) {
+        return Value::Text(String::new());
     }
-    Ok(extract_non_null_value(row, idx, type_name, &raw))
+    extract_non_null_value(idx, raw, decoder)
 }
 
-fn extract_non_null_value(row: &PgRow, idx: usize, type_name: &str, raw: &sqlx::postgres::PgValueRef<'_>) -> Value {
-    if matches!(raw.type_info().kind(), sqlx::postgres::PgTypeKind::Enum(_)) {
-        return extract_enum_value(raw, idx, type_name);
+fn extract_non_null_value(idx: usize, raw: &PgValueRef<'_>, decoder: &PgColumnDecoder) -> Value {
+    if matches!(decoder.kind, PgColumnKind::Enum) {
+        return extract_enum_value(raw, idx, &decoder.type_name);
     }
-    if matches!(raw.type_info().kind(), sqlx::postgres::PgTypeKind::Array(_)) {
-        return array::decode(raw).unwrap_or_else(|| undecodable(idx, type_name));
+    if matches!(decoder.kind, PgColumnKind::Array) {
+        return array::decode(raw).unwrap_or_else(|| undecodable(idx, &decoder.type_name));
     }
-    if type_name == "NUMERIC" {
+    if matches!(decoder.kind, PgColumnKind::Numeric) {
         let value = match raw.format() {
             sqlx::postgres::PgValueFormat::Binary => raw.as_bytes().ok().and_then(numeric::decode_binary),
             sqlx::postgres::PgValueFormat::Text => raw.as_str().ok().and_then(numeric::decode_text),
         };
-        return value.unwrap_or_else(|| undecodable(idx, type_name));
+        return value.unwrap_or_else(|| undecodable(idx, &decoder.type_name));
     }
-    if type_name == "JSON" {
-        return extract_json_text(raw, idx, type_name);
+    if matches!(decoder.kind, PgColumnKind::Json) {
+        return extract_json_text(raw, idx, &decoder.type_name);
     }
-    if raw.format() == sqlx::postgres::PgValueFormat::Binary {
-        if matches!(type_name, "TIME" | "TIMETZ") {
-            return raw
-                .as_bytes()
-                .ok()
-                .and_then(|bytes| temporal::decode_time(bytes, type_name == "TIMETZ"))
-                .unwrap_or_else(|| undecodable(idx, type_name));
-        }
-        if matches!(type_name, "DATE" | "TIMESTAMP" | "TIMESTAMPTZ") {
-            return raw
-                .as_bytes()
-                .ok()
-                .and_then(|bytes| temporal::decode_temporal(bytes, type_name))
-                .unwrap_or_else(|| undecodable(idx, type_name));
-        }
-        if let Some(text) = raw
-            .as_bytes()
-            .ok()
-            .and_then(|bytes| decode::decode_pg_binary_text(type_name, bytes))
-        {
-            return Value::Text(text);
+    if raw.format() == PgValueFormat::Binary {
+        match decoder.kind {
+            PgColumnKind::Time | PgColumnKind::TimeTz => {
+                return raw
+                    .as_bytes()
+                    .ok()
+                    .and_then(|bytes| temporal::decode_time(bytes, matches!(decoder.kind, PgColumnKind::TimeTz)))
+                    .unwrap_or_else(|| undecodable(idx, &decoder.type_name));
+            }
+            PgColumnKind::Date | PgColumnKind::Timestamp | PgColumnKind::TimestampTz => {
+                let kind = match decoder.kind {
+                    PgColumnKind::Date => temporal::PgTemporalKind::Date,
+                    PgColumnKind::Timestamp => temporal::PgTemporalKind::Timestamp,
+                    _ => temporal::PgTemporalKind::TimestampTz,
+                };
+                return raw
+                    .as_bytes()
+                    .ok()
+                    .and_then(|bytes| temporal::decode_temporal(bytes, kind))
+                    .unwrap_or_else(|| undecodable(idx, &decoder.type_name));
+            }
+            PgColumnKind::BinaryText(kind) => {
+                if let Some(text) = raw
+                    .as_bytes()
+                    .ok()
+                    .and_then(|bytes| decode::decode_pg_binary_text_kind(kind, bytes))
+                {
+                    return Value::Text(text);
+                }
+            }
+            _ => {}
         }
     }
-    let decoded = match type_name {
-        "BOOL" => row.try_get::<bool, _>(idx).map(Value::Bool),
-        "INT2" => row.try_get::<i16, _>(idx).map(|v| Value::Int(v as i64)),
-        "INT4" => row.try_get::<i32, _>(idx).map(|v| Value::Int(v as i64)),
-        "INT8" => row.try_get::<i64, _>(idx).map(Value::Int),
-        "FLOAT4" => row
-            .try_get::<f32, _>(idx)
-            .map(|v| Value::Float(bookie_core::single_precision_as_f64(v))),
-        "FLOAT8" => row.try_get::<f64, _>(idx).map(Value::Float),
-        "DATE" => row.try_get::<chrono::NaiveDate, _>(idx).map(Value::Date),
-        "TIME" => row.try_get::<chrono::NaiveTime, _>(idx).map(Value::Time),
-        "TIMESTAMP" => row.try_get::<chrono::NaiveDateTime, _>(idx).map(Value::DateTime),
-        "TIMESTAMPTZ" => row
-            .try_get::<chrono::DateTime<chrono::Utc>, _>(idx)
-            .map(Value::TimestampTz),
-        "UUID" => row.try_get::<uuid::Uuid, _>(idx).map(Value::Uuid),
-        "JSONB" => row.try_get::<serde_json::Value, _>(idx).map(Box::new).map(Value::Json),
-        "BYTEA" => row.try_get::<Vec<u8>, _>(idx).map(Value::Bytes),
-        _ => extract_fallback_text(row, idx, raw),
+    let decoded = match decoder.kind {
+        PgColumnKind::Bool => decode_raw::<bool>(raw).map(Value::Bool),
+        PgColumnKind::Int2 => decode_raw::<i16>(raw).map(|v| Value::Int(v as i64)),
+        PgColumnKind::Int4 => decode_raw::<i32>(raw).map(|v| Value::Int(v as i64)),
+        PgColumnKind::Int8 => decode_raw::<i64>(raw).map(Value::Int),
+        PgColumnKind::Float4 => decode_raw::<f32>(raw).map(|v| Value::Float(bookie_core::single_precision_as_f64(v))),
+        PgColumnKind::Float8 => decode_raw::<f64>(raw).map(Value::Float),
+        PgColumnKind::Date => decode_raw::<chrono::NaiveDate>(raw).map(Value::Date),
+        PgColumnKind::Time => decode_raw::<chrono::NaiveTime>(raw).map(Value::Time),
+        PgColumnKind::Timestamp => decode_raw::<chrono::NaiveDateTime>(raw).map(Value::DateTime),
+        PgColumnKind::TimestampTz => decode_raw::<chrono::DateTime<chrono::Utc>>(raw).map(Value::TimestampTz),
+        PgColumnKind::Uuid => decode_raw::<uuid::Uuid>(raw).map(Value::Uuid),
+        PgColumnKind::Jsonb => decode_raw::<serde_json::Value>(raw).map(Box::new).map(Value::Json),
+        PgColumnKind::Bytea => decode_raw::<Vec<u8>>(raw).map(Value::Bytes),
+        _ => extract_fallback_text(raw),
     };
-    decoded.unwrap_or_else(|_| undecodable(idx, type_name))
+    decoded.unwrap_or_else(|| undecodable(idx, &decoder.type_name))
 }
 
-fn extract_fallback_text(row: &PgRow, idx: usize, raw: &sqlx::postgres::PgValueRef<'_>) -> Result<Value, sqlx::Error> {
-    if raw.format() == sqlx::postgres::PgValueFormat::Text {
-        return raw
-            .as_str()
-            .map(|value| Value::Text(value.into()))
-            .map_err(sqlx::Error::Decode);
+fn extract_fallback_text(raw: &PgValueRef<'_>) -> Option<Value> {
+    if raw.format() == PgValueFormat::Text {
+        return raw.as_str().ok().map(|value| Value::Text(value.into()));
     }
-    row.try_get::<String, _>(idx).map(Value::Text)
+    decode_raw::<String>(raw).map(Value::Text)
+}
+
+fn decode_raw<T>(raw: &PgValueRef<'_>) -> Option<T>
+where
+    for<'r> T: sqlx::Decode<'r, Postgres> + Type<Postgres>,
+{
+    let type_info = raw.type_info();
+    if !type_info.is_null() && !T::compatible(&type_info) {
+        return None;
+    }
+    <T as sqlx::Decode<Postgres>>::decode(raw.clone()).ok()
 }
 
 fn extract_json_text(raw: &sqlx::postgres::PgValueRef<'_>, idx: usize, type_name: &str) -> Value {

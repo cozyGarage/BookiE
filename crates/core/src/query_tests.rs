@@ -156,6 +156,20 @@ fn result_budget_into_clears_refused_rows_without_changing_counts() {
 }
 
 #[test]
+fn result_budget_precheck_rejects_partial_payload_before_decoding() {
+    let budget = QueryResultBudget {
+        bytes: MAX_QUERY_RESULT_BYTES - 128,
+        ..QueryResultBudget::default()
+    };
+
+    assert!(budget.can_admit_row_payload(1, 0));
+    assert!(!budget.can_admit_row_payload(1, 128));
+    assert_eq!(budget.rows, 0);
+    assert_eq!(budget.cells, 0);
+    assert_eq!(budget.bytes, MAX_QUERY_RESULT_BYTES - 128);
+}
+
+#[test]
 fn result_budget_caps_cells_and_dynamic_value_storage() {
     assert_eq!(MAX_QUERY_RESULT_BYTES, 67_108_864);
     let row = vec![Value::Text("x".into())];

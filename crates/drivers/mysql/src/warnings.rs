@@ -1,9 +1,10 @@
 use bookie_core::{MAX_SERVER_MESSAGES, MessageSeverity, ServerMessage, ServerMessages, Value};
 use futures::TryStreamExt;
+use sqlx::Row;
 use sqlx::mysql::MySql;
 use sqlx::pool::PoolConnection;
 
-use crate::decode::extract_value;
+use crate::decode::{column_decoders, extract_row};
 
 pub(crate) fn discard(connection: &mut PoolConnection<MySql>) {
     let _ = connection.take_warning_count();
@@ -28,8 +29,10 @@ async fn show_warnings(connection: &mut PoolConnection<MySql>) -> Result<Vec<Vec
     let sql = format!("SHOW WARNINGS LIMIT {MAX_SERVER_MESSAGES}");
     let mut stream = sqlx::raw_sql(sqlx::AssertSqlSafe(sql)).fetch(&mut **connection);
     let mut rows = Vec::new();
+    let mut decoders = None;
     while let Some(row) = stream.try_next().await? {
-        rows.push((0..3).map(|index| extract_value(&row, index)).collect());
+        let decoders = decoders.get_or_insert_with(|| column_decoders(row.columns()));
+        rows.push(extract_row(&row, decoders));
     }
     Ok(rows)
 }

@@ -1,5 +1,6 @@
 use super::*;
 use crate::query::undecodable;
+use bookie_core::{ConnectOptions, DatabaseDriver};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -151,7 +152,7 @@ fn an_undecodable_column_is_reported_to_the_logs_with_its_index_and_type() {
 #[test]
 fn structure_metadata_declarations_match_the_connection_impl() {
     let d = PgDriver;
-    let source = include_str!("lib.rs");
+    let source = include_str!("connection.rs");
     assert!(d.supports_index_metadata());
     assert!(d.supports_foreign_key_metadata());
     assert!(d.supports_view_metadata());

@@ -121,7 +121,6 @@ crates/drivers/mssql/src/errors.rs 5
 crates/drivers/mssql/src/lib.rs 32
 crates/drivers/mssql/src/schema_types.rs 16
 crates/drivers/mssql/src/tests.rs 7
-crates/drivers/mysql/src/decode.rs 16
 crates/drivers/mysql/src/errors.rs 3
 crates/drivers/mysql/src/introspection.rs 16
 crates/drivers/mysql/src/lib.rs 46
@@ -131,9 +130,10 @@ crates/drivers/mysql/src/temporal.rs 1
 crates/drivers/postgres/src/array.rs 4
 crates/drivers/postgres/src/errors.rs 3
 crates/drivers/postgres/src/introspection.rs 31
-crates/drivers/postgres/src/lib.rs 9
+crates/drivers/postgres/src/lib.rs 7
 crates/drivers/postgres/src/session.rs 3
 crates/drivers/postgres/src/temporal.rs 1
+crates/drivers/postgres/src/transaction.rs 2
 crates/drivers/redis/src/lib.rs 9
 crates/drivers/redis/src/tests.rs 2
 crates/drivers/sqlite/src/interrupt.rs 13
