@@ -1834,7 +1834,8 @@ fn the_status_command_reports_a_healthy_direct_connection_in_messages(cx: &mut T
 #[gpui::test]
 fn typing_into_a_large_sql_editor_rebuilds_marks_once_after_debounce(cx: &mut TestAppContext) {
     use bookie_gpui::live::{LiveTable, Origin};
-    let origin = Origin::File(orders_fixture());
+    let fixture = orders();
+    let origin = Origin::File(fixture.as_ref().to_path_buf());
     let table = std::sync::Arc::new(
         LiveTable::load(
             &origin,
