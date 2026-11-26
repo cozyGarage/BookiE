@@ -74,6 +74,8 @@ mod set_cells_ui;
 mod sidebar_catalog;
 mod sidebar_fields;
 mod sidebar_state;
+mod sql_editor;
+mod sql_editor_marks;
 mod sql_file_ui;
 mod ssh_form;
 mod structure_ui;
@@ -357,28 +359,33 @@ impl GridView {
             this.on_editor_event(event, window, cx);
         })
         .detach();
+        let owner = cx.entity().downgrade();
         let sql_input = cx.new(|cx| {
-            EditorState::new(window, cx)
+            let mut editor = EditorState::new(window, cx)
                 .language("sql")
                 .line_number(true)
                 .folding(true)
-                .placeholder("SELECT … (Enter adds a line, Ctrl+Enter runs it)")
+                .placeholder("SELECT … (Ctrl+Enter runs the selection or statement)");
+            Self::install_sql_completion(&mut editor, owner);
+            editor
         });
         cx.subscribe(
             &sql_input,
             |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
                 if matches!(event, gpui_kit::component::input::InputEvent::Change) {
                     this.last_edit = Some(input.read(cx).cursor_position());
+                    input.update(cx, Self::clear_sql_diagnostics);
                 }
                 if matches!(
                     event,
                     gpui_kit::component::input::InputEvent::PressEnter { secondary: true, .. }
                 ) {
-                    this.run_query(cx);
+                    this.run_at_cursor(cx);
                 }
             },
         )
         .detach();
+        Self::observe_sql_marks(&sql_input, cx);
         let value_editor = cx.new(|cx| EditorState::new(window, cx).placeholder("Edit full value"));
         (find, filter, editor, sql_input, value_editor)
     }
@@ -867,6 +874,7 @@ impl GridView {
     fn invalidate_background(&mut self) {
         self.clear_chart();
         self.loads.invalidate();
+        self.panel.running = None;
         self.invalidate_scans();
         self.counts.invalidate();
         self.charts.invalidate();

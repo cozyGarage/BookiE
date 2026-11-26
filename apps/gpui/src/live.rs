@@ -412,8 +412,15 @@ impl LiveSession {
     }
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
-        let epoch = self.next_epoch();
-        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        self.read_columns(table, self.next_epoch(), Duration::from_secs(10))
+    }
+
+    pub(crate) fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+        self.read_columns(table, Epoch(self.epoch.load(Ordering::Relaxed)), Duration::from_secs(1))
+    }
+
+    fn read_columns(&self, table: &TableInfo, epoch: Epoch, timeout: Duration) -> Result<Vec<ColumnInfo>, String> {
+        let control = OperationControl::with_timeout(timeout);
         let event = self.runtime.block_on(dispatch_read(
             DispatchContext::Sessions(&self.sessions),
             Command::ReadColumns {

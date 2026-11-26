@@ -145,8 +145,9 @@ impl GridView {
                 }
             };
             self.panel.error_location = None;
+            self.sql_input.update(cx, Self::clear_sql_diagnostics);
             self.status = "Running…".into();
-            self.begin_background(
+            self.begin_background_with_context(
                 Work::Load,
                 cx,
                 {
@@ -189,41 +190,53 @@ impl GridView {
                         (statement, source, mapping, started.elapsed(), result)
                     }
                 },
-                move |this, (sql, source, mapping, elapsed, result)| match result {
-                    Ok(table) => {
-                        this.panel.error_location = None;
-                        let (rows, truncated) = (
-                            bookie_gpui::source::ResultSource::total(&table),
-                            bookie_gpui::source::ResultSource::is_partial(&table),
-                        );
-                        this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
-                        this.panel.messages.server_messages(&table.messages);
-                        this.show_plan_of(&table);
-                        this.add_run_with_cancel_process(Some(std::sync::Arc::new(table)), cancel_process);
-                        if let Some(slot) = this.run_tabs.slots.last_mut() {
-                            slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                move |this, (sql, source, mapping, elapsed, result), cx| {
+                    this.panel.running = None;
+                    match result {
+                        Ok(table) => {
+                            this.panel.error_location = None;
+                            let (rows, truncated) = (
+                                bookie_gpui::source::ResultSource::total(&table),
+                                bookie_gpui::source::ResultSource::is_partial(&table),
+                            );
+                            this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
+                            this.panel.messages.server_messages(&table.messages);
+                            this.show_plan_of(&table);
+                            this.add_run_with_cancel_process(Some(std::sync::Arc::new(table)), cancel_process);
+                            if let Some(slot) = this.run_tabs.slots.last_mut() {
+                                slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                            }
                         }
-                    }
-                    Err(error) => {
-                        this.panel.explaining = false;
-                        let detail = match error.hint.as_deref() {
-                            Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
-                            _ => error.message.clone(),
-                        };
-                        this.panel.messages.statement_failed(&sql, &detail, elapsed);
-                        this.add_failed_run(detail, elapsed);
-                        let (original, position) = original_error_location(mapping, &sql, error.position);
-                        this.panel.error_location = position
-                            .zip(this.panel.messages.entries().last())
-                            .map(|(position, message)| (original, position, message.id, source));
-                        this.panel.view = ResultView::Messages;
-                        this.status = error.message;
+                        Err(error) => {
+                            this.panel.explaining = false;
+                            let detail = match error.hint.as_deref() {
+                                Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
+                                _ => error.message.clone(),
+                            };
+                            this.panel.messages.statement_failed(&sql, &detail, elapsed);
+                            this.add_failed_run(detail, elapsed);
+                            let (original, position) = original_error_location(mapping, &sql, error.position);
+                            this.panel.error_location = position
+                                .zip(this.panel.messages.entries().last())
+                                .map(|(position, message)| (original, position, message.id, source));
+                            this.panel.view = ResultView::Messages;
+                            this.show_sql_diagnostic(error.message.clone(), cx);
+                            this.status = error.message;
+                        }
                     }
                 },
             );
+            self.panel.running = Some(self.loads.generation);
             return;
         }
         self.add_run(None);
+    }
+
+    pub(crate) fn stop_query(&mut self) {
+        if self.panel.running == Some(self.loads.generation) && !self.loads.cancel.is_cancelled() {
+            self.loads.cancel.cancel();
+            self.status = "Cancellation requested…".into();
+        }
     }
 
     pub(crate) fn show_data_dictionary(&mut self, cx: &mut Context<Self>) {
