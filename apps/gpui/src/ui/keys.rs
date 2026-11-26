@@ -19,6 +19,14 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if let Some(surface) = top {
+            if self.surface_key(key, cx) {
+                cx.stop_propagation();
+            }
+            if surface != Surface::Notifications || key == "escape" {
+                return;
+            }
+        }
         if self.palette.open {
             if palette_navigation_key(key, event.keystroke.modifiers) {
                 self.move_palette_selection(key, cx);
@@ -26,14 +34,6 @@ impl GridView {
                 cx.notify();
             }
             return;
-        }
-        if let Some(surface) = top {
-            if self.surface_key(key, cx) {
-                cx.stop_propagation();
-            }
-            if surface != Surface::Notifications {
-                return;
-            }
         }
         if key == "escape" && self.can_stop_query() && self.sql_input.read(cx).focus_handle(cx).is_focused(window) {
             self.stop_query();
@@ -470,17 +470,17 @@ pub(crate) enum Surface {
 
 impl Surface {
     pub(crate) const ORDER: [Surface; 20] = [
-        Surface::Approval,
-        Surface::HostKey,
-        Surface::CloseConfirm,
         Surface::CancelProcess,
+        Surface::CloseConfirm,
+        Surface::HostKey,
+        Surface::Approval,
         Surface::DeleteConnection,
-        Surface::Notifications,
         Surface::ConnectionForm,
-        Surface::SaveReview,
+        Surface::Notifications,
         Surface::Import,
         Surface::ExportFile,
         Surface::SchemaDiagram,
+        Surface::SaveReview,
         Surface::Insert,
         Surface::DataCompare,
         Surface::Structure,

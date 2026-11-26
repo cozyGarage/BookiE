@@ -39,8 +39,7 @@ impl GridView {
         };
         self.tabs.open_query();
         self.sync_grid_owner();
-        self.sql_input
-            .update(cx, |input, cx| input.set_value(draft.sql, window, cx));
+        self.set_sql_text(draft.sql, window, cx);
         self.status = "Reopened the last closed query".into();
         true
     }

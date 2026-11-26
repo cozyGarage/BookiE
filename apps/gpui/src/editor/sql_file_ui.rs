@@ -66,7 +66,7 @@ impl GridView {
         let Some(text) = self.search.sql_file.opened.take() else {
             return;
         };
-        self.sql_input.update(cx, |input, cx| input.set_value(text, window, cx));
+        self.set_sql_text(text, window, cx);
         self.focus_editor = true;
     }
 

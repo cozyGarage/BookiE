@@ -647,19 +647,24 @@ fn completion_reuses_columns_it_has_read_until_they_are_forgotten() {
     let table = live.tables[0].clone();
     assert!(live.cached_columns(&table).is_none());
 
+    let reads = live.column_read_count();
     let first = live.completion_columns(&table).expect("columns are read");
+    assert_eq!(live.column_read_count(), reads + 1);
     assert_eq!(live.cached_columns(&table), Some(first.clone()), "the read is kept");
     assert_eq!(
         live.completion_columns(&table).unwrap(),
         first,
         "the next completion reuses it"
     );
+    assert_eq!(live.column_read_count(), reads + 1);
 
     live.forget_columns();
     assert!(
         live.cached_columns(&table).is_none(),
         "a refresh or a save forgets cached columns"
     );
+    live.completion_columns(&table).unwrap();
+    assert_eq!(live.column_read_count(), reads + 2);
 }
 
 #[test]
