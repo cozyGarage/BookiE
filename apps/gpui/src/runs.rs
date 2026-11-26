@@ -199,15 +199,14 @@ impl GridView {
                     this.panel.explaining = false;
                     let activate = this.can_activate_query_result(selected) && this.cell_edit.active.is_none();
                     let original = (sql, source, mapping);
-                    let cancelled = this.queries.cancel.is_cancelled();
                     let error_status = outcomes
                         .last()
                         .and_then(|outcome| outcome.result.as_ref().err())
-                        .filter(|_| !cancelled)
+                        .filter(|error| !error.cancelled)
                         .map(|error| error.message.clone());
                     let first_new_number = this.run_tabs.next_number;
                     for outcome in outcomes {
-                        if cancelled && outcome.result.is_err() {
+                        if outcome.result.as_ref().is_err_and(|error| error.cancelled) {
                             this.apply_cancelled_outcome(&outcome);
                             continue;
                         }
