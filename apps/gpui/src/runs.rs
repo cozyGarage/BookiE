@@ -628,3 +628,7 @@ mod retention_tests {
         assert_eq!(result_evictions(&tabs, 0), Some(vec![0]));
     }
 }
+
+fn strip_position(tab_index: usize) -> usize {
+    tab_index.saturating_sub(1)
+}

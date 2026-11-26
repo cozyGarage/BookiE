@@ -553,6 +553,9 @@ impl GridView {
         reconnect: Option<bookie_core::TableInfo>,
         cx: &mut Context<Self>,
     ) {
+        if let Some(live) = self.live.as_ref() {
+            live.forget_columns();
+        }
         if let Some(scope) = self.save.refresh_diagram.take() {
             self.status = text;
             self.search.diagram.ddl = None;
