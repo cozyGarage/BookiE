@@ -283,7 +283,6 @@ impl LiveSession {
                 epoch,
                 &self.epoch,
             ))
-            .map_err(QueryFailure::from)
             .map_err(|failure| self.name_the_read_path(failure))?;
         Ok(LiveTable {
             session: self.clone(),
@@ -591,16 +590,15 @@ impl LiveSession {
         }
         let epoch = self.next_epoch();
         let started = std::time::Instant::now();
-        let result = self.runtime.block_on(read_pages(
-            &self.sessions,
-            self.session_id,
-            &table,
-            max_rows,
-            sort,
-            cancellation,
+        let reader = PageReader {
+            sessions: &self.sessions,
+            session_id: self.session_id,
             epoch,
-            &self.epoch,
-        ))?;
+            current_epoch: &self.epoch,
+        };
+        let result = self
+            .runtime
+            .block_on(read_pages(reader, &table, max_rows, sort, cancellation))?;
         let mut columns: Vec<_> = result.columns.iter().map(column_meta).collect();
         for column in &mut columns {
             column.primary_key = key.contains(&column.name);
@@ -1180,32 +1178,28 @@ impl SubscriptionSampler for RegistrySubscriptionSampler {
     }
 }
 
-async fn read_pages(
-    sessions: &ReadSessionStore,
+#[derive(Clone, Copy)]
+struct PageReader<'a> {
+    sessions: &'a ReadSessionStore,
     session_id: SessionId,
+    epoch: Epoch,
+    current_epoch: &'a AtomicU64,
+}
+
+async fn read_pages(
+    reader: PageReader<'_>,
     table: &TableInfo,
     max_rows: u64,
     sort: Option<&bookie_app_services::read_session::TableSort>,
     cancellation: &CancellationToken,
-    epoch: Epoch,
-    current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let open_control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
-    let mut cursor = sessions
-        .open_table_cursor_sorted(session_id, table, sort, &open_control)
+    let mut cursor = reader
+        .sessions
+        .open_table_cursor_sorted(reader.session_id, table, sort, &open_control)
         .await
         .map_err(|failure| driver_failure_message(&failure))?;
-    let result = collect_pages(
-        sessions,
-        session_id,
-        table,
-        max_rows,
-        cancellation,
-        &mut cursor,
-        epoch,
-        current_epoch,
-    )
-    .await;
+    let result = collect_pages(reader, table, max_rows, cancellation, &mut cursor).await;
     let close_result = if let Some(cursor) = cursor {
         cursor.close().await.map_err(|failure| driver_failure_message(&failure))
     } else {
@@ -1224,14 +1218,11 @@ async fn read_pages(
 }
 
 async fn collect_pages(
-    sessions: &ReadSessionStore,
-    session_id: SessionId,
+    reader: PageReader<'_>,
     table: &TableInfo,
     max_rows: u64,
     cancellation: &CancellationToken,
     cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
-    epoch: Epoch,
-    current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let mut infos: Vec<ColumnInfo> = Vec::new();
     let mut rows = QueryRows::new();
@@ -1239,18 +1230,8 @@ async fn collect_pages(
     let mut budget = QueryResultBudget::default();
     while (rows.len() as u64) < max_rows {
         let limit = PAGE_ROWS.min(max_rows - rows.len() as u64);
-        let (mut page, has_next_page) = next_result_page(
-            sessions,
-            session_id,
-            table,
-            rows.len() as u64,
-            limit,
-            cancellation,
-            cursor,
-            epoch,
-            current_epoch,
-        )
-        .await?;
+        let (mut page, has_next_page) =
+            next_result_page(reader, table, rows.len() as u64, limit, cancellation, cursor).await?;
         cap_page_rows(&mut page, limit);
         if infos.is_empty() {
             infos.clone_from(&page.columns);
@@ -1283,15 +1264,12 @@ async fn collect_pages(
 }
 
 async fn next_result_page(
-    sessions: &ReadSessionStore,
-    session_id: SessionId,
+    reader: PageReader<'_>,
     table: &TableInfo,
     offset: u64,
     limit: u64,
     cancellation: &CancellationToken,
     cursor: &mut Option<bookie_app_services::read_session::PostgresTableCursor>,
-    epoch: Epoch,
-    current_epoch: &AtomicU64,
 ) -> Result<(QueryResult, bool), String> {
     let control = OperationControl::new(cancellation.clone(), Some(tokio::time::Instant::now() + PAGE_TIMEOUT));
     match cursor {
@@ -1302,20 +1280,7 @@ async fn next_result_page(
                 .map_err(|failure| driver_failure_message(&failure))?;
             Ok((page.result, page.has_next_page))
         }
-        None => Ok((
-            bridge_read_page(
-                sessions,
-                session_id,
-                table,
-                offset,
-                limit,
-                &control,
-                epoch,
-                current_epoch,
-            )
-            .await?,
-            false,
-        )),
+        None => Ok((bridge_read_page(reader, table, offset, limit, &control).await?, false)),
     }
 }
 
@@ -1420,27 +1385,24 @@ async fn bridge_query_detailed(
 }
 
 async fn bridge_read_page(
-    sessions: &ReadSessionStore,
-    session_id: SessionId,
+    reader: PageReader<'_>,
     table: &TableInfo,
     offset: u64,
     limit: u64,
     control: &OperationControl,
-    epoch: Epoch,
-    current_epoch: &AtomicU64,
 ) -> Result<QueryResult, String> {
     let event = dispatch_read(
-        DispatchContext::Sessions(sessions),
+        DispatchContext::Sessions(reader.sessions),
         Command::ReadPage {
-            epoch,
-            session_id,
+            epoch: reader.epoch,
+            session_id: reader.session_id,
             table: table.clone(),
             offset,
             limit,
         },
         control,
-        epoch,
-        current_epoch,
+        reader.epoch,
+        reader.current_epoch,
     )
     .await?;
     let Event::PageRead { outcome, .. } = event else {

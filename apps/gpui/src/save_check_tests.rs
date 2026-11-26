@@ -60,7 +60,7 @@ fn check(id: i64, name: &str) -> CellCheck {
 
 #[test]
 fn checks_carry_the_key_of_the_original_row_and_need_a_key() {
-    let original = vec![Cell::Int(7), Cell::Text("old".into())];
+    let original = [Cell::Int(7), Cell::Text("old".into())];
     let new = Cell::Text("new".into());
     let keys = key_columns(&[column("id", true), column("name", false)]);
     assert_eq!(keys, vec![0]);
