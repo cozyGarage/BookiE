@@ -116,7 +116,31 @@ pub struct LiveSession {
     column_cache: std::sync::Mutex<ColumnCache>,
 }
 
-type ColumnCache = std::collections::HashMap<(Option<String>, String), (std::time::Instant, Vec<ColumnInfo>)>;
+type ColumnKey = (Option<String>, String);
+
+#[derive(Default)]
+struct ColumnCache {
+    generation: u64,
+    tables: std::collections::HashMap<ColumnKey, (std::time::Instant, Vec<ColumnInfo>)>,
+}
+
+impl ColumnCache {
+    fn get(&self, key: &ColumnKey) -> Option<&(std::time::Instant, Vec<ColumnInfo>)> {
+        self.tables.get(key)
+    }
+
+    fn forget(&mut self) {
+        self.generation = self.generation.wrapping_add(1);
+        self.tables.clear();
+    }
+
+    fn remember(&mut self, read_generation: u64, key: ColumnKey, columns: &[ColumnInfo]) {
+        if read_generation == self.generation {
+            self.tables
+                .insert(key, (std::time::Instant::now(), columns.to_vec()));
+        }
+    }
+}
 
 const COLUMN_CACHE_TTL: Duration = Duration::from_secs(30);
 
@@ -165,7 +189,7 @@ impl LiveSession {
             sessions,
             session_id: opened.session_id,
             epoch: AtomicU64::new(0),
-            column_cache: std::sync::Mutex::new(ColumnCache::new()),
+            column_cache: std::sync::Mutex::new(ColumnCache::default()),
             label: opened.label,
             tables: opened.tables,
             saved,
@@ -216,7 +240,7 @@ impl LiveSession {
             sessions,
             session_id: self.session_id,
             epoch: AtomicU64::new(0),
-            column_cache: std::sync::Mutex::new(ColumnCache::new()),
+            column_cache: std::sync::Mutex::new(ColumnCache::default()),
             driver_id: driver_id.to_string(),
             label: self.label.clone(),
             tables: self.tables.clone(),
@@ -535,16 +559,17 @@ impl LiveSession {
 
     pub fn forget_columns(&self) {
         if let Ok(mut cache) = self.column_cache.lock() {
-            cache.clear();
+            cache.forget();
         }
     }
 
-    fn remember_columns(&self, table: &TableInfo, columns: &[ColumnInfo]) {
-        if let Ok(mut cache) = self.column_cache.lock() {
-            cache.insert(
-                (table.schema.clone(), table.name.clone()),
-                (std::time::Instant::now(), columns.to_vec()),
-            );
+    fn column_generation(&self) -> Option<u64> {
+        self.column_cache.lock().ok().map(|cache| cache.generation)
+    }
+
+    fn remember_columns(&self, read_generation: Option<u64>, table: &TableInfo, columns: &[ColumnInfo]) {
+        if let (Some(read_generation), Ok(mut cache)) = (read_generation, self.column_cache.lock()) {
+            cache.remember(read_generation, (table.schema.clone(), table.name.clone()), columns);
         }
     }
 
@@ -559,6 +584,7 @@ impl LiveSession {
         timeout: Duration,
     ) -> Result<Vec<ColumnInfo>, String> {
         let control = OperationControl::with_timeout(timeout);
+        let generation = self.column_generation();
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let command = Command::ReadColumns {
             epoch,
@@ -576,7 +602,7 @@ impl LiveSession {
             return Err("The command bridge returned an unexpected event".into());
         };
         let columns = outcome.map_err(|failure| driver_failure_message(&failure))?;
-        self.remember_columns(table, &columns);
+        self.remember_columns(generation, table, &columns);
         Ok(columns)
     }
 

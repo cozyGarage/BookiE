@@ -219,6 +219,9 @@ impl GridView {
                 match result {
                     Ok((outcome, close)) => {
                         this.transaction = None;
+                        if let Some(live) = this.live.as_ref().filter(|_| outcome.is_some()) {
+                            live.forget_columns();
+                        }
                         let message = match outcome {
                             Some(bookie_core::SessionCommitOutcome::Committed) => "Transaction committed",
                             Some(bookie_core::SessionCommitOutcome::RolledBack) => {
