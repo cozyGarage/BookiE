@@ -25,3 +25,4 @@ apps/linux/app/src/ui/structure_tab/mod.rs hand-built-toolbar 1
 apps/linux/app/src/ui/theme.rs thread_local 1
 apps/linux/app/src/ui/typography.rs thread_local 1
 apps/linux/app/src/ui/welcome_view.rs literal-spacing 2
+apps/gpui/src/connection/connection_form.rs gpui-button-new 1
