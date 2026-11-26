@@ -3,7 +3,7 @@ use bookie_app_services::unknown_outcomes::{
     OutcomeDecision, UnknownOutcome, UnknownOutcomeError, list_unknown_outcomes, resolve_unknown_outcome,
 };
 
-use crate::surfaces::{ButtonKind, button, task_bar_frame, task_title};
+use crate::surfaces::{ButtonKind, button, sql_preview, task_bar_frame, task_title};
 use crate::*;
 
 #[derive(Default)]
@@ -266,15 +266,12 @@ impl GridView {
                             )),
                         ),
                 )
-                .child(
-                    div()
-                        .id("resolve-record")
-                        .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
-                        .overflow_y_scroll()
-                        .font_family("monospace")
-                        .text_size(px(size::TEXT_SMALL))
-                        .child(record),
-                )
+                .child(sql_preview(
+                    "resolve-record",
+                    record,
+                    size::SAVE_PREVIEW_MAX_HEIGHT,
+                    theme,
+                ))
                 .child(
                     div()
                         .text_size(px(size::TEXT_SMALL))

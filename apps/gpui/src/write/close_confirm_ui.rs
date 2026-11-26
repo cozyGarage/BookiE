@@ -1,4 +1,4 @@
-use crate::surfaces::{ButtonKind, button, dialog_surface, scrim};
+use crate::surfaces::{ButtonKind, ConfirmDialog, button, confirm_dialog};
 use crate::*;
 
 impl GridView {
@@ -31,46 +31,20 @@ impl GridView {
             return None;
         }
         let count = self.pending_edit_count().max(1);
-        Some(
-            scrim(theme).id("close-confirm-overlay").occlude().child(
-                dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
-                    .id("close-confirm-dialog")
-                    .debug_selector(|| "close-confirm-dialog".into())
-                    .max_w(gpui::relative(0.92))
-                    .gap_2()
-                    .p_3()
-                    .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(
-                        div()
-                            .font_weight(gpui::FontWeight::SEMIBOLD)
-                            .child(format!("Close the window and discard {count} pending change(s)?")),
-                    )
-                    .child(
-                        div()
-                            .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(
-                                "Nothing has been saved to the database. The query text is kept for Reopen closed tab.",
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_end()
-                            .gap_2()
-                            .child(
-                                button(ButtonKind::Destructive, "discard-and-close", "Discard and close", theme)
-                                    .debug_selector(|| "discard-and-close".into())
-                                    .on_click(cx.listener(|this, _, window, cx| this.discard_and_close(window, cx))),
-                            )
-                            .child(
-                                button(ButtonKind::Ghost, "keep-editing", "Keep editing", theme)
-                                    .debug_selector(|| "keep-editing".into())
-                                    .on_click(cx.listener(|this, _, _, cx| this.keep_editing(cx))),
-                            ),
-                    ),
-            ),
-        )
+        let dialog = ConfirmDialog {
+            id: "close-confirm",
+            title: format!("Close the window and discard {count} pending change(s)?").into(),
+            body: "Nothing has been saved to the database. The query text is kept for Reopen closed tab.".into(),
+            sql: None,
+        };
+        let actions = [
+            button(ButtonKind::Destructive, "discard-and-close", "Discard and close", theme)
+                .debug_selector(|| "discard-and-close".into())
+                .on_click(cx.listener(|this, _, window, cx| this.discard_and_close(window, cx))),
+            button(ButtonKind::Ghost, "keep-editing", "Keep editing", theme)
+                .debug_selector(|| "keep-editing".into())
+                .on_click(cx.listener(|this, _, _, cx| this.keep_editing(cx))),
+        ];
+        Some(confirm_dialog(dialog, actions, theme))
     }
 }
