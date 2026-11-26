@@ -350,10 +350,12 @@ async fn next_generated_id_after_importing_1200_explicit_keys(batches_to_run: us
             .await
             .unwrap();
     }
-    guard
-        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
-        .await
-        .unwrap();
+    let end = if cancel {
+        BulkInsertEnd::Cancelled
+    } else {
+        BulkInsertEnd::Completed
+    };
+    guard.finish_bulk_insert(&mut scope, end).await.unwrap();
     let checker = PgDriver.connect(opts).await.unwrap();
     let next = checker
         .query("INSERT INTO import_seq (name) VALUES ('generated') RETURNING id::text")

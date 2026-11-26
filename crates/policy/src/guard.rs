@@ -90,8 +90,8 @@ impl Authorization {
     fn rearm(&self, control: &OperationControl) -> OperationControl {
         let deadline = control
             .deadline()
-            .filter(|deadline| !self.runs_past_the_read_deadline || *deadline <= tokio::time::Instant::now())
-            .map(|deadline| deadline + self.approval_wait);
+            .map(|deadline| deadline + self.approval_wait)
+            .filter(|deadline| !self.runs_past_the_read_deadline || *deadline <= tokio::time::Instant::now());
         OperationControl::new(control.cancellation_token().clone(), deadline)
     }
 }
