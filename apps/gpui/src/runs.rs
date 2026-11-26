@@ -1,10 +1,14 @@
 use super::*;
 
+const MAX_RESULT_TABS: usize = 64;
+const MAX_RETAINED_RESULT_BYTES: usize = 256 * 1024 * 1024;
+
 pub(crate) struct RunSlot {
     pub run: Run,
     pub edits: grid_edit::Edits,
     pub source: Option<Source>,
     pub failure: Option<String>,
+    pub estimated_bytes: usize,
     pub cancel_process: bool,
 }
 
@@ -12,12 +16,40 @@ impl RunSlot {
     pub fn new(run: Run, source: Option<Source>) -> Self {
         Self {
             run,
+            estimated_bytes: source.as_ref().map_or(0, |source| source.estimated_retained_bytes()),
             edits: grid_edit::Edits::new(),
             source,
             failure: None,
             cancel_process: false,
         }
     }
+}
+
+fn result_evictions(tabs: &panel_state::RunTabs, incoming_bytes: usize) -> Option<Vec<usize>> {
+    let mut count = tabs.slots.len() + 1;
+    let mut bytes = tabs
+        .slots
+        .iter()
+        .fold(incoming_bytes, |total, slot| total.saturating_add(slot.estimated_bytes));
+    let mut evictions = Vec::new();
+    for (index, slot) in tabs.slots.iter().enumerate() {
+        if count <= MAX_RESULT_TABS && bytes <= MAX_RETAINED_RESULT_BYTES {
+            break;
+        }
+        if index == tabs.active
+            || !slot.edits.is_empty()
+            || slot
+                .source
+                .as_ref()
+                .is_some_and(|source| std::sync::Arc::strong_count(source) > 1)
+        {
+            continue;
+        }
+        count -= 1;
+        bytes -= slot.estimated_bytes;
+        evictions.push(index);
+    }
+    (count <= MAX_RESULT_TABS && bytes <= MAX_RETAINED_RESULT_BYTES).then_some(evictions)
 }
 
 fn original_error_location(
@@ -44,7 +76,8 @@ impl GridView {
             self.status = "Type a statement first".into();
             return;
         }
-        self.run_with_parameters(sql, cx);
+        let source = Some((sql.clone(), 0..sql.len()));
+        self.run_with_parameters(sql, source, cx);
     }
 
     pub(crate) fn explain_query(&mut self, cx: &mut Context<Self>) {
@@ -121,103 +154,61 @@ impl GridView {
             return;
         }
         if let Some(session) = self.live.clone() {
-            let schema_statement = match bookie_app_services::schema_context::schema_context_for_run(
+            let execution = match crate::query_execution::Execution::plan(
+                &sql,
+                params,
                 &session.driver_id,
                 self.schema_context.as_deref().unwrap_or_default(),
-                true,
             ) {
-                Ok(statement) => statement,
-                Err(bookie_app_services::schema_context::SchemaContextError::Unsupported(_)) => {
-                    self.status = "This connection does not support a schema or database context".into();
-                    return;
-                }
-                Err(bookie_app_services::schema_context::SchemaContextError::Invalid(_)) => {
-                    self.status = "Enter a valid schema or database name".into();
-                    return;
-                }
-                Err(bookie_app_services::schema_context::SchemaContextError::NeedsSession) => {
-                    self.status = "A pinned database session is required for schema context".into();
+                Ok(execution) => execution,
+                Err(message) => {
+                    self.status = message;
+                    cx.notify();
                     return;
                 }
             };
+            if !matches!(self.tabs.current(), Tab::Query) {
+                self.tabs.open_query();
+                self.sync_grid_owner();
+                if !matches!(self.tabs.current(), Tab::Query) {
+                    return;
+                }
+            }
             self.panel.error_location = None;
             self.sql_input.update(cx, Self::clear_sql_diagnostics);
             self.status = "Running…".into();
             let explaining = crate::plan_view::typed_explain(&sql);
+            let current_session = session.clone();
+            let selected = self
+                .run_tabs
+                .slots
+                .get(self.run_tabs.active)
+                .map(|slot| slot.run.number);
             self.begin_background_with_context(
-                Work::Load,
+                Work::Query,
                 cx,
-                {
-                    let statement = sql.clone();
-                    move |cancel| {
-                        let (started, clock) = (Instant::now(), std::time::SystemTime::now());
-                        let result = run_with_schema_context(
-                            schema_statement.as_deref(),
-                            &statement,
-                            |schema| {
-                                session
-                                    .run_query_bound_detailed(schema, &[], bookie_gpui::live::ROW_CAP, &cancel)
-                                    .map(|_| ())
-                            },
-                            |statement| {
-                                session.run_query_bound_detailed(
-                                    statement,
-                                    &params,
-                                    bookie_gpui::live::ROW_CAP,
-                                    &cancel,
-                                )
-                            },
-                        )
-                        .map_err(|error| match error {
-                            SchemaContextRunError::Schema(mut error) => {
-                                error.message =
-                                    format!("Could not apply the selected schema or database: {}", error.message);
-                                error
-                            }
-                            SchemaContextRunError::Query(error) => error,
-                        });
-                        let (rows, error) = match &result {
-                            Ok(table) => (
-                                i64::try_from(bookie_gpui::source::ResultSource::total(table)).ok(),
-                                None,
-                            ),
-                            Err(error) => (None, Some(error.message.clone())),
-                        };
-                        session.record_history(&statement, clock, started.elapsed(), rows, error);
-                        (statement, source, mapping, started.elapsed(), result)
+                move |cancel| execution.run(&session, cancel),
+                move |this, outcomes, cx| {
+                    if !this.is_current_session(&current_session) {
+                        this.invalidate_query();
+                        return;
                     }
-                },
-                move |this, (sql, source, mapping, elapsed, result), cx| {
                     this.panel.running = None;
                     this.panel.explaining = false;
-                    match result {
-                        Ok(table) => {
-                            this.panel.error_location = None;
-                            let (rows, truncated) = (
-                                bookie_gpui::source::ResultSource::total(&table),
-                                bookie_gpui::source::ResultSource::is_partial(&table),
-                            );
-                            this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
-                            this.panel.messages.server_messages(&table.messages);
-                            this.add_run_with_cancel_process(Some(std::sync::Arc::new(table)), cancel_process);
-                            if let Some(slot) = this.run_tabs.slots.last_mut() {
-                                slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
-                            }
-                        }
-                        Err(error) => {
-                            let detail = match error.hint.as_deref() {
-                                Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
-                                _ => error.message.clone(),
-                            };
-                            this.panel.messages.statement_failed(&sql, &detail, elapsed);
-                            this.add_failed_run(detail, elapsed);
-                            let (original, position) = original_error_location(mapping, &sql, error.position);
-                            this.panel.error_location = position
-                                .zip(this.panel.messages.entries().last())
-                                .map(|(position, message)| (original, position, message.id, source));
-                            this.panel.view = ResultView::Messages;
-                            this.show_sql_diagnostic(error.message.clone(), cx);
-                            this.status = error.message;
+                    let activate = this.can_activate_query_result(selected) && this.cell_edit.active.is_none();
+                    let original = (sql, source, mapping);
+                    let error_status = outcomes
+                        .last()
+                        .and_then(|outcome| outcome.result.as_ref().err())
+                        .map(|error| error.message.clone());
+                    let first_new_number = this.run_tabs.next_number;
+                    for outcome in outcomes {
+                        this.apply_query_outcome(outcome, &original, cancel_process, activate, cx);
+                    }
+                    if activate && this.run_tabs.next_number != first_new_number {
+                        this.activate_run(this.run_tabs.slots.len() - 1);
+                        if let Some(message) = error_status {
+                            this.status = message;
                         }
                     }
                 },
@@ -229,8 +220,62 @@ impl GridView {
         self.add_run(None);
     }
 
+    fn apply_query_outcome(
+        &mut self,
+        outcome: crate::query_execution::Outcome,
+        (submitted, source, mapping): &(
+            String,
+            Option<(String, std::ops::Range<usize>)>,
+            Option<(String, bookie_core::NamedParameters)>,
+        ),
+        cancel_process: bool,
+        activate: bool,
+        cx: &mut Context<Self>,
+    ) {
+        let crate::query_execution::Outcome { sql, elapsed, result } = outcome;
+        match result {
+            Ok(tables) => {
+                for table in tables {
+                    let rows = bookie_gpui::source::ResultSource::total(&table);
+                    let truncated = bookie_gpui::source::ResultSource::is_partial(&table);
+                    self.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
+                    self.panel.messages.server_messages(&table.messages);
+                    if let Some(slot) = self.append_run(Some(std::sync::Arc::new(table)), cancel_process, false) {
+                        slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
+                    }
+                }
+            }
+            Err(error) => {
+                let detail = match error.hint.as_deref() {
+                    Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
+                    _ => error.message.clone(),
+                };
+                self.panel.messages.statement_failed(&sql, &detail, elapsed);
+                self.append_failed_run(detail, elapsed);
+                if activate {
+                    let matches = &sql == submitted;
+                    let (original, position) =
+                        original_error_location(if matches { mapping.clone() } else { None }, &sql, error.position);
+                    self.panel.error_location =
+                        position
+                            .zip(self.panel.messages.entries().last())
+                            .map(|(position, message)| {
+                                (
+                                    original,
+                                    position,
+                                    message.id,
+                                    if matches { source.clone() } else { None },
+                                )
+                            });
+                    self.show_sql_diagnostic(error.message.clone(), cx);
+                    self.status = error.message;
+                }
+            }
+        }
+    }
+
     fn track_running_query(&mut self, cx: &mut Context<Self>) {
-        let running = (self.loads.generation, Instant::now());
+        let running = (self.queries.generation, Instant::now());
         self.panel.running = Some(running);
         cx.spawn(async move |this, cx| {
             loop {
@@ -256,10 +301,10 @@ impl GridView {
         if self
             .panel
             .running
-            .is_some_and(|(generation, _)| generation == self.loads.generation)
-            && !self.loads.cancel.is_cancelled()
+            .is_some_and(|(generation, _)| generation == self.queries.generation)
+            && !self.queries.cancel.is_cancelled()
         {
-            self.loads.cancel.cancel();
+            self.queries.cancel.cancel();
             self.status = "Cancellation requested…".into();
         }
     }
@@ -287,8 +332,7 @@ impl GridView {
             },
             |this, (elapsed, result)| match result {
                 Ok(table) => {
-                    this.add_run(Some(std::sync::Arc::new(table)));
-                    if let Some(slot) = this.run_tabs.slots.last_mut() {
+                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, true) {
                         slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                     }
                 }
@@ -298,33 +342,76 @@ impl GridView {
     }
 
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
-        self.add_run_with_cancel_process(source, false);
+        self.append_run(source, false, true);
     }
 
-    fn add_run_with_cancel_process(&mut self, source: Option<Source>, cancel_process: bool) {
+    fn can_activate_query_result(&self, selected: Option<usize>) -> bool {
+        matches!(self.tabs.current(), Tab::Query)
+            && self
+                .run_tabs
+                .slots
+                .get(self.run_tabs.active)
+                .is_none_or(|slot| Some(slot.run.number) == selected)
+    }
+
+    fn append_run(&mut self, source: Option<Source>, cancel_process: bool, activate: bool) -> Option<&mut RunSlot> {
         let mut run = next_run(self.run_tabs.next_number);
         if let Some(source) = &source {
             run.rows = source.total();
         }
-        self.run_tabs.next_number += 1;
         let mut slot = RunSlot::new(run, source);
         slot.cancel_process = cancel_process;
-        self.run_tabs.slots.push(slot);
-        self.activate_run(self.run_tabs.slots.len() - 1);
+        if !self.retain_result(slot) {
+            return None;
+        }
+        if activate {
+            self.activate_run(self.run_tabs.slots.len() - 1);
+        }
+        self.run_tabs.slots.last_mut()
     }
 
+    fn retain_result(&mut self, slot: RunSlot) -> bool {
+        let Some(evictions) = result_evictions(&self.run_tabs, slot.estimated_bytes) else {
+            let message = "Result could not be kept. Close unused result tabs before running more queries.".to_string();
+            self.notices.push(message.clone(), notifications::NoticeKind::Error);
+            self.status = message;
+            return false;
+        };
+        if !evictions.is_empty() {
+            self.notices.push(
+                format!(
+                    "Closed {} older result tab(s) to stay within the retention limit",
+                    evictions.len()
+                ),
+                notifications::NoticeKind::Success,
+            );
+        }
+        for index in evictions.into_iter().rev() {
+            self.run_tabs.slots.remove(index);
+            if index < self.run_tabs.active {
+                self.run_tabs.active -= 1;
+            }
+        }
+        self.run_tabs.slots.push(slot);
+        self.run_tabs.next_number += 1;
+        true
+    }
+
+    #[cfg(test)]
     pub(crate) fn add_failed_run(&mut self, detail: String, elapsed: std::time::Duration) {
+        if self.append_failed_run(detail, elapsed) && self.cell_edit.active.is_none() {
+            self.activate_run(self.run_tabs.slots.len() - 1);
+        }
+    }
+
+    fn append_failed_run(&mut self, detail: String, elapsed: std::time::Duration) -> bool {
         let mut run = next_run(self.run_tabs.next_number);
         run.rows = 0;
         run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
-        self.run_tabs.next_number += 1;
         let source: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Failed query".into()));
         let mut slot = RunSlot::new(run, Some(source));
         slot.failure = Some(detail);
-        self.run_tabs.slots.push(slot);
-        if self.cell_edit.active.is_none() {
-            self.activate_run(self.run_tabs.slots.len() - 1);
-        }
+        self.retain_result(slot)
     }
 
     pub(crate) fn close_tab(&mut self, index: usize, cx: &gpui::App) {
@@ -348,6 +435,8 @@ impl GridView {
         if !closing_query {
             return;
         }
+        self.invalidate_query();
+        self.params.rows.clear();
         self.panel.error_location = None;
         if self.grid_is_query {
             self.invalidate_background();
@@ -513,72 +602,36 @@ impl GridView {
     }
 }
 
-enum SchemaContextRunError<E> {
-    Schema(E),
-    Query(E),
-}
-
-fn run_with_schema_context<T, E>(
-    schema_statement: Option<&str>,
-    sql: &str,
-    run_schema: impl FnOnce(&str) -> Result<(), E>,
-    run_sql: impl FnOnce(&str) -> Result<T, E>,
-) -> Result<T, SchemaContextRunError<E>> {
-    if let Some(schema_statement) = schema_statement {
-        run_schema(schema_statement).map_err(SchemaContextRunError::Schema)?;
-    }
-    run_sql(sql).map_err(SchemaContextRunError::Query)
-}
-
 #[cfg(test)]
-mod tests {
-    use super::{SchemaContextRunError, run_with_schema_context};
+mod retention_tests {
+    use super::*;
 
     #[test]
-    fn schema_prefix_failure_stops_before_the_user_statement() {
-        let statements = std::cell::RefCell::new(Vec::new());
-        let result = run_with_schema_context(
-            Some("SET search_path TO \"billing\""),
-            "SELECT * FROM invoices",
-            |sql| {
-                statements.borrow_mut().push(sql.to_owned());
-                Err("schema change denied")
-            },
-            |sql| -> Result<(), &'static str> {
-                statements.borrow_mut().push(sql.to_owned());
-                Ok(())
-            },
-        );
-        assert!(matches!(
-            result,
-            Err(SchemaContextRunError::Schema("schema change denied"))
-        ));
-        assert_eq!(
-            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
-            ["SET search_path TO \"billing\""]
-        );
+    fn result_retention_protects_the_selected_result_and_in_flight_sources() {
+        let held: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Held".into()));
+        let mut tabs = panel_state::RunTabs::new(RunSlot::new(next_run(1), None));
+        tabs.slots[0].estimated_bytes = MAX_RETAINED_RESULT_BYTES / 2;
+        let mut owned = RunSlot::new(next_run(2), Some(held.clone()));
+        owned.estimated_bytes = MAX_RETAINED_RESULT_BYTES / 4;
+        tabs.slots.push(owned);
+        let mut idle = RunSlot::new(next_run(3), None);
+        idle.estimated_bytes = MAX_RETAINED_RESULT_BYTES / 4;
+        tabs.slots.push(idle);
+
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 4), Some(vec![2]));
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 2), None);
+        drop(held);
+        assert_eq!(result_evictions(&tabs, MAX_RETAINED_RESULT_BYTES / 2), Some(vec![1, 2]));
     }
 
     #[test]
-    fn successful_schema_prefix_runs_before_the_user_statement() {
-        let statements = std::cell::RefCell::new(Vec::new());
-        let result = run_with_schema_context(
-            Some("USE `billing`"),
-            "SELECT * FROM invoices",
-            |sql| -> Result<(), &'static str> {
-                statements.borrow_mut().push(sql.to_owned());
-                Ok(())
-            },
-            |sql| {
-                statements.borrow_mut().push(sql.to_owned());
-                Ok(sql.to_owned())
-            },
-        );
-        assert!(matches!(result, Ok(sql) if sql == "SELECT * FROM invoices"));
-        assert_eq!(
-            statements.borrow().iter().map(String::as_str).collect::<Vec<_>>(),
-            ["USE `billing`", "SELECT * FROM invoices"]
-        );
+    fn result_retention_bounds_even_empty_results() {
+        let mut tabs = panel_state::RunTabs::new(RunSlot::new(next_run(1), None));
+        for number in 2..=MAX_RESULT_TABS {
+            tabs.slots.push(RunSlot::new(next_run(number), None));
+        }
+        tabs.active = 1;
+        assert_eq!(result_evictions(&tabs, 0), Some(vec![0]));
     }
 }
 

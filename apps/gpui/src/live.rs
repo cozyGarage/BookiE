@@ -294,6 +294,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: false,
             messages,
@@ -301,6 +302,102 @@ impl LiveSession {
             load_elapsed: started.elapsed(),
             table: None,
         })
+    }
+
+    pub fn open_editor_session(
+        &self,
+        control: &OperationControl,
+    ) -> Result<bookie_app_services::interactive_session::SharedSession, QueryFailure> {
+        self.runtime.block_on(async {
+            tokio::select! {
+                biased;
+                _ = control.cancellation_token().cancelled() => Err(QueryFailure::from("Canceled the operation".to_owned())),
+                _ = tokio::time::sleep(PAGE_TIMEOUT) => Err(QueryFailure::from("Opening the query session timed out".to_owned())),
+                result = self.sessions.open_interactive(self.session_id) => result.map_err(QueryFailure::from),
+            }
+        })
+    }
+
+    pub fn close_editor_session(
+        &self,
+        shared: bookie_app_services::interactive_session::SharedSession,
+    ) -> Result<(), QueryFailure> {
+        self.runtime.block_on(async {
+            tokio::time::timeout(
+                PAGE_TIMEOUT,
+                bookie_app_services::interactive_session::close_for_teardown(shared),
+            )
+            .await
+            .map_err(|_| QueryFailure::from("Closing the query session timed out".to_owned()))?
+            .map_err(|error| QueryFailure::from(bookie_app_services::driver_error_presentation::classify(&error)))
+        })
+    }
+
+    pub fn run_editor_batch(
+        self: &Arc<Self>,
+        shared: Option<&bookie_app_services::interactive_session::SharedSession>,
+        sql: &str,
+        params: &[bookie_core::Value],
+        control: &OperationControl,
+        budget: &mut QueryResultBudget,
+    ) -> Result<Vec<LiveTable>, QueryFailure> {
+        let started = std::time::Instant::now();
+        let mut batch = self
+            .runtime
+            .block_on(async {
+                if let Some(shared) = shared {
+                    let mut handle = shared.lock().await;
+                    let session = handle
+                        .as_mut()
+                        .ok_or_else(|| QueryFailure::from("The query session closed".to_owned()))?;
+                    session
+                        .query_result_sets_with_audit(sql, params, control)
+                        .await
+                        .result
+                        .map_err(|error| {
+                            QueryFailure::from(bookie_app_services::driver_error_presentation::classify(&error))
+                        })
+                } else {
+                    let epoch = Epoch(0);
+                    bridge_query_detailed(
+                        &self.sessions,
+                        self.session_id,
+                        (sql, params),
+                        control,
+                        epoch,
+                        &AtomicU64::new(0),
+                    )
+                    .await
+                }
+            })
+            .map_err(|error| self.name_the_read_path(error))?;
+        let mut messages = std::mem::take(&mut batch.messages);
+        if batch.result_sets.is_empty() {
+            batch.result_sets.push(QueryResult {
+                columns: Vec::new(),
+                rows: QueryRows::new(),
+                truncated: batch.truncated,
+            });
+        }
+        let result = batch
+            .result_sets
+            .into_iter()
+            .map(|mut result| {
+                result.truncated = bound_query_result(&mut result, ROW_CAP as usize, budget) || batch.truncated;
+                LiveTable {
+                    session: self.clone(),
+                    columns: result.columns.iter().map(column_meta).collect(),
+                    estimated_retained_bytes: result.estimated_row_bytes(),
+                    result,
+                    snapshot_consistent: false,
+                    messages: std::mem::take(&mut messages),
+                    executed_sql: Some(sql.to_owned()),
+                    load_elapsed: started.elapsed(),
+                    table: None,
+                }
+            })
+            .collect();
+        Ok(result)
     }
 
     pub fn table_from_result(
@@ -314,6 +411,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             messages: Default::default(),
             snapshot_consistent: false,
@@ -341,6 +439,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns: result.columns.iter().map(column_meta).collect(),
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: false,
             messages: Default::default(),
@@ -639,6 +738,7 @@ impl LiveSession {
         Ok(LiveTable {
             session: self.clone(),
             columns,
+            estimated_retained_bytes: result.estimated_row_bytes(),
             result,
             snapshot_consistent: self.supports_snapshot_cursor,
             messages: Default::default(),
@@ -829,6 +929,7 @@ pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
     result: QueryResult,
+    estimated_retained_bytes: usize,
     snapshot_consistent: bool,
     pub messages: bookie_core::ServerMessages,
     executed_sql: Option<String>,
@@ -1695,6 +1796,10 @@ fn numeric_type(data_type: &str) -> bool {
 }
 
 impl ResultSource for LiveTable {
+    fn estimated_retained_bytes(&self) -> usize {
+        self.estimated_retained_bytes
+    }
+
     fn load_elapsed(&self) -> Option<Duration> {
         Some(self.load_elapsed)
     }

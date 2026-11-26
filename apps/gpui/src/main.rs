@@ -55,6 +55,7 @@ mod params_ui;
 mod paste_ui;
 mod picker;
 mod plan_view;
+mod query_execution;
 mod query_pane;
 mod refresh_ui;
 mod render;
@@ -127,6 +128,7 @@ enum Mode {
 #[derive(Clone, Copy)]
 enum Work {
     Load,
+    Query,
     Scan,
     Count,
     Chart,
@@ -238,6 +240,7 @@ struct GridView {
     export: panel_state::ExportState,
     measure: measure::Measure,
     loads: Ticket,
+    queries: Ticket,
     scans: Ticket,
     counts: Ticket,
     charts: Ticket,
@@ -660,6 +663,7 @@ impl GridView {
             connections: Vec::new(),
             check_histories: Vec::new(),
             loads: Ticket::new(),
+            queries: Ticket::new(),
             scans: Ticket::new(),
             counts: Ticket::new(),
             charts: Ticket::new(),
@@ -843,12 +847,14 @@ impl GridView {
     ) {
         match work_kind {
             Work::Load => self.invalidate_background(),
+            Work::Query => self.invalidate_query(),
             Work::Scan => self.invalidate_scans(),
             Work::Count => self.counts.invalidate(),
             Work::Chart => self.charts.invalidate(),
         }
         let ticket = match work_kind {
             Work::Load => &mut self.loads,
+            Work::Query => &mut self.queries,
             Work::Scan => &mut self.scans,
             Work::Count => &mut self.counts,
             Work::Chart => &mut self.charts,
@@ -861,6 +867,7 @@ impl GridView {
             this.update(cx, |this, cx| {
                 let current = match work_kind {
                     Work::Load => this.loads.generation,
+                    Work::Query => this.queries.generation,
                     Work::Scan => this.scans.generation,
                     Work::Count => this.counts.generation,
                     Work::Chart => this.charts.generation,
@@ -878,11 +885,15 @@ impl GridView {
     fn invalidate_background(&mut self) {
         self.clear_chart();
         self.loads.invalidate();
-        self.panel.running = None;
-        self.panel.explaining = false;
         self.invalidate_scans();
         self.counts.invalidate();
         self.charts.invalidate();
+    }
+
+    fn invalidate_query(&mut self) {
+        self.queries.invalidate();
+        self.panel.running = None;
+        self.panel.explaining = false;
     }
 
     fn invalidate_scans(&mut self) {

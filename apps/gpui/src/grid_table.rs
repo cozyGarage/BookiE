@@ -303,48 +303,35 @@ impl TableDelegate for GridDelegate {
     fn visible_rows_changed(&mut self, visible: Range<usize>, window: &mut Window, cx: &mut Context<TableState<Self>>) {
         self.visible_rows = visible.clone();
         let Some(source) = &self.source else { return };
-        if self.map.compare.is_some()
-            || self.content_widths.len() != self.columns.len()
-            || !visible.clone().take(64).any(|row| {
-                self.map
-                    .source_row(row)
-                    .is_some_and(|index| source.row_ref(index).is_some())
-            })
-        {
+        if self.map.compare.is_some() || self.content_widths.len() != self.columns.len() {
             return;
         }
-        let measured = measure_visible_columns(
-            source,
-            &self.map,
-            (&self.columns, 0..self.columns.len()),
-            &self.kinds,
-            &self.edits,
-            viewport_sample(visible.start, visible.len()),
-            MAX_MEASURE_CELLS,
-            |text| measure_text(text, window),
-        );
-        for (current, measured) in self.content_widths.iter_mut().zip(measured) {
-            *current = current.max(measured);
-        }
-        let mut columns = self.columns.clone();
-        for ((_, width), measured) in columns.iter_mut().zip(&self.content_widths) {
-            *width = *measured;
-        }
-        if let Some(widths) = self
+        let manual = self
             .width_scope
             .as_ref()
-            .and_then(|scope| self.manual_widths.get(scope))
-        {
-            for (name, width) in &mut columns {
-                if let Some(manual) = widths.get(name) {
-                    *width = *manual;
-                }
-            }
-        }
-        if columns == self.columns {
+            .and_then(|scope| self.manual_widths.get(scope));
+        let selected: Vec<_> = (0..self.projection.len())
+            .filter_map(|index| self.projection.source_index(index))
+            .filter(|&index| {
+                self.content_widths[index] < MAX_CONTENT_WIDTH
+                    && manual.is_none_or(|widths| !widths.contains_key(&self.columns[index].0))
+            })
+            .collect();
+        let grew = measure_scroll_growth(
+            source,
+            &self.map,
+            &self.edits,
+            &selected,
+            &mut self.content_widths,
+            viewport_sample(visible.start, visible.len()),
+            |text| measure_text(text, window),
+        );
+        if !grew {
             return;
         }
-        self.columns = columns;
+        for index in selected {
+            self.columns[index].1 = self.content_widths[index];
+        }
         let table = cx.entity();
         window.on_next_frame(move |_, cx| {
             let _ = table.update(cx, |table, cx| table.refresh(cx));
@@ -1344,6 +1331,40 @@ fn viewport_sample(start: usize, rows: usize) -> Range<usize> {
     start..start.saturating_add(rows.max(1).saturating_add(4).min(64))
 }
 
+fn measure_scroll_growth(
+    source: &Source,
+    map: &RowMap,
+    edits: &Edits,
+    selected: &[usize],
+    widths: &mut [f32],
+    sample: Range<usize>,
+    mut measure: impl FnMut(&str) -> f32,
+) -> bool {
+    if selected.is_empty() {
+        return false;
+    }
+    let rows = (MAX_MEASURE_CELLS / selected.len()).max(1);
+    let end = sample.end.min(map.count).min(sample.start.saturating_add(rows));
+    let mut grew = false;
+    for row in sample.start..end {
+        let Some(index) = map.source_row(row) else { continue };
+        let Some(cells) = source.row_ref(index) else { continue };
+        for &column in selected {
+            if widths[column] >= MAX_CONTENT_WIDTH {
+                continue;
+            }
+            let Some(cell) = cells.get(column) else { continue };
+            let preview = cell_preview(edits.get(&(index, column)).unwrap_or(cell));
+            let measured = measure(&preview).min(MAX_CONTENT_WIDTH);
+            if measured > widths[column] {
+                widths[column] = measured;
+                grew = true;
+            }
+        }
+    }
+    grew
+}
+
 fn measure_visible_columns(
     source: &Source,
     map: &RowMap,
@@ -1803,6 +1824,38 @@ mod tests {
         assert_eq!(widths[0], MIN_CONTENT_WIDTH);
         assert!(widths[1] > columns[1].1);
         assert_eq!(source.row_copies.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn scroll_width_growth_measures_only_selected_unsaturated_columns() {
+        let source: Source = Arc::new(BorrowedRowSource {
+            cells: (0..5).map(Cell::Int).collect(),
+            rows: 2,
+            row_copies: AtomicUsize::new(0),
+        });
+        let map = RowMap {
+            count: 2,
+            ..Default::default()
+        };
+        let mut widths = [56.0, 75.0, 100.0, MAX_CONTENT_WIDTH, 56.0];
+        let mut measured = Vec::new();
+        assert!(measure_scroll_growth(
+            &source,
+            &map,
+            &Edits::default(),
+            &[1, 3, 4],
+            &mut widths,
+            0..2,
+            |text| {
+                measured.push(text.to_owned());
+                MAX_CONTENT_WIDTH
+            }
+        ));
+        assert_eq!(measured, ["1", "4"]);
+        assert_eq!(
+            widths,
+            [56.0, MAX_CONTENT_WIDTH, 100.0, MAX_CONTENT_WIDTH, MAX_CONTENT_WIDTH]
+        );
     }
 
     #[test]

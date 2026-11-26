@@ -2363,13 +2363,16 @@ fn showing_referencing_rows_runs_the_child_query_and_a_plain_column_opens_nothin
     });
     settle_saving(cx);
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_referencing_rows(cx)));
-    settle_saving(cx);
+    for _ in 0..200 {
+        settle_saving(cx);
+        if view.read_with(cx, |view, _| view.grid_is_query && view.source.total() == 2) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(25));
+    }
     view.read_with(cx, |view, _| {
-        assert!(
-            view.status.contains("2 rows"),
-            "the two child rows ran as a query: {}",
-            view.status
-        );
+        assert!(view.grid_is_query, "the result opens in the query grid");
+        assert_eq!(view.source.total(), 2, "the result contains both child rows");
     });
     std::fs::remove_file(&path).ok();
 }

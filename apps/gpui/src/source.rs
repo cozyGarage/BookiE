@@ -25,6 +25,9 @@ pub trait ResultSource: Send + Sync + 'static {
         "Synthetic data · no database connection".into()
     }
     fn total(&self) -> u64;
+    fn estimated_retained_bytes(&self) -> usize {
+        0
+    }
     fn executed_sql(&self) -> Option<&str> {
         None
     }
