@@ -703,16 +703,17 @@ fn grid_column_menu_applies_and_clears_sort(cx: &mut TestAppContext) {
         );
     });
 
-    let menu = cx.update(|window, _| {
-        assert!(window.try_find(("column-sort-direction", 0usize)).is_some());
-        window.find_by_label("Actions for id").bounds()
-    });
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("column-sort-direction-0").is_some());
+    let menu = cx.update(|window, _| window.find_by_label("Actions for id").bounds());
     cx.simulate_click(menu.center(), Default::default());
     cx.run_until_parked();
     let clear = cx.update(|window, _| window.find_by_label("Clear sort").bounds());
     cx.simulate_click(clear.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert!(view.local_sort.is_none()));
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("column-sort-direction-0").is_none());
 }
 
 #[gpui::test]

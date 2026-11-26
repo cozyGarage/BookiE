@@ -447,6 +447,7 @@ impl TableDelegate for GridDelegate {
                     .children(active_sort.map(|ascending| {
                         div()
                             .id(("column-sort-direction", col_ix))
+                            .debug_selector(move || format!("column-sort-direction-{col_ix}"))
                             .flex_none()
                             .tooltip(crate::surfaces::tooltip_view(
                                 if ascending {
