@@ -330,12 +330,19 @@ impl GridView {
             move |cancel| open_first_table(&requested, prefer.as_ref(), &cancel),
             move |this, opened, cx| match opened {
                 Ok(table) => {
+                    let diagram = this.save.diagram_after_reconnect.take();
                     if this.connect_live(table) {
                         this.search.origin = Some(origin);
                         this.request_connection_info(cx);
+                        if let Some(scope) = diagram {
+                            this.load_schema_diagram(scope, cx);
+                        }
                     }
                 }
-                Err(message) => this.status = message,
+                Err(message) => {
+                    this.save.diagram_after_reconnect = None;
+                    this.status = message;
+                }
             },
         );
     }

@@ -169,7 +169,7 @@ impl GridView {
             review: "Review the generated SQL before applying it".into(),
             confirm: "Apply",
             note: None,
-            reconnect: None,
+            reconnect: create.then(|| table.clone()),
         };
         self.prepare_diagram_ddl(live, table, create, plan, labels, cx);
     }
@@ -340,6 +340,7 @@ mod tests {
         let write = write_session(&path, false);
         cx.update(|window, cx| {
             view.update(cx, |view, cx| {
+                view.search.origin = Some(Origin::File(path.clone()));
                 view.tabs.open_diagram();
                 let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
                 view.save.write = Some((id, write));
@@ -364,14 +365,24 @@ mod tests {
         assert!(!current().tables.iter().any(|table| table.name == "draft table"));
 
         cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
-        for _ in 0..100 {
+        let listed = |view: &GridView| {
+            view.catalog.tables.iter().any(|table| table.name == "draft table")
+                && view
+                    .live
+                    .as_ref()
+                    .is_some_and(|live| live.tables.iter().any(|table| table.name == "draft table"))
+        };
+        for _ in 0..200 {
             settle_saving(cx);
-            if view.read_with(cx, |view, _| !view.save.busy && !view.search.diagram.loading) {
+            if view.read_with(cx, |view, _| {
+                !view.save.busy && !view.search.diagram.loading && listed(view)
+            }) {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         view.read_with(cx, |view, _| {
+            assert!(listed(view), "the sidebar lists the new table: {}", view.status);
             assert!(matches!(view.tabs.current(), Tab::Diagram));
             let diagram = view.search.diagram.view.as_ref().expect(&view.status);
             assert!(
