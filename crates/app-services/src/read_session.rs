@@ -96,14 +96,14 @@ pub(crate) async fn saved_connection(id: Uuid) -> Result<Option<SavedConnection>
 }
 
 impl ReadSession {
-    fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
+    pub(crate) fn guard(&self) -> Result<PolicyGuard, DriverFailurePresentation> {
         self.database
             .guard_for_generation(self.id, self.generation, Principal::human_gui())
             .ok_or(DriverFailurePresentation::Disconnected)
     }
 
-    pub(crate) fn backup_identity(&self) -> (Uuid, Uuid, bool) {
-        (self.id, self.generation, self.writable)
+    pub(crate) fn backup_identity(&self) -> (Uuid, bool) {
+        (self.id, self.writable)
     }
 }
 
@@ -326,6 +326,18 @@ impl ReadSession {
         let guard = self.guard()?;
         guard
             .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
+            .await
+            .map_err(|error| classify(&error))
+    }
+
+    pub async fn read_enum_labels(
+        &self,
+        type_name: &bookie_core::QualifiedTypeName,
+        control: &OperationControl,
+    ) -> Result<Vec<String>, DriverFailurePresentation> {
+        let guard = self.guard()?;
+        guard
+            .fetch_enum_labels_controlled(&type_name.schema, &type_name.name, control)
             .await
             .map_err(|error| classify(&error))
     }

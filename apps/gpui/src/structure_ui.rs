@@ -4,6 +4,9 @@ use super::*;
 use crate::save_ui::{ReviewLabels, SaveRequest};
 use crate::surfaces::{ButtonKind, button, task_bar, task_bar_frame};
 
+pub(crate) const STRUCTURE_CHANGE_NOTE: &str = "This changes the table's structure for everyone using the database, and \
+most databases cannot undo it. A connection that needs approval will ask before it runs.";
+
 #[derive(Default)]
 pub(crate) struct StructureState {
     pub open: bool,
@@ -207,8 +210,7 @@ impl GridView {
                  changing a referenced row will fail afterwards. Most databases cannot undo it, and a connection \
                  that needs approval will ask before it runs."
                 } else {
-                    "This changes the table's structure for everyone using the database, and most databases cannot \
-                 undo it. A connection that needs approval will ask before it runs."
+                    STRUCTURE_CHANGE_NOTE
                 },
             ),
             reconnect: match kind {

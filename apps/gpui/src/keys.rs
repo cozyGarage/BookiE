@@ -183,6 +183,7 @@ impl GridView {
             || self.insert.open
             || self.export.file.open
             || self.search.diagram.open
+            || self.search.data_compare.open
             || self.save.pending.is_some()
             || self.approval.current.is_some()
             || self.close_confirm

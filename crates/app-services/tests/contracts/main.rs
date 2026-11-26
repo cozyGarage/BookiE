@@ -1,0 +1,16 @@
+#![recursion_limit = "256"]
+
+mod activity_statements_policy;
+mod browse_planning;
+mod edge_cases;
+mod edit_tracking;
+mod guarded_sessions;
+mod headless_completion;
+mod headless_open_read;
+mod interactive_commit_denial;
+mod no_gui_dependency;
+mod read_session;
+mod service_models;
+mod workspace_model;
+mod workspace_persistence;
+mod workspace_staging;

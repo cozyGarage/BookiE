@@ -43,6 +43,7 @@ pub(crate) struct SaveState {
     pub banner_serial: u64,
     refresh_diagram: Option<Option<String>>,
     pub reconnect_after: Option<bookie_core::TableInfo>,
+    pub diagram_after_reconnect: Option<Option<String>>,
     pub checks: Vec<CellCheck>,
 }
 
@@ -488,7 +489,6 @@ impl GridView {
             Some((revision, _)) => {
                 matches!(self.tabs.current(), Tab::Diagram)
                     && *revision == self.search.diagram.request.generation
-                    && !self.transaction_open()
             }
             None => {
                 pending.table == self.catalog.grid_table
@@ -577,7 +577,18 @@ impl GridView {
         if let Some(live) = self.live.as_ref() {
             live.forget_columns();
         }
-        if let Some(scope) = self.save.refresh_diagram.take() {
+        if let Some(table) = reconnect {
+            self.status = text;
+            let diagram = self.save.refresh_diagram.take();
+            self.search.diagram.ddl = None;
+            self.save.diagram_after_reconnect = diagram.filter(|_| matches!(self.tabs.current(), Tab::Diagram));
+            let origin = self
+                .search
+                .origin
+                .clone()
+                .unwrap_or_else(|| bookie_gpui::live::Origin::Saved(connection_id.to_string()));
+            self.connect_preferring(origin, Some(table), cx);
+        } else if let Some(scope) = self.save.refresh_diagram.take() {
             self.status = text;
             self.search.diagram.ddl = None;
             if matches!(self.tabs.current(), Tab::Diagram) {
@@ -585,13 +596,6 @@ impl GridView {
             } else {
                 self.reset_diagram();
             }
-        } else if let Some(table) = reconnect {
-            self.status = text;
-            self.connect_preferring(
-                bookie_gpui::live::Origin::Saved(connection_id.to_string()),
-                Some(table),
-                cx,
-            );
         } else {
             self.reload_after_save(text, cx);
         }

@@ -19,7 +19,9 @@ fn assert_tooltips(cx: &mut VisualTestContext, controls: &[(&'static str, &'stat
 fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(760.0), gpui::px(800.0)));
+    cx.run_until_parked();
     view.update(cx, |view, cx| {
+        view.sidebar.open = true;
         view.tabs.open_query();
         view.sync_grid_owner();
         view.tabs.active = 0;

@@ -297,11 +297,10 @@ impl GridView {
                     .children({
                         let hidden = self.table.read(cx).delegate().hidden_column_count();
                         (hidden > 0).then(|| {
-                            let total = self.source.columns().len();
                             compact_button(
                                 ButtonKind::Ghost,
                                 "show-hidden-columns",
-                                format!("Columns {}/{}", total - hidden, total),
+                                show_all_columns_label(hidden),
                                 theme,
                             )
                             .on_click(cx.listener(|this, _, window, cx| {
@@ -621,7 +620,7 @@ impl Render for GridView {
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, insert_form), cx);
         let content_width =
             f32::from(window.viewport_size().width) - if self.sidebar.open { self.sidebar.width } else { 0.0 };
-        let compact_query = content_width < crate::query_pane::COMPACT_QUERY_WIDTH;
+        let compact_query = content_width < size::COMPACT_QUERY_WIDTH;
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
@@ -877,5 +876,19 @@ impl GridView {
                     )
                     .children(empty),
             )
+    }
+}
+
+fn show_all_columns_label(hidden: usize) -> String {
+    format!("Show all ({hidden} hidden)")
+}
+
+#[cfg(test)]
+mod show_all_columns_tests {
+    #[test]
+    fn the_hidden_columns_button_is_not_a_second_columns_control() {
+        let label = super::show_all_columns_label(2);
+        assert!(label.contains('2'));
+        assert!(!label.starts_with("Columns"));
     }
 }

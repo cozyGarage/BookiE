@@ -4,7 +4,7 @@ use bookie_core::sql_ddl::{DraftColumn, StructureOp, materialize_ops};
 
 use super::*;
 use crate::save_ui::ReviewLabels;
-use crate::surfaces::{ButtonKind, compact_button};
+use crate::surfaces::{ButtonKind, compact_button, segment, segmented};
 
 const MAX_DRAFT_COLUMNS: usize = 32;
 
@@ -169,8 +169,8 @@ impl GridView {
             review: "Review the generated SQL before applying it".into(),
             confirm: "Apply",
             destructive: false,
-            note: None,
-            reconnect: None,
+            note: Some(crate::structure_ui::STRUCTURE_CHANGE_NOTE),
+            reconnect: create.then(|| table.clone()),
         };
         self.prepare_diagram_ddl(live, table, create, plan, labels, cx);
     }
@@ -244,54 +244,39 @@ impl GridView {
         theme: Theme,
         cx: &mut Context<Self>,
     ) -> Div {
-        div()
-            .flex()
-            .gap_1()
-            .items_center()
-            .child(
-                compact_button(
-                    if fields.primary_key {
-                        ButtonKind::Primary
-                    } else {
-                        ButtonKind::Ghost
-                    },
-                    ("diagram-draft-primary-key", index),
-                    "Primary key",
-                    theme,
-                )
-                .on_click(cx.listener(move |view, _, _, cx| {
-                    if let Some(fields) = view
-                        .search
-                        .diagram
-                        .ddl
-                        .as_mut()
-                        .and_then(|draft| draft.columns.get_mut(index))
-                    {
-                        fields.primary_key = !fields.primary_key;
-                        cx.notify();
-                    }
-                })),
-            )
-            .children((!fields.primary_key).then(|| {
-                compact_button(
-                    ButtonKind::Ghost,
-                    ("diagram-draft-nullable", index),
-                    if fields.nullable { "Nullable" } else { "Not null" },
-                    theme,
-                )
-                .on_click(cx.listener(move |view, _, _, cx| {
-                    if let Some(fields) = view
-                        .search
-                        .diagram
-                        .ddl
-                        .as_mut()
-                        .and_then(|draft| draft.columns.get_mut(index))
-                    {
-                        fields.nullable = !fields.nullable;
-                        cx.notify();
-                    }
-                }))
-            }))
+        let choices = [
+            ("Nullable", true, false),
+            ("Not null", false, false),
+            ("Primary key", false, true),
+        ];
+        let current = (fields.nullable && !fields.primary_key, fields.primary_key);
+        segmented(
+            choices
+                .into_iter()
+                .enumerate()
+                .map(|(choice, (label, nullable, primary_key))| {
+                    segment(
+                        ("diagram-draft-constraint", index * choices.len() + choice),
+                        label,
+                        current == (nullable, primary_key),
+                        theme,
+                    )
+                    .on_click(cx.listener(move |view, _, _, cx| {
+                        if let Some(fields) = view
+                            .search
+                            .diagram
+                            .ddl
+                            .as_mut()
+                            .and_then(|draft| draft.columns.get_mut(index))
+                        {
+                            fields.nullable = nullable;
+                            fields.primary_key = primary_key;
+                            cx.notify();
+                        }
+                    }))
+                }),
+            theme,
+        )
     }
 
     fn diagram_ddl_controls(&self, draft: &DiagramDdl, theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -313,6 +298,10 @@ impl GridView {
                     }),
                 )
             }))
+            .children(self.diagram_can_draft().then(|| {
+                compact_button(ButtonKind::Primary, "diagram-ddl-review", "Review SQL", theme)
+                    .on_click(cx.listener(|this, _, _, cx| this.review_diagram_ddl(cx)))
+            }))
             .child(
                 compact_button(ButtonKind::Ghost, "diagram-ddl-cancel", "Cancel", theme).on_click(cx.listener(
                     |this, _, _, cx| {
@@ -321,10 +310,6 @@ impl GridView {
                     },
                 )),
             )
-            .children(self.diagram_can_draft().then(|| {
-                compact_button(ButtonKind::Primary, "diagram-ddl-review", "Review SQL", theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.review_diagram_ddl(cx)))
-            }))
     }
 }
 
@@ -341,6 +326,7 @@ mod tests {
         let write = write_session(&path, false);
         cx.update(|window, cx| {
             view.update(cx, |view, cx| {
+                view.search.origin = Some(Origin::File(path.clone()));
                 view.tabs.open_diagram();
                 let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
                 view.save.write = Some((id, write));
@@ -360,19 +346,30 @@ mod tests {
         view.read_with(cx, |view, _| {
             let review = view.save.pending.as_ref().expect("SQL review");
             assert!(review.plan.preview.contains("CREATE TABLE"));
+            assert!(review.note.is_some(), "the review explains the structure change");
         });
         let current = || LiveSession::open(&Origin::File(path.clone())).expect("open current database");
         assert!(!current().tables.iter().any(|table| table.name == "draft table"));
 
         cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
-        for _ in 0..100 {
+        let listed = |view: &GridView| {
+            view.catalog.tables.iter().any(|table| table.name == "draft table")
+                && view
+                    .live
+                    .as_ref()
+                    .is_some_and(|live| live.tables.iter().any(|table| table.name == "draft table"))
+        };
+        for _ in 0..200 {
             settle_saving(cx);
-            if view.read_with(cx, |view, _| !view.save.busy && !view.search.diagram.loading) {
+            if view.read_with(cx, |view, _| {
+                !view.save.busy && !view.search.diagram.loading && listed(view)
+            }) {
                 break;
             }
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         view.read_with(cx, |view, _| {
+            assert!(listed(view), "the sidebar lists the new table: {}", view.status);
             assert!(matches!(view.tabs.current(), Tab::Diagram));
             let diagram = view.search.diagram.view.as_ref().expect(&view.status);
             assert!(
@@ -382,6 +379,38 @@ mod tests {
             );
         });
         assert!(current().tables.iter().any(|table| table.name == "draft table"));
+        std::fs::remove_file(path).ok();
+    }
+
+    #[gpui::test]
+    fn the_draft_form_puts_review_first_and_keeps_the_nullable_choice_in_place(cx: &mut gpui::TestAppContext) {
+        use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
+        let path = fixture_copy("diagram-draft-form");
+        let (view, cx) = saving_view(cx, &path);
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.tabs.open_diagram();
+                view.begin_diagram_ddl(None, window, cx);
+            })
+        });
+        settle_saving(cx);
+        let bounds = |cx: &mut gpui::VisualTestContext, id: &'static str| cx.debug_bounds(id).expect(id);
+        let review = bounds(cx, "diagram-ddl-review");
+        let cancel = bounds(cx, "diagram-ddl-cancel");
+        assert!(
+            review.origin.x < cancel.origin.x,
+            "the primary action comes before Cancel"
+        );
+        let nullable = bounds(cx, "Nullable");
+        let primary = bounds(cx, "Primary key");
+        cx.simulate_click(primary.center(), Default::default());
+        settle_saving(cx);
+        view.read_with(cx, |view, cx| {
+            let draft = view.search.diagram.ddl.as_ref().expect("draft");
+            let column = draft.columns[0].column(cx);
+            assert!(column.primary_key && !column.nullable);
+        });
+        assert_eq!(bounds(cx, "Nullable"), nullable, "the nullable choice keeps its place");
         std::fs::remove_file(path).ok();
     }
 

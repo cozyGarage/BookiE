@@ -286,6 +286,7 @@ impl GridView {
             self.reset_diagram();
             self.search.closed = Default::default();
             self.search.recent = Default::default();
+            self.search.data_compare = Default::default();
         }
         self.mcp.register(session.database_service());
         self.connection_info = None;
@@ -338,12 +339,19 @@ impl GridView {
             move |cancel| open_first_table(&requested, prefer.as_ref(), &cancel),
             move |this, opened, cx| match opened {
                 Ok(table) => {
+                    let diagram = this.save.diagram_after_reconnect.take();
                     if this.connect_live(table) {
                         this.search.origin = Some(origin);
                         this.request_connection_info(cx);
+                        if let Some(scope) = diagram {
+                            this.load_schema_diagram(scope, cx);
+                        }
                     }
                 }
-                Err(message) => this.status = message,
+                Err(message) => {
+                    this.save.diagram_after_reconnect = None;
+                    this.status = message;
+                }
             },
         );
     }
@@ -483,6 +491,7 @@ impl GridView {
         };
         self.save.busy = true;
         self.cell_edit.edits.clear();
+        self.edits_changed();
         let checks = std::mem::take(&mut self.save.checks);
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();

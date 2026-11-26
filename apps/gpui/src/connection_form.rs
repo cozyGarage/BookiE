@@ -1024,11 +1024,18 @@ impl GridView {
             return;
         }
         cx.spawn(async move |this, cx| {
-            let outcome = cx
+            let (outcome, connections) = cx
                 .background_executor()
-                .spawn(async move { block_on(connection_save::delete(id)) })
+                .spawn(async move {
+                    let outcome = block_on(connection_save::delete(id));
+                    let connections = outcome.is_ok().then(bookie_gpui::live::saved_connections);
+                    (outcome, connections)
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                if let Some(Ok(connections)) = connections {
+                    this.connections = connections;
+                }
                 this.finish_delete(outcome);
                 cx.notify();
             });
@@ -1046,9 +1053,6 @@ impl GridView {
                 } else {
                     "Deleted".into()
                 };
-                if let Ok(list) = bookie_gpui::live::saved_connections() {
-                    self.connections = list;
-                }
             }
             Err(message) => self.connection_form.status = message,
         }
@@ -1071,10 +1075,10 @@ impl GridView {
         self.connection_form.status = "Saving…".into();
         cx.notify();
         cx.spawn(async move |this, cx| {
-            let result = cx
+            let (result, connections) = cx
                 .background_executor()
                 .spawn(async move {
-                    block_on(async move {
+                    let result = block_on(async move {
                         let saved = connection_save::save(draft).await?;
                         let color_saved =
                             bookie_app_services::read_session::set_connection_color(saved.id, color.as_deref())
@@ -1087,10 +1091,15 @@ impl GridView {
                             ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
                         });
                         Ok((saved.id, saved.name, hops, color_saved))
-                    })
+                    });
+                    let connections = result.is_ok().then(bookie_gpui::live::saved_connections);
+                    (result, connections)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                if let Some(Ok(connections)) = connections {
+                    this.connections = connections;
+                }
                 let saved = this.finish_connection_save(result, cx);
                 if let Some(id) = saved.filter(|_| open) {
                     this.connect(bookie_gpui::live::Origin::Saved(id.to_string()), cx);
@@ -1128,9 +1137,6 @@ impl GridView {
                 self.connection_form
                     .password
                     .update(cx, |input, cx| input.set_content("", cx));
-                if let Ok(list) = bookie_gpui::live::saved_connections() {
-                    self.connections = list;
-                }
                 color_saved.then_some(id)
             }
             Err(message) => {

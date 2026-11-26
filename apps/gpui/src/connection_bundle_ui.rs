@@ -258,11 +258,13 @@ impl GridView {
         self.connection_bundle.busy = true;
         self.status = "Importing connections…".into();
         cx.spawn(async move |this, cx| {
-            let result = cx
+            let (result, saved) = cx
                 .background_executor()
-                .spawn(async move { apply_import(pending) })
+                .spawn(async move {
+                    let result = apply_import(pending);
+                    (result, bookie_gpui::live::saved_connections())
+                })
                 .await;
-            let saved = bookie_gpui::live::saved_connections();
             this.update(cx, |this, cx| {
                 this.connection_bundle.busy = false;
                 match (result, saved) {
