@@ -26,6 +26,13 @@ impl Execution {
     pub fn plan(sql: &str, params: Vec<Value>, driver: &str, schema: &str) -> Result<Self, String> {
         let schema = bookie_app_services::schema_context::schema_context_for_run(driver, schema, true)
             .map_err(|_| "The selected schema is invalid or unsupported on this connection".to_owned())?;
+        if bookie_app_services::result_editability::grammar_for_driver(driver).is_none() {
+            return Ok(Self {
+                statements: vec![sql.to_owned()],
+                params,
+                schema,
+            });
+        }
         let plan = script_statements(sql, driver)?;
         if plan.statements.is_empty() {
             return Err("Type a statement first".into());

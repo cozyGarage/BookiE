@@ -1458,7 +1458,7 @@ fn parameter_enter_runs_the_original_selection_after_the_editor_changes(cx: &mut
             view.sql_input
                 .update(cx, |input, cx| input.set_value("SELECT 99", window, cx));
             field.update(cx, |input, cx| input.set_content("7", cx));
-            window.focus(&field.read(cx).focus_handle(cx), cx);
+            window.focus(&field.read(cx).focus_handle_for_tests(), cx);
         })
     });
     cx.simulate_keystrokes("enter");

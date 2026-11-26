@@ -537,3 +537,6 @@ impl GridView {
         self.show_run(next, self.run_tabs.slots[next].run);
     }
 }
+fn strip_position(tab_index: usize) -> usize {
+    tab_index.saturating_sub(1)
+}
