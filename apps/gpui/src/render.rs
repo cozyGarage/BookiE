@@ -296,11 +296,10 @@ impl GridView {
                     .children({
                         let hidden = self.table.read(cx).delegate().hidden_column_count();
                         (hidden > 0).then(|| {
-                            let total = self.source.columns().len();
                             compact_button(
                                 ButtonKind::Ghost,
                                 "show-hidden-columns",
-                                format!("Columns {}/{}", total - hidden, total),
+                                show_all_columns_label(hidden),
                                 theme,
                             )
                             .on_click(cx.listener(|this, _, window, cx| {
@@ -876,5 +875,19 @@ impl GridView {
                     )
                     .children(empty),
             )
+    }
+}
+
+fn show_all_columns_label(hidden: usize) -> String {
+    format!("Show all ({hidden} hidden)")
+}
+
+#[cfg(test)]
+mod show_all_columns_tests {
+    #[test]
+    fn the_hidden_columns_button_is_not_a_second_columns_control() {
+        let label = super::show_all_columns_label(2);
+        assert!(label.contains('2'));
+        assert!(!label.starts_with("Columns"));
     }
 }
