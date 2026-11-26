@@ -6,12 +6,13 @@ use std::sync::Arc;
 use bookie_app_services::command_bridge::{ChannelEventSink, Command, DispatchContext, Epoch, Event, dispatch};
 use bookie_app_services::database_service::DatabaseService;
 use bookie_app_services::driver_error_presentation::DriverFailurePresentation;
-use bookie_app_services::read_session::ReadSession;
+use bookie_app_services::read_session::{ReadSession, SessionAccess};
 use bookie_app_services::read_session_store::{ReadSessionStore, SessionId};
 use bookie_core::{
     AuthMode, ConnectOptions, DatabaseDriver, DriverRegistry, Environment, OperationControl, TableInfo, Value,
 };
 use bookie_storage::SavedConnection;
+use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 fn saved(path: &std::path::Path, id: Uuid) -> SavedConnection {
@@ -66,9 +67,15 @@ async fn seeded(path: &std::path::Path) {
 async fn session(path: &std::path::Path, id: Uuid, database: Arc<DatabaseService>) -> ReadSession {
     let mut registry = DriverRegistry::new();
     registry.register(Arc::new(drivers_sqlite::SqliteDriver));
-    ReadSession::open(saved(path, id), Arc::new(registry), database)
-        .await
-        .expect("open")
+    ReadSession::open(
+        saved(path, id),
+        Arc::new(registry),
+        database,
+        CancellationToken::new(),
+        SessionAccess::ReadOnly,
+    )
+    .await
+    .expect("open")
 }
 
 async fn stored_session(path: &std::path::Path) -> (ReadSessionStore, SessionId) {
@@ -211,6 +218,8 @@ async fn a_writable_saved_configuration_cannot_write_through_a_read_session() {
         configuration,
         Arc::new(registry),
         Arc::new(DatabaseService::new_isolated()),
+        CancellationToken::new(),
+        SessionAccess::ReadOnly,
     )
     .await
     .unwrap();

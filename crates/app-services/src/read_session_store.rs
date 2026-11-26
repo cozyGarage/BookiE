@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::database_service::DatabaseService;
 use crate::driver_error_presentation::DriverFailurePresentation;
 use crate::driver_failure_message::open_failure_message;
-use crate::read_session::ReadSession;
+use crate::read_session::{ReadSession, SessionAccess};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscriptionRequest {
@@ -105,7 +105,7 @@ impl ReadSessionStore {
             .map_err(|error| error.to_string())?
             .ok_or_else(|| format!("connection {id} not found"))?;
         let label = saved.name.clone();
-        self.open(saved, label, control).await
+        self.open(saved, label, control, SessionAccess::ReadOnly).await
     }
 
     pub async fn saved_connection_stamp(id: Uuid) -> Result<String, String> {
@@ -122,7 +122,7 @@ impl ReadSessionStore {
             .map_err(|error| error.to_string())?
             .ok_or_else(|| format!("connection {id} not found"))?;
         let label = saved.name.clone();
-        self.open_writable(saved, label, control).await
+        self.open(saved, label, control, SessionAccess::Writable).await
     }
 
     pub async fn apply_changes(
@@ -147,7 +147,7 @@ impl ReadSessionStore {
         let mut saved = crate::open_request::file_connection(&file);
         saved.read_only = read_only;
         let label = path.display().to_string();
-        self.open_writable(saved, label, control).await
+        self.open(saved, label, control, SessionAccess::Writable).await
     }
 
     pub async fn open_file(&self, path: &std::path::Path, control: &OperationControl) -> Result<OpenedSession, String> {
@@ -158,7 +158,7 @@ impl ReadSessionStore {
         );
         let mut saved = crate::open_request::file_connection(&file);
         saved.read_only = true;
-        self.open(saved, label, control).await
+        self.open(saved, label, control, SessionAccess::ReadOnly).await
     }
 
     pub async fn read_schema_diagram(
@@ -423,29 +423,14 @@ impl ReadSessionStore {
         saved: bookie_storage::SavedConnection,
         label: String,
         control: &OperationControl,
+        access: SessionAccess,
     ) -> Result<OpenedSession, String> {
-        let session = Box::pin(ReadSession::open_controlled(
+        let session = Box::pin(ReadSession::open(
             saved,
             Arc::clone(&self.registry),
             Arc::clone(&self.database),
             control.cancellation_token().clone(),
-        ))
-        .await
-        .map_err(|failure| open_failure_message(&failure))?;
-        Ok(self.register(session, label))
-    }
-
-    async fn open_writable(
-        &self,
-        saved: bookie_storage::SavedConnection,
-        label: String,
-        control: &OperationControl,
-    ) -> Result<OpenedSession, String> {
-        let session = Box::pin(ReadSession::open_writable_controlled(
-            saved,
-            Arc::clone(&self.registry),
-            Arc::clone(&self.database),
-            control.cancellation_token().clone(),
+            access,
         ))
         .await
         .map_err(|failure| open_failure_message(&failure))?;
@@ -497,7 +482,10 @@ mod tests {
         let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
 
-        let opened = store.open(saved, "writable".into(), &control).await.unwrap();
+        let opened = store
+            .open(saved, "writable".into(), &control, SessionAccess::ReadOnly)
+            .await
+            .unwrap();
 
         let session = store.get(opened.session_id).unwrap();
         for sql in [
@@ -540,7 +528,10 @@ mod tests {
         registry.register(Arc::new(drivers_sqlite::SqliteDriver));
         let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
-        let opened = store.open(saved, "bound".into(), &control).await.unwrap();
+        let opened = store
+            .open(saved, "bound".into(), &control, SessionAccess::ReadOnly)
+            .await
+            .unwrap();
         let session = store.get(opened.session_id).unwrap();
 
         let found = session
@@ -595,7 +586,10 @@ mod tests {
         registry.register(Arc::new(drivers_sqlite::SqliteDriver));
         let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
-        let opened = store.open_writable(saved, "writable".into(), &control).await.unwrap();
+        let opened = store
+            .open(saved, "writable".into(), &control, SessionAccess::Writable)
+            .await
+            .unwrap();
         (directory, path, store, opened)
     }
 
@@ -688,7 +682,10 @@ mod tests {
         registry.register(Arc::new(drivers_sqlite::SqliteDriver));
         let store = ReadSessionStore::new(Arc::new(registry), Arc::new(DatabaseService::new_isolated()));
         let control = OperationControl::with_timeout(Duration::from_secs(5));
-        let opened = store.open(saved, "plain".into(), &control).await.unwrap();
+        let opened = store
+            .open(saved, "plain".into(), &control, SessionAccess::ReadOnly)
+            .await
+            .unwrap();
 
         let result = store
             .apply_changes(opened.session_id, &rename(1, "changed"), &[0], &control)

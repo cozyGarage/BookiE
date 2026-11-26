@@ -594,11 +594,12 @@ fn live_sqlite_selection_copies_exact_typed_values(cx: &mut TestAppContext) {
                     Value::Text("α".into()),
                 ]]
             );
+            view.cell_edit.edits.insert((0, 3), Value::Text("edited α".into()));
             view.copy_selection(false, cx);
         })
     });
     let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
-    assert_eq!(copied.as_deref(), Some("9223372036854775807\t\\x00ff\t\\N\tα"));
+    assert_eq!(copied.as_deref(), Some("9223372036854775807\t\\x00ff\t\\N\tedited α"));
 }
 
 #[gpui::test]
