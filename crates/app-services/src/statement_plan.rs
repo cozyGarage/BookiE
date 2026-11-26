@@ -104,6 +104,10 @@ pub fn statement_range_at<'a>(
     byte: usize,
 ) -> Option<std::ops::Range<usize>> {
     let plan = lexing.into().plan(text)?;
+    statement_range_in_plan(text, &plan, byte)
+}
+
+pub fn statement_range_in_plan(text: &str, plan: &ScriptPlan, byte: usize) -> Option<std::ops::Range<usize>> {
     let statement = plan.statement_at(byte)?;
     let unterminated = plan.diagnostics().iter().any(|diagnostic| {
         let bookie_core::sql_syntax::script::ScriptDiagnostic::Unterminated { start, .. } = diagnostic;

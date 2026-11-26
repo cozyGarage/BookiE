@@ -305,7 +305,7 @@ impl GridView {
         })
     }
 
-    pub(crate) fn transaction_controls(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub(crate) fn transaction_controls(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
         let Some(transaction) = self.transaction.as_ref() else {
             return div().child(
                 button(ButtonKind::Ghost, "begin-transaction", "Begin transaction", theme).on_click(cx.listener(
@@ -317,12 +317,22 @@ impl GridView {
             );
         };
         let elapsed = transaction.started.elapsed().as_secs();
+        let warning = self.transaction_idle_warning();
+        let detail = format!(
+            "Transaction · {}:{:02} · {} run{}{}",
+            elapsed / 60,
+            elapsed % 60,
+            transaction.statements,
+            if transaction.statements == 1 { "" } else { "s" },
+            warning
+                .as_ref()
+                .map_or_else(String::new, |warning| format!(" · {warning}")),
+        );
         div()
             .flex()
             .items_center()
             .gap_2()
             .child({
-                let warning = self.transaction_idle_warning();
                 let color = if warning.is_some() {
                     theme.destructive
                 } else {
@@ -336,22 +346,15 @@ impl GridView {
                     .border_1()
                     .border_color(rgb(color))
                     .text_color(rgb(color))
-                    .when_some(warning, |badge, warning| {
-                        badge.tooltip(move |window, cx| {
-                            gpui_component::tooltip::Tooltip::new(warning.clone()).build(window, cx)
-                        })
+                    .tooltip({
+                        let detail = detail.clone();
+                        move |window, cx| gpui_component::tooltip::Tooltip::new(detail.clone()).build(window, cx)
                     })
-                    .child(format!(
-                        "Transaction · {}:{:02} · {} run{}",
-                        elapsed / 60,
-                        elapsed % 60,
-                        transaction.statements,
-                        if self.transaction_idle_warning().is_some() {
-                            " · idle"
-                        } else {
-                            ""
-                        }
-                    ))
+                    .child(if compact {
+                        format!("Tx · {}:{:02}", elapsed / 60, elapsed % 60)
+                    } else {
+                        detail
+                    })
             })
             .child(
                 button(ButtonKind::Ghost, "commit-transaction", "Commit", theme).on_click(cx.listener(

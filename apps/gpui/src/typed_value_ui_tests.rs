@@ -98,7 +98,7 @@ fn selection_and_copy_keep_every_core_value_variant(cx: &mut TestAppContext) {
     let copied = cx.update(|_, cx| cx.read_from_clipboard().and_then(|item| item.text()));
     let expected = bookie_app_services::result_copy::tsv(
         &bookie_gpui::core_bridge::column_infos_for(&columns),
-        vec![values],
+        &[values],
         false,
     );
     assert_eq!(copied.as_deref(), Some(expected.as_str()));

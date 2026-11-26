@@ -105,6 +105,9 @@ fn the_statement_range_covers_the_trimmed_statement_under_the_cursor() {
     let start = sql.find("SELECT '東京'").unwrap();
     let range = statement_range_at(sql, "postgres", start + 4).unwrap();
     assert_eq!(&sql[range], "SELECT '東京'");
+    let plan = plan_for(sql, SqlGrammar::PostgreSql);
+    let range = statement_range_in_plan(sql, &plan, start + 4).unwrap();
+    assert_eq!(&sql[range], "SELECT '東京'");
     assert_eq!(statement_range_at("SELECT 'open", "postgres", 3), None);
     assert_eq!(statement_range_at("SELECT 1", "redis", 1), None);
 }

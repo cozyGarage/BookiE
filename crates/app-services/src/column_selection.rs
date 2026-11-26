@@ -97,7 +97,7 @@ pub fn copy_selection(
     let copy_format = match format {
         SelectionCopyFormat::Tsv => {
             return Ok(Copied {
-                text: tsv(columns, rows.to_vec(), false),
+                text: tsv(columns, rows, false),
                 note: None,
             });
         }
