@@ -1,6 +1,41 @@
 use bookie_core::Value;
 
 const MAX_BIND_PARAMETERS: usize = 30_000;
+const MAX_STATEMENT_VALUE_BYTES: usize = 4 * 1024 * 1024;
+
+pub(super) fn mysql_multi_row_safe(sql_mode: &str, engine: Option<&str>) -> bool {
+    let strict = sql_mode
+        .split(',')
+        .any(|mode| matches!(mode.trim(), "STRICT_ALL_TABLES" | "STRICT_TRANS_TABLES"));
+    strict && engine.is_some_and(|engine| engine.eq_ignore_ascii_case("InnoDB"))
+}
+
+fn value_bytes(value: &Value) -> usize {
+    match value {
+        Value::Text(text) | Value::JsonText(text) => text.len(),
+        Value::Bytes(bytes) => bytes.len(),
+        _ => 16,
+    }
+}
+
+fn chunk_rows(rows: &[Vec<Value>], per_statement: usize) -> Vec<&[Vec<Value>]> {
+    let mut chunks = Vec::new();
+    let mut start = 0;
+    let mut bytes = 0;
+    for (index, row) in rows.iter().enumerate() {
+        let size: usize = row.iter().map(value_bytes).sum();
+        if index > start && (index - start == per_statement || bytes + size > MAX_STATEMENT_VALUE_BYTES) {
+            chunks.push(&rows[start..index]);
+            start = index;
+            bytes = 0;
+        }
+        bytes += size;
+    }
+    if start < rows.len() {
+        chunks.push(&rows[start..]);
+    }
+    chunks
+}
 
 fn skip_quoted(bytes: &[u8], start: usize) -> usize {
     let quote = bytes[start];
@@ -133,7 +168,8 @@ pub(super) fn multi_row_statements(
     }
     let per_statement = (MAX_BIND_PARAMETERS / width).max(1);
     Some(
-        rows.chunks(per_statement)
+        chunk_rows(rows, per_statement)
+            .into_iter()
             .map(|chunk| {
                 let mut sql = String::with_capacity(statement.len() + chunk.len() * tuple.len());
                 sql.push_str(&statement[..open]);
@@ -166,6 +202,39 @@ mod tests {
                     .collect()
             })
             .collect()
+    }
+
+    #[test]
+    fn mysql_uses_multi_row_only_for_a_strict_transactional_table() {
+        assert!(mysql_multi_row_safe("STRICT_TRANS_TABLES,NO_ZERO_DATE", Some("InnoDB")));
+        assert!(mysql_multi_row_safe(
+            "ONLY_FULL_GROUP_BY,STRICT_ALL_TABLES",
+            Some("innodb")
+        ));
+        assert!(
+            !mysql_multi_row_safe("", Some("InnoDB")),
+            "non-strict coerces NULL and bad values"
+        );
+        assert!(
+            !mysql_multi_row_safe("STRICT_TRANS_TABLES", Some("MyISAM")),
+            "no rollback before the retry"
+        );
+        assert!(
+            !mysql_multi_row_safe("STRICT_ALL_TABLES", None),
+            "an unknown engine stays per-row"
+        );
+        assert!(!mysql_multi_row_safe("NOT_STRICT_TRANS_TABLES_X", Some("InnoDB")));
+    }
+
+    #[test]
+    fn large_values_split_a_batch_before_the_statement_grows_too_big() {
+        let wide: Vec<Vec<Value>> = (0..10)
+            .map(|row| vec![Value::Int(row), Value::Text("x".repeat(1024 * 1024))])
+            .collect();
+        let statements = multi_row_statements("INSERT INTO t (id, body) VALUES (?, ?)", "mysql", &wide).unwrap();
+        assert!(statements.len() >= 3, "{} statements", statements.len());
+        assert!(statements.iter().all(|(_, params)| params.len() / 2 <= 4));
+        assert_eq!(statements.iter().map(|(_, params)| params.len()).sum::<usize>(), 20);
     }
 
     #[test]

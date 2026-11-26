@@ -989,7 +989,7 @@ async fn an_upsert_is_accepted_as_one_insert_shape_in_every_supported_dialect() 
             .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
             .await
             .expect("finish");
-        let statements = if driver == "duckdb" { 2 } else { 1 };
+        let statements = if matches!(driver, "duckdb" | "mysql") { 2 } else { 1 };
         assert_eq!(*batches.lock().expect("batch lock"), vec![statements], "{driver}");
     }
 }
