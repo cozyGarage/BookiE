@@ -876,6 +876,20 @@ impl LiveSession {
             .map_err(|error| driver_failure_message(&bookie_app_services::driver_error_presentation::classify(&error)))
     }
 
+    pub fn compare_table_data(
+        &self,
+        source: &TableInfo,
+        target: &TableInfo,
+        cancellation: &CancellationToken,
+    ) -> Result<bookie_app_services::data_compare::DataCompare, bookie_app_services::data_compare::DataCompareError>
+    {
+        let control = bookie_app_services::operation_control::bounded_with(30, cancellation.clone());
+        self.runtime.block_on(
+            self.sessions
+                .compare_table_data(self.session_id, source, target, &control),
+        )
+    }
+
     pub fn search_values(
         &self,
         term: &str,

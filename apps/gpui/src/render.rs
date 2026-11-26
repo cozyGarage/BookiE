@@ -609,6 +609,7 @@ impl Render for GridView {
             .or_else(|| self.schema_diagram_bar(theme, cx))
             .or_else(|| self.save_bar(theme, cx))
             .or_else(|| self.insert_form(theme, cx))
+            .or_else(|| self.data_compare_bar(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
         let save_bar = self.save.pending.is_none().then(|| self.edits_bar(theme, cx)).flatten();
         let bundle_bar = self.connection_bundle_bar(theme, cx);
@@ -828,6 +829,7 @@ impl GridView {
             PaletteMode::NameFilter => "Type a name for the filter",
             PaletteMode::SchemaContext => "Enter a valid schema or database name",
             PaletteMode::Themes => "No matching theme",
+            PaletteMode::CompareTarget => "No other table to compare with",
         };
         let (count, list) = if self.palette.mode == PaletteMode::Commands {
             let actions = self.palette_actions();
