@@ -1,4 +1,4 @@
-use gpui::TestAppContext;
+use gpui::{Focusable, TestAppContext};
 use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
@@ -156,5 +156,54 @@ fn the_host_key_prompt_cancels_on_escape_and_has_no_enter_default(cx: &mut TestA
     cx.simulate_keystrokes("escape");
     view.read_with(cx, |view, _| assert_eq!(view.top_surface(), None));
     assert_eq!(answer.try_recv().ok(), Some(false), "escape refuses the key");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn escape_closes_the_connection_dialog_above_the_notification_drawer(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.notices.open = true;
+            view.open_connection_dialog(cx);
+        })
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(cx.debug_bounds("notifications-list").is_some());
+    assert!(cx.debug_bounds("connection-dialog").is_some());
+
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| {
+        assert!(!view.connection_form.open, "Escape closes the topmost dialog");
+        assert!(view.notices.open, "the covered notification drawer stays open");
+    });
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn escape_closes_notifications_without_stopping_a_focused_query(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.notices.open = true;
+            view.queries.cancel = tokio_util::sync::CancellationToken::new();
+            view.panel.running = Some((view.queries.generation, std::time::Instant::now()));
+            view.sql_input.update(cx, |editor, cx| editor.focus(window, cx));
+        })
+    });
+    view.read_with(cx, |view, _| assert!(view.can_stop_query(), "the test query is active"));
+    assert!(cx.update(|window, cx| view.read(cx).sql_input.read(cx).focus_handle(cx).is_focused(window)));
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| {
+        assert!(!view.notices.open, "Escape closes the notification drawer");
+        assert!(
+            !view.queries.cancel.is_cancelled(),
+            "closing the drawer does not stop the query"
+        );
+    });
     std::fs::remove_file(&path).ok();
 }

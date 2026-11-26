@@ -31,7 +31,7 @@ impl GridView {
             if self.surface_key(key, cx) {
                 cx.stop_propagation();
             }
-            if surface != Surface::Notifications {
+            if surface != Surface::Notifications || key == "escape" {
                 return;
             }
         }
@@ -470,17 +470,17 @@ pub(crate) enum Surface {
 
 impl Surface {
     pub(crate) const ORDER: [Surface; 20] = [
-        Surface::Approval,
-        Surface::HostKey,
-        Surface::CloseConfirm,
         Surface::CancelProcess,
+        Surface::CloseConfirm,
+        Surface::HostKey,
+        Surface::Approval,
         Surface::DeleteConnection,
-        Surface::Notifications,
         Surface::ConnectionForm,
-        Surface::SaveReview,
+        Surface::Notifications,
         Surface::Import,
         Surface::ExportFile,
         Surface::SchemaDiagram,
+        Surface::SaveReview,
         Surface::Insert,
         Surface::DataCompare,
         Surface::Structure,
