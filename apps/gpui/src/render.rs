@@ -4,7 +4,6 @@ use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
 use crate::surfaces::{ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim};
 use gpui::uniform_list;
-use gpui_kit::component::scroll::Scrollbar;
 
 impl GridView {
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -36,7 +35,7 @@ impl GridView {
         let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
         let content_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         let grid_width = (content_width - self.detail_sidebar_width(content_width)).max(0.0);
-        self.sync_table((grid_width - f32::from(Scrollbar::width())).max(0.0), window, cx);
+        self.sync_table(window, cx);
         if self.synced_width != grid_width {
             self.synced_width = grid_width;
             let table = self.table.clone();

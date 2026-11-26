@@ -1224,7 +1224,7 @@ fn painting_a_row_reads_the_source_once_and_keeps_pending_edits_available(cx: &m
         view.update(cx, |view, cx| {
             view.cell_edit.edits.insert((1, 1), Cell::Text(full.clone()));
             requests.store(0, Ordering::Relaxed);
-            view.sync_table(0.0, window, cx);
+            view.sync_table(window, cx);
             view.table.update(cx, |table, _| {
                 let delegate = table.delegate_mut();
                 let edited = delegate.label_of(1, 1).0;

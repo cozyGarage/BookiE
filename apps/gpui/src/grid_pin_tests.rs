@@ -221,13 +221,13 @@ fn query_widths_survive_same_query_and_do_not_follow_a_different_query(cx: &mut 
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.grid_is_query = true;
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             view.remember_grid_widths(&[gpui::px(180.0)], cx);
             view.source = source("select id from a");
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             assert_eq!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
             view.source = source("select id from b");
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             assert_ne!(f32::from(view.table.read(cx).col_width(0).unwrap()), 180.0);
         })
     });
@@ -254,10 +254,10 @@ fn rendering_the_same_query_result_reuses_its_width_identity(cx: &mut TestAppCon
         view.update(cx, |view, cx| {
             view.tabs.open_query();
             view.grid_is_query = true;
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
             let before = reads.load(std::sync::atomic::Ordering::Relaxed);
             for _ in 0..5 {
-                view.sync_table(900.0, window, cx);
+                view.sync_table(window, cx);
             }
             assert_eq!(reads.load(std::sync::atomic::Ordering::Relaxed), before);
         })
@@ -470,7 +470,7 @@ fn binary_display_mode_controls_preview_detail_and_edit_without_changing_value_t
         view.update(cx, |view, cx| {
             view.source = Arc::new(BinarySource(vec![0, 255, 65]));
             view.table_source = view.source.clone();
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
         })
     });
     view.update(cx, |view, cx| {
@@ -573,7 +573,7 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
             let table = view.catalog.grid_table.clone();
             view.tabs.close(view.tabs.active);
             view.tabs.open_table(&table);
-            view.sync_table(900.0, window, cx);
+            view.sync_table(window, cx);
         })
     });
     cx.run_until_parked();
@@ -655,6 +655,37 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
             "pinned leading column leaves the last cell clipped: {last_cell:?}, visible right edge: {visible_right:?}"
         );
     });
+}
+
+#[gpui::test]
+fn a_small_result_keeps_fitted_width_and_wide_headers_keep_pin_in_the_menu(cx: &mut TestAppContext) {
+    let source = Arc::new(WideSource(vec![ColumnMeta {
+        name: "category".into(),
+        width: 150.0,
+        numeric: false,
+        data_type: "text".into(),
+        primary_key: false,
+    }]));
+    cx.update(text_input::bind_keys);
+    let (_, cx) = cx.add_window_view(|window, cx| GridView::with_source(source, Instant::now(), window, cx));
+    cx.simulate_resize(gpui::size(gpui::px(950.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let fitted = cx.debug_bounds("column-header-0").expect("fitted header");
+
+    cx.simulate_resize(gpui::size(gpui::px(1_400.0), gpui::px(760.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let header = cx.debug_bounds("column-header-0").expect("header after resize");
+    assert_eq!(header.size.width, fitted.size.width);
+    assert!(header.size.width < gpui::px(260.0));
+    assert!(cx.update(|window, _| window.try_find_by_label("Pin through category").is_none()));
+
+    let menu = cx.update(|window, _| window.find_by_label("Actions for category").bounds());
+    assert!(header.origin.x + header.size.width - (menu.origin.x + menu.size.width) <= gpui::px(2.0));
+    cx.simulate_click(menu.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.update(|window, _| window.try_find_by_label("Pin through category").is_some()));
 }
 
 #[gpui::test]
