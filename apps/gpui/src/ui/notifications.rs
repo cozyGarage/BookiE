@@ -71,6 +71,12 @@ impl GridView {
         cx.notify();
     }
 
+    pub(crate) fn report_failure(&mut self, what: &str, message: &str) {
+        let text = format!("Could not {what}: {message}");
+        self.status = text.clone();
+        self.notices.push(text, NoticeKind::Error);
+    }
+
     pub(crate) fn toggle_notifications(&mut self, cx: &mut Context<Self>) {
         self.notices.open = !self.notices.open;
         cx.notify();
@@ -170,11 +176,7 @@ impl GridView {
 
     fn notice_row(&self, notice: &Notice, theme: Theme, cx: &mut Context<Self>) -> Div {
         let id = notice.id;
-        let colour = match (notice.kind, notice.read) {
-            (NoticeKind::Success, _) => theme.muted_foreground,
-            (_, false) => theme.destructive,
-            (_, true) => theme.foreground,
-        };
+        let colour = notice_colour(notice, theme);
         let resolve = (notice.kind == NoticeKind::UnknownOutcome).then(|| {
             compact_button(
                 ButtonKind::Ghost,
@@ -220,11 +222,13 @@ impl GridView {
             .py_2()
             .border_b_1()
             .border_color(rgb(theme.border))
+            .child(unread_dot(notice, colour, theme))
             .child(
                 div()
                     .flex_1()
                     .min_w_0()
                     .text_color(rgb(colour))
+                    .when(!notice.read, |text| text.font_weight(gpui::FontWeight::SEMIBOLD))
                     .child(notice.text.clone()),
             )
             .children(resolve)
@@ -237,9 +241,50 @@ impl GridView {
     }
 }
 
+pub(crate) fn notice_colour(notice: &Notice, theme: Theme) -> u32 {
+    match (notice.kind, notice.read) {
+        (NoticeKind::Success, _) => theme.muted_foreground,
+        (NoticeKind::IdleTransaction, false) => theme.warning,
+        (_, false) => theme.destructive,
+        (_, true) => theme.foreground,
+    }
+}
+
+fn unread_dot(notice: &Notice, colour: u32, theme: Theme) -> Div {
+    let fill = if notice.read { theme.popover } else { colour };
+    div()
+        .debug_selector(|| "notice-unread-dot".into())
+        .flex_none()
+        .mt(px(size::XS))
+        .size(px(size::SM))
+        .rounded_full()
+        .bg(rgb(fill))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{KEEP, NoticeKind, Notices};
+    use super::{KEEP, Notice, NoticeKind, Notices, notice_colour};
+    use bookie_gpui::theme::Theme;
+
+    #[test]
+    fn an_idle_transaction_warns_and_a_failure_is_destructive() {
+        let theme = Theme::light();
+        let notice = |kind, read| Notice {
+            id: 1,
+            text: "x".into(),
+            kind,
+            read,
+        };
+        assert_eq!(
+            notice_colour(&notice(NoticeKind::IdleTransaction, false), theme),
+            theme.warning
+        );
+        assert_eq!(
+            notice_colour(&notice(NoticeKind::Error, false), theme),
+            theme.destructive
+        );
+        assert_eq!(notice_colour(&notice(NoticeKind::Error, true), theme), theme.foreground);
+    }
 
     #[test]
     fn a_success_arrives_read_and_a_failure_waits_until_dismissed() {

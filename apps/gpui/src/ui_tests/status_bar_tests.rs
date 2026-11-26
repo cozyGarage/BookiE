@@ -204,3 +204,17 @@ fn the_empty_results_keycaps_line_up_in_one_column(cx: &mut TestAppContext) {
         "{caps:?}"
     );
 }
+
+#[gpui::test]
+fn a_failed_filter_save_reaches_the_notification_centre_unread(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let before = view.read_with(cx, |view, _| view.notices.unread());
+    view.update(cx, |view, _| view.report_failure("save the filter", "the disk is full"));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.notices.unread(), before + 1);
+        let notice = &view.notices.items[0];
+        assert_eq!(notice.kind, crate::notifications::NoticeKind::Error);
+        assert!(!notice.read);
+        assert_eq!(view.status, notice.text, "the status line shows the same failure");
+    });
+}

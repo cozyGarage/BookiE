@@ -96,7 +96,7 @@ impl GridView {
                         this.remember_table_sort(&current_table, requested_sort);
                         this.show_loaded_table(current_table, source);
                     }
-                    Err(message) => this.status = format!("Could not sort {column}: {message}"),
+                    Err(message) => this.report_failure(&format!("sort {column}"), &message),
                 }
             },
         );
@@ -211,7 +211,7 @@ impl GridView {
                         this.scroll.scroll_to_item_strict(0, gpui::ScrollStrategy::Top);
                         this.status = format!("Sorted {} rows by {column_name}", crate::thousands(row_count));
                     }
-                    Err(message) => this.status = format!("Could not sort {column_name}: {message}"),
+                    Err(message) => this.report_failure(&format!("sort {column_name}"), message),
                 }
             },
         );
@@ -249,14 +249,16 @@ impl GridView {
                 {
                     return;
                 }
-                this.status = match result {
-                    Ok(count) => format!(
-                        "Database table {} has {} rows{scope} at count time",
-                        current_table.name,
-                        crate::thousands(count)
-                    ),
-                    Err(message) => format!("Could not count rows in {}: {message}", current_table.name),
-                };
+                match result {
+                    Ok(count) => {
+                        this.status = format!(
+                            "Database table {} has {} rows{scope} at count time",
+                            current_table.name,
+                            crate::thousands(count)
+                        )
+                    }
+                    Err(message) => this.report_failure(&format!("count rows in {}", current_table.name), &message),
+                }
             },
         );
     }

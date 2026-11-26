@@ -74,9 +74,8 @@ impl GridView {
         let overview = match live.overview() {
             Ok(overview) => overview,
             Err(error) => {
-                let message = format!("Could not read connection status: {error}");
-                self.status = message.clone();
-                self.panel.messages.push(MessageKind::Error, message);
+                self.report_failure("read connection status", &error.to_string());
+                self.panel.messages.push(MessageKind::Error, self.status.clone());
                 return;
             }
         };

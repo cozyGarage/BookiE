@@ -122,7 +122,7 @@ impl GridView {
                 let ((identity, source), where_sql, order) = match result {
                     Ok(loaded) => loaded,
                     Err(message) => {
-                        this.status = format!("Could not apply the WHERE filter: {message}");
+                        this.report_failure("apply the WHERE filter", &message);
                         return;
                     }
                 };
