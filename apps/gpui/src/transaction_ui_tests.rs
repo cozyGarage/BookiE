@@ -28,6 +28,7 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
                 statements: 0,
                 finishing: false,
                 running: false,
+                running_cancel: None,
             });
             view.tabs.open_query();
             view.sync_grid_owner();
@@ -61,6 +62,22 @@ fn a_starting_transaction_blocks_closing_and_a_second_begin(cx: &mut TestAppCont
             view.begin_transaction(cx);
             assert!(view.transaction_starting);
             assert!(view.transaction.is_none());
+        })
+    });
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn an_in_flight_save_blocks_beginning_a_manual_transaction(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-save-busy");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.save.busy = true;
+            view.begin_transaction(cx);
+            assert!(!view.transaction_starting);
+            assert!(view.transaction.is_none());
+            assert!(view.status.contains("save review"), "{}", view.status);
         })
     });
     std::fs::remove_file(path).ok();
@@ -176,6 +193,36 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
 }
 
 #[gpui::test]
+fn stop_cancels_the_running_transaction_statement(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-stop-statement");
+    let original = saved_customer(&path, 1);
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.run_in_transaction("UPDATE orders SET customer = 'Temporary' WHERE id = 1".into(), cx);
+            let cancel = view
+                .transaction
+                .as_ref()
+                .and_then(|transaction| transaction.running_cancel.as_ref())
+                .expect("the running statement owns a cancellation token")
+                .clone();
+            view.stop_transaction_statement();
+            assert!(cancel.is_cancelled());
+        })
+    });
+    wait_for(&view, cx, |view| {
+        view.transaction.as_ref().is_none_or(|transaction| !transaction.running)
+    });
+    if view.read_with(cx, |view, _| view.transaction.is_some()) {
+        cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+        wait_for(&view, cx, |view| view.transaction.is_none());
+    }
+    assert_eq!(saved_customer(&path, 1), original);
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
 fn grid_save_requests_are_refused_inside_a_manual_transaction(cx: &mut TestAppContext) {
     let path = fixture_copy("transaction-blocks-save-request");
     let original = saved_customer(&path, 1);
@@ -240,6 +287,7 @@ fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx:
                 statements: 0,
                 finishing: false,
                 running: false,
+                running_cancel: None,
             });
         })
     });
@@ -333,6 +381,7 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
                 statements: 1,
                 finishing: false,
                 running: false,
+                running_cancel: None,
             });
             view.transaction.as_mut().unwrap().running = true;
             view.end_transaction(true, cx);
@@ -404,6 +453,7 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
                     statements: 1,
                     finishing: false,
                     running: false,
+                    running_cancel: None,
                 });
                 view.end_transaction(true, cx);
                 assert!(view.transaction_open());

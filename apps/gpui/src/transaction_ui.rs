@@ -15,6 +15,7 @@ pub(crate) struct TransactionState {
     pub statements: usize,
     pub finishing: bool,
     pub running: bool,
+    pub running_cancel: Option<tokio_util::sync::CancellationToken>,
 }
 
 impl GridView {
@@ -24,6 +25,10 @@ impl GridView {
 
     pub(crate) fn begin_transaction(&mut self, cx: &mut Context<Self>) {
         if self.transaction_open() {
+            return;
+        }
+        if self.save.busy || self.save.pending.is_some() || self.form_open() {
+            self.status = "Finish or cancel the open form or save review before starting a transaction".into();
             return;
         }
         let Some((connection_id, opened_with)) = self
@@ -64,6 +69,7 @@ impl GridView {
                             statements: 0,
                             finishing: false,
                             running: false,
+                            running_cancel: None,
                         });
                         this.refresh_while_transaction_open(cx);
                         this.status = "Transaction open: statements run in it until you commit or roll back".into();
@@ -102,20 +108,23 @@ impl GridView {
         }
         self.status = "Running in the transaction…".into();
         self.invalidate_background();
-        let generation = self.loads.generation;
         let cancel = CancellationToken::new();
-        self.loads.cancel = cancel.clone();
+        let cancel_for_run = cancel.clone();
+        if let Some(transaction) = self.transaction.as_mut() {
+            transaction.running_cancel = Some(cancel.clone());
+        }
         let owner = shared.clone();
         cx.spawn(async move |this, cx| {
             let (ran, ended, cleanup) = cx.background_executor().spawn(async move {
                 let ran = (|| -> Result<_, String> {
-                    let result = write.run_in_transaction(&shared, &sql, &cancel)?;
-                    live.table_from_result(result, &sql, &cancel)
+                    let result = write.run_in_transaction(&shared, &sql, &cancel_for_run)?;
+                    live.table_from_result(result, &sql, &cancel_for_run)
                 })();
                 let ended = !write.transaction_is_open(&shared);
                 let cleanup = if ended { write.close_transaction(&shared) } else { None };
                 (ran, ended, cleanup)
             }).await;
+            let cancelled = cancel.is_cancelled();
             this.update(cx, |this, cx| {
                 let Some(transaction) = this.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, &owner)) else {
                     return;
@@ -136,24 +145,39 @@ impl GridView {
                     return;
                 }
                 transaction.running = false;
+                transaction.running_cancel = None;
                 if ran.is_ok() {
                     transaction.statements += 1;
                     transaction.last_activity = Instant::now();
                 }
-                if this.loads.generation == generation {
-                    match ran {
-                        Ok(table) => {
-                            this.add_run(Some(Arc::new(table)));
-                            if !ended {
-                                this.status = "Ran in the transaction (not committed yet)".into();
-                            }
+                match ran {
+                    Ok(table) => {
+                        this.add_run(Some(Arc::new(table)));
+                        if !ended {
+                            this.status = "Ran in the transaction (not committed yet)".into();
                         }
-                        Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
                     }
+                    Err(message) if cancelled => {
+                        this.status = format!("The transaction statement was cancelled: {message}")
+                    }
+                    Err(message) => this.status = format!("The statement failed inside the transaction: {message}"),
                 }
                 cx.notify();
             }).ok();
         }).detach();
+    }
+
+    pub(crate) fn stop_transaction_statement(&mut self) {
+        if let Some(cancel) = self
+            .transaction
+            .as_ref()
+            .filter(|transaction| transaction.running)
+            .and_then(|transaction| transaction.running_cancel.as_ref())
+            && !cancel.is_cancelled()
+        {
+            cancel.cancel();
+            self.status = "Cancellation requested…".into();
+        }
     }
 
     pub(crate) fn end_transaction(&mut self, commit: bool, cx: &mut Context<Self>) {
@@ -345,5 +369,29 @@ impl GridView {
                     },
                 )),
             )
+            .when(transaction.running, |bar| {
+                if transaction
+                    .running_cancel
+                    .as_ref()
+                    .is_some_and(tokio_util::sync::CancellationToken::is_cancelled)
+                {
+                    bar.child(crate::surfaces::unavailable_button(
+                        ButtonKind::Ghost,
+                        "stop-transaction-statement",
+                        "Stopping…",
+                        "Waiting for the database",
+                        theme,
+                    ))
+                } else {
+                    bar.child(
+                        button(ButtonKind::Destructive, "stop-transaction-statement", "Stop", theme).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                this.stop_transaction_statement();
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                }
+            })
     }
 }
