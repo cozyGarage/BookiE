@@ -47,7 +47,7 @@ fn page_future(
     } else {
         target.page(offset, EXPORT_PAGE_ROWS, plan.sort, None)
     };
-    let query = page.map_err(ExportError::Source)?;
+    let query = page.map_err(|error| ExportError::Source(error.to_string()))?;
     let schema = plan.schema.clone();
     let table = plan.table.clone();
     let deadline = operation_control::deadline_for(plan.timeout_secs);

@@ -449,7 +449,10 @@ async fn dispatch_open_saved(
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     let outcome = match bookie_core::check_pre_dispatch(control) {
-        Ok(()) => sessions.open_saved(connection_id, control).await,
+        Ok(()) => sessions
+            .open_saved(connection_id, control)
+            .await
+            .map_err(|error| error.to_string()),
         Err(error) => Err(error.to_string()),
     };
     emit_opened(sessions, epoch, outcome, sink)
@@ -463,7 +466,10 @@ async fn dispatch_open_file(
     sink: &dyn EventSink,
 ) -> Result<(), DispatchError> {
     let outcome = match bookie_core::check_pre_dispatch(control) {
-        Ok(()) => sessions.open_file(&path, control).await,
+        Ok(()) => sessions
+            .open_file(&path, control)
+            .await
+            .map_err(|error| error.to_string()),
         Err(error) => Err(error.to_string()),
     };
     emit_opened(sessions, epoch, outcome, sink)

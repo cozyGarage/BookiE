@@ -239,6 +239,7 @@ fn table_select_sorted(
     target
         .full_select(Some((index, sort.ascending)), false)
         .map(|query| query.sql)
+        .map_err(|error| error.to_string())
 }
 
 async fn open_table_cursor(

@@ -36,5 +36,5 @@ pub(super) async fn persist_connection(request: PersistRequest<'_>) -> Result<()
         ssh,
     )
     .await
-    .map_err(ConnectFailure::from)
+    .map_err(|error| ConnectFailure::from(error.to_string()))
 }

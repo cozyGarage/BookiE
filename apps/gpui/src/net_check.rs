@@ -37,7 +37,9 @@ pub fn kafka_topics(broker: &str) -> Result<String, String> {
 }
 
 pub fn run_check(address: &str) -> Outcome {
-    block_on(async { Ok(bookie_app_services::checks::check_tcp(address, std::time::Duration::from_secs(5)).await) })
+    block_on(async {
+        Ok::<_, String>(bookie_app_services::checks::check_tcp(address, std::time::Duration::from_secs(5)).await)
+    })
         .unwrap_or_else(|reason| Outcome::Down { reason })
 }
 
