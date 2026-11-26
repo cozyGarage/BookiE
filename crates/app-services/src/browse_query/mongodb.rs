@@ -1,17 +1,17 @@
-use super::{BoundQuery, BrowseTarget};
+use super::{BoundQuery, BrowseQueryError, BrowseTarget};
 use bookie_core::Value;
 
 pub(super) fn value_query(
     target: &BrowseTarget<'_>,
     column_index: usize,
     pk_values: &[Value],
-) -> Result<BoundQuery, String> {
+) -> Result<BoundQuery, BrowseQueryError> {
     let keys: Vec<_> = target.columns.iter().filter(|column| column.primary_key).collect();
     let Some(column) = target.columns.get(column_index) else {
-        return Err("value column no longer exists".into());
+        return Err(BrowseQueryError::StaleValueColumn { index: column_index });
     };
     if keys.len() != 1 || keys[0].name != "_id" || pk_values.len() != 1 {
-        return Err("MongoDB value fetch requires its single _id key".into());
+        return Err(BrowseQueryError::InvalidMongoValueTarget);
     }
     let quote = |name| bookie_core::sql_dialect::quote_ident("mongodb", name);
     let collection = target
@@ -56,6 +56,13 @@ mod tests {
             "SELECT \"payload\" FROM \"appdb\".\"records\" WHERE \"_id\" = ?"
         );
         assert_eq!(query.params, vec![key]);
+
+        let invalid_target = target.value_query(1, &[]).unwrap_err();
+        assert!(matches!(&invalid_target, BrowseQueryError::InvalidMongoValueTarget));
+        assert_eq!(
+            invalid_target.to_string(),
+            "MongoDB value fetch requires its single _id key"
+        );
     }
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {

@@ -511,7 +511,9 @@ impl LiveSession {
         } else {
             let columns = self.table_columns(table)?;
             let filter = where_filter(where_sql);
-            let query = browse_target(&self.driver_id, table, &columns, &filter).count()?;
+            let query = browse_target(&self.driver_id, table, &columns, &filter)
+                .count()
+                .map_err(|error| error.to_string())?;
             (query.sql, query.params)
         };
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
@@ -811,12 +813,9 @@ impl LiveSession {
             None => None,
         };
         let filter = where_filter(where_sql);
-        let page = browse_target(&self.driver_id, &table, &columns, &filter).page(
-            0,
-            max_rows.saturating_add(1),
-            sort,
-            None,
-        )?;
+        let page = browse_target(&self.driver_id, &table, &columns, &filter)
+            .page(0, max_rows.saturating_add(1), sort, None)
+            .map_err(|error| error.to_string())?;
         let bookie_app_services::browse_query::PageQuery::Sql(query) = page else {
             return Err("The WHERE filter could not be sent to the database".into());
         };
@@ -840,12 +839,12 @@ impl LiveSession {
             max_rows_per_table,
             timeout_secs: 600,
         };
-        self.runtime.block_on(self.sessions.export_tables_to_folder(
-            self.session_id,
-            self.tables.clone(),
-            job,
-            cancellation,
-        ))
+        self.runtime
+            .block_on(
+                self.sessions
+                    .export_tables_to_folder(self.session_id, self.tables.clone(), job, cancellation),
+            )
+            .map_err(|error| error.to_string())
     }
 
     pub fn run_backup(
@@ -1103,9 +1102,13 @@ impl WriteSession {
         database.set_approval_sink(bookie_app_services::approval_prompt::reviewable_prompt_sink(approvals));
         let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database);
         let control = OperationControl::with_timeout(Duration::from_secs(30));
-        let stamp = runtime.block_on(ReadSessionStore::saved_connection_stamp(connection_id))?;
+        let stamp = runtime
+            .block_on(ReadSessionStore::saved_connection_stamp(connection_id))
+            .map_err(|error| error.to_string())?;
         refuse_edited_connection(opened_with, &stamp)?;
-        let opened = runtime.block_on(sessions.open_saved_writable(connection_id, &control))?;
+        let opened = runtime
+            .block_on(sessions.open_saved_writable(connection_id, &control))
+            .map_err(|error| error.to_string())?;
         Ok(WriteSession {
             runtime,
             sessions,
@@ -1198,7 +1201,8 @@ impl WriteSession {
         };
         let now = self
             .runtime
-            .block_on(ReadSessionStore::saved_connection_stamp(*connection_id))?;
+            .block_on(ReadSessionStore::saved_connection_stamp(*connection_id))
+            .map_err(|error| error.to_string())?;
         Ok(now == *stamp)
     }
 

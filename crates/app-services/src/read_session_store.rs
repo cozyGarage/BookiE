@@ -10,7 +10,30 @@ use uuid::Uuid;
 use crate::database_service::DatabaseService;
 use crate::driver_error_presentation::DriverFailurePresentation;
 use crate::driver_failure_message::open_failure_message;
+use crate::open_failure::OpenFailure;
 use crate::read_session::{ReadSession, SessionAccess};
+
+#[derive(Debug, thiserror::Error)]
+pub enum ReadSessionStoreError {
+    #[error(transparent)]
+    Storage(#[from] bookie_storage::StorageError),
+    #[error("connection {0} not found")]
+    ConnectionNotFound(Uuid),
+    #[error(transparent)]
+    Serialization(#[from] serde_json::Error),
+    #[error("{0:?}")]
+    FileRejected(crate::open_request::OpenRejection),
+    #[error("{message}")]
+    Open { failure: OpenFailure, message: String },
+    #[error("{0}")]
+    Export(String),
+    #[error("The connection is closed")]
+    Closed,
+    #[error("The database driver is not available")]
+    DriverUnavailable,
+    #[error("This connection does not support consistent table export.")]
+    SnapshotExportUnsupported,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SubscriptionRequest {
@@ -99,28 +122,33 @@ impl ReadSessionStore {
         &self.database
     }
 
-    pub async fn open_saved(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
+    pub async fn open_saved(
+        &self,
+        id: Uuid,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, ReadSessionStoreError> {
         let saved = crate::read_session::saved_connection(id)
-            .await
-            .map_err(|error| error.to_string())?
-            .ok_or_else(|| format!("connection {id} not found"))?;
+            .await?
+            .ok_or(ReadSessionStoreError::ConnectionNotFound(id))?;
         let label = saved.name.clone();
         self.open(saved, label, control, SessionAccess::ReadOnly).await
     }
 
-    pub async fn saved_connection_stamp(id: Uuid) -> Result<String, String> {
+    pub async fn saved_connection_stamp(id: Uuid) -> Result<String, ReadSessionStoreError> {
         let saved = crate::read_session::saved_connection(id)
-            .await
-            .map_err(|error| error.to_string())?
-            .ok_or_else(|| format!("connection {id} not found"))?;
-        serde_json::to_string(&saved).map_err(|error| error.to_string())
+            .await?
+            .ok_or(ReadSessionStoreError::ConnectionNotFound(id))?;
+        Ok(serde_json::to_string(&saved)?)
     }
 
-    pub async fn open_saved_writable(&self, id: Uuid, control: &OperationControl) -> Result<OpenedSession, String> {
+    pub async fn open_saved_writable(
+        &self,
+        id: Uuid,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, ReadSessionStoreError> {
         let saved = crate::read_session::saved_connection(id)
-            .await
-            .map_err(|error| error.to_string())?
-            .ok_or_else(|| format!("connection {id} not found"))?;
+            .await?
+            .ok_or(ReadSessionStoreError::ConnectionNotFound(id))?;
         let label = saved.name.clone();
         self.open(saved, label, control, SessionAccess::Writable).await
     }
@@ -142,16 +170,20 @@ impl ReadSessionStore {
         path: &std::path::Path,
         read_only: bool,
         control: &OperationControl,
-    ) -> Result<OpenedSession, String> {
-        let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
+    ) -> Result<OpenedSession, ReadSessionStoreError> {
+        let file = crate::open_request::classify_file(path).map_err(ReadSessionStoreError::FileRejected)?;
         let mut saved = crate::open_request::file_connection(&file);
         saved.read_only = read_only;
         let label = path.display().to_string();
         self.open(saved, label, control, SessionAccess::Writable).await
     }
 
-    pub async fn open_file(&self, path: &std::path::Path, control: &OperationControl) -> Result<OpenedSession, String> {
-        let file = crate::open_request::classify_file(path).map_err(|error| format!("{error:?}"))?;
+    pub async fn open_file(
+        &self,
+        path: &std::path::Path,
+        control: &OperationControl,
+    ) -> Result<OpenedSession, ReadSessionStoreError> {
+        let file = crate::open_request::classify_file(path).map_err(ReadSessionStoreError::FileRejected)?;
         let label = path.file_name().map_or_else(
             || path.display().to_string(),
             |name| name.to_string_lossy().into_owned(),
@@ -206,19 +238,23 @@ impl ReadSessionStore {
         tables: Vec<TableInfo>,
         job: crate::export_tables::TablesExportJob,
         cancel: &tokio_util::sync::CancellationToken,
-    ) -> Result<Vec<crate::export_tables::TableResult>, String> {
-        let session = self.get(id).ok_or("The connection is closed")?;
+    ) -> Result<Vec<crate::export_tables::TableResult>, ReadSessionStoreError> {
+        let session = self.get(id).ok_or(ReadSessionStoreError::Closed)?;
         let driver = self
             .registry
             .get(&session.driver_id)
-            .ok_or("The database driver is not available")?;
+            .ok_or(ReadSessionStoreError::DriverUnavailable)?;
         if !driver.capabilities().supports_snapshot_export {
-            return Err("This connection does not support consistent table export.".into());
+            return Err(ReadSessionStoreError::SnapshotExportUnsupported);
         }
-        let guard = session.guard().map_err(|_| "The connection is closed")?;
+        let guard = session.guard().map_err(|_| ReadSessionStoreError::Closed)?;
         let control = crate::operation_control::bounded_with(job.timeout_secs, cancel.clone());
-        let targets = crate::export_tables::prepare_targets(&guard, tables, &control).await?;
-        crate::export_tables::export_tables_to_csv(Arc::new(guard), driver, targets, job, cancel.clone()).await
+        let targets = crate::export_tables::prepare_targets(&guard, tables, &control)
+            .await
+            .map_err(ReadSessionStoreError::Export)?;
+        crate::export_tables::export_tables_to_csv(Arc::new(guard), driver, targets, job, cancel.clone())
+            .await
+            .map_err(ReadSessionStoreError::Export)
     }
 
     pub async fn run_backup_job(
@@ -425,7 +461,7 @@ impl ReadSessionStore {
         label: String,
         control: &OperationControl,
         access: SessionAccess,
-    ) -> Result<OpenedSession, String> {
+    ) -> Result<OpenedSession, ReadSessionStoreError> {
         let session = Box::pin(ReadSession::open(
             saved,
             Arc::clone(&self.registry),
@@ -434,7 +470,10 @@ impl ReadSessionStore {
             access,
         ))
         .await
-        .map_err(|failure| open_failure_message(&failure))?;
+        .map_err(|failure| ReadSessionStoreError::Open {
+            message: open_failure_message(&failure),
+            failure,
+        })?;
         Ok(self.register(session, label))
     }
 
@@ -458,6 +497,28 @@ impl ReadSessionStore {
 mod tests {
     use super::*;
     use bookie_core::DatabaseDriver;
+
+    #[tokio::test]
+    async fn opening_a_missing_file_preserves_the_rejection_kind() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("missing.sqlite");
+        let store = ReadSessionStore::new(
+            Arc::new(DriverRegistry::new()),
+            Arc::new(DatabaseService::new_isolated()),
+        );
+        let control = OperationControl::with_timeout(Duration::from_secs(1));
+
+        let error = store.open_file(&path, &control).await.unwrap_err();
+
+        assert!(matches!(
+            &error,
+            ReadSessionStoreError::FileRejected(crate::open_request::OpenRejection::Missing(found)) if found == &path
+        ));
+        assert_eq!(
+            error.to_string(),
+            format!("{:?}", crate::open_request::OpenRejection::Missing(path))
+        );
+    }
 
     #[tokio::test]
     async fn a_writable_saved_configuration_cannot_write_through_the_store() {
@@ -857,7 +918,7 @@ mod tests {
                 &tokio_util::sync::CancellationToken::new(),
             )
             .await;
-        assert!(result.unwrap_err().contains("closed"));
+        assert!(result.unwrap_err().to_string().contains("closed"));
     }
 
     #[tokio::test]
@@ -876,7 +937,7 @@ mod tests {
                 &tokio_util::sync::CancellationToken::new(),
             )
             .await;
-        assert!(result.unwrap_err().contains("consistent table export"));
+        assert!(result.unwrap_err().to_string().contains("consistent table export"));
         assert_eq!(std::fs::read_dir(&out).unwrap().count(), 0);
     }
 }

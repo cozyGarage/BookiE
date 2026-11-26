@@ -93,7 +93,7 @@ fn snapshot_query(plan: &PagePlan) -> Result<BoundQuery, ExportError> {
         supports_reverse_keyset: false,
     }
     .full_select(plan.sort, plan.row_id_order)
-    .map_err(ExportError::Source)
+    .map_err(|error| ExportError::Source(error.to_string()))
 }
 
 async fn start(

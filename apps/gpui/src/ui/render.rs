@@ -578,6 +578,9 @@ impl Render for GridView {
         if std::mem::take(&mut self.connection_form.restore_focus) {
             window.focus(&self.focus, cx);
         }
+        if let Some(focus) = self.connection_form.focus_validation.take() {
+            window.focus(&focus, cx);
+        }
         if self.approval.current.is_some() && !self.focus.is_focused(window) {
             window.focus(&self.focus, cx);
         }
