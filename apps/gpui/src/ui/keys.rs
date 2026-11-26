@@ -8,24 +8,10 @@ use crate::{GridView, Tab, palette_step};
 
 impl GridView {
     pub(crate) fn intercept_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if self.approval.current.is_some() {
-            if event.keystroke.key == "escape" {
-                self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx);
-            }
-            cx.stop_propagation();
-            return;
-        }
-        if self.close_confirm {
-            if event.keystroke.key == "escape" {
-                self.keep_editing(cx);
-            }
-            cx.stop_propagation();
-            return;
-        }
-        if self.cancel_confirm.is_some() {
-            if event.keystroke.key == "escape" {
-                self.keep_process_running(cx);
-            }
+        let key = event.keystroke.key.as_str();
+        let top = self.top_surface();
+        if top.is_some_and(Surface::blocks_keys) {
+            self.surface_key(key, cx);
             cx.stop_propagation();
             return;
         }
@@ -33,8 +19,15 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if let Some(surface) = top {
+            if self.surface_key(key, cx) {
+                cx.stop_propagation();
+            }
+            if surface != Surface::Notifications || key == "escape" {
+                return;
+            }
+        }
         if self.palette.open {
-            let key = event.keystroke.key.as_str();
             if palette_navigation_key(key, event.keystroke.modifiers) {
                 self.move_palette_selection(key, cx);
                 cx.stop_propagation();
@@ -42,39 +35,16 @@ impl GridView {
             }
             return;
         }
-        if self.notices.open && event.keystroke.key == "escape" {
-            self.toggle_notifications(cx);
-            cx.stop_propagation();
-            return;
-        }
-        if self.search.data_compare.open && event.keystroke.key == "escape" {
-            self.close_data_compare(cx);
-            cx.stop_propagation();
-            return;
-        }
-        if self.connection_form.open {
-            if event.keystroke.key == "escape" {
-                self.close_connection_dialog(cx);
-                cx.stop_propagation();
-            }
-            return;
-        }
-        if self.save.pending.is_some() {
-            if event.keystroke.key == "escape" {
-                self.cancel_save(cx);
-            }
-            cx.stop_propagation();
-            return;
-        }
-        if event.keystroke.key == "escape"
-            && self.can_stop_query()
-            && self.sql_input.read(cx).focus_handle(cx).is_focused(window)
-        {
+        if key == "escape" && self.can_stop_query() && self.sql_input.read(cx).focus_handle(cx).is_focused(window) {
             self.stop_query();
             cx.stop_propagation();
             cx.notify();
             return;
         }
+        self.intercept_grid_key(event, window, cx);
+    }
+
+    fn intercept_grid_key(&mut self, event: &KeystrokeEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
         let control = control_modifier(modifiers);
         if !self.grid_key_ready(window, control || modifiers.alt) {
@@ -92,6 +62,112 @@ impl GridView {
             cx.stop_propagation();
             cx.notify();
         }
+    }
+
+    fn surface_key(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
+        match key {
+            "escape" => self.close_top_surface(cx),
+            "enter" => {
+                let submitted = self.submit_top_surface(cx);
+                cx.notify();
+                submitted
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn top_surface(&self) -> Option<Surface> {
+        Surface::ORDER
+            .iter()
+            .copied()
+            .find(|surface| self.surface_open(*surface))
+    }
+
+    fn surface_open(&self, surface: Surface) -> bool {
+        match surface {
+            Surface::Approval => self.approval.current.is_some(),
+            Surface::HostKey => self.host_key.current.is_some(),
+            Surface::CloseConfirm => self.close_confirm,
+            Surface::CancelProcess => self.cancel_confirm.is_some(),
+            Surface::DeleteConnection => self.connection_form.open && self.connection_form.confirm_delete,
+            Surface::Notifications => self.notices.open,
+            Surface::ConnectionForm => self.connection_form.open,
+            Surface::SaveReview => self.save.pending.is_some(),
+            Surface::Import => self.import.open,
+            Surface::ExportFile => self.export.file.open,
+            Surface::SchemaDiagram => self.search.diagram.open,
+            Surface::Insert => self.insert.open,
+            Surface::DataCompare => self.search.data_compare.open,
+            Surface::Structure => self.structure.open,
+            Surface::SetCells => self.cell_edit.set.open,
+            Surface::Resolve => self.resolve.open,
+            Surface::Backup => self.search.backup.open,
+            Surface::SqlFile => self.search.sql_file.open,
+            Surface::TablesExport => self.search.tables_export.open,
+            Surface::ConnectionBundle => {
+                self.connection_bundle.pending.is_some() || self.connection_bundle.encrypted.is_some()
+            }
+        }
+    }
+
+    pub(crate) fn close_top_surface(&mut self, cx: &mut Context<Self>) -> bool {
+        let Some(surface) = self.top_surface() else {
+            return false;
+        };
+        self.close_surface(surface, cx);
+        cx.notify();
+        true
+    }
+
+    pub(crate) fn submit_top_surface(&mut self, cx: &mut Context<Self>) -> bool {
+        self.top_surface()
+            .is_some_and(|surface| self.submit_surface(surface, cx))
+    }
+
+    fn close_surface(&mut self, surface: Surface, cx: &mut Context<Self>) {
+        match surface {
+            Surface::Approval => self.answer_approval(bookie_app_services::approval_prompt::ApprovalOutcome::Deny, cx),
+            Surface::HostKey => self.answer_host_key(false, cx),
+            Surface::CloseConfirm => self.keep_editing(cx),
+            Surface::CancelProcess => self.keep_process_running(cx),
+            Surface::DeleteConnection => self.cancel_delete_connection(cx),
+            Surface::Notifications => self.toggle_notifications(cx),
+            Surface::ConnectionForm => self.close_connection_dialog(cx),
+            Surface::SaveReview => self.cancel_save(cx),
+            Surface::Import => self.cancel_import_bar(cx),
+            Surface::ExportFile => self.close_export_file_bar(),
+            Surface::SchemaDiagram => self.search.diagram.open = false,
+            Surface::Insert => self.cancel_insert_form(cx),
+            Surface::DataCompare => self.close_data_compare(cx),
+            Surface::Structure => self.cancel_structure_bar(cx),
+            Surface::SetCells => self.close_set_cells_bar(),
+            Surface::Resolve => self.close_resolve_panel(),
+            Surface::Backup => self.search.backup.open = false,
+            Surface::SqlFile => self.search.sql_file.open = false,
+            Surface::TablesExport => self.search.tables_export.open = false,
+            Surface::ConnectionBundle => self.cancel_connection_import(cx),
+        }
+    }
+
+    fn submit_surface(&mut self, surface: Surface, cx: &mut Context<Self>) -> bool {
+        match surface {
+            Surface::SaveReview if self.save.pending.as_ref().is_some_and(|pending| !pending.destructive) => {
+                self.confirm_save(cx)
+            }
+            Surface::Import => self.review_import(cx),
+            Surface::ExportFile => self.write_export_file(cx),
+            Surface::SchemaDiagram => self.write_schema_diagram(cx),
+            Surface::Insert => self.review_insert(cx),
+            Surface::Structure => self.review_structure(cx),
+            Surface::SetCells => self.apply_set_cells(false, cx),
+            Surface::Backup if !self.search.backup.restore => self.start_backup_job(cx),
+            Surface::SqlFile => self.run_sql_file(cx),
+            Surface::TablesExport => self.start_tables_export(cx),
+            Surface::ConnectionBundle if self.connection_bundle.pending.is_none() => self.unlock_connection_import(cx),
+            Surface::Notifications | Surface::ConnectionForm => return false,
+            _ => {}
+        }
+        true
     }
 
     fn move_palette_selection(&mut self, key: &str, cx: &mut Context<Self>) {
@@ -176,18 +252,8 @@ impl GridView {
     }
 
     pub(crate) fn modal_open(&self) -> bool {
-        self.connection_form.open
-            || self.host_key.current.is_some()
-            || self.resolve.open
-            || self.import.open
-            || self.insert.open
-            || self.export.file.open
-            || self.search.diagram.open
-            || self.search.data_compare.open
-            || self.save.pending.is_some()
-            || self.approval.current.is_some()
-            || self.close_confirm
-            || self.cancel_confirm.is_some()
+        self.top_surface()
+            .is_some_and(|surface| surface != Surface::Notifications)
             || self.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
     }
 
@@ -375,6 +441,67 @@ impl GridView {
             }
         }
         cx.notify();
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum Surface {
+    Approval,
+    HostKey,
+    CloseConfirm,
+    CancelProcess,
+    DeleteConnection,
+    Notifications,
+    ConnectionForm,
+    SaveReview,
+    Import,
+    ExportFile,
+    SchemaDiagram,
+    Insert,
+    DataCompare,
+    Structure,
+    SetCells,
+    Resolve,
+    Backup,
+    SqlFile,
+    TablesExport,
+    ConnectionBundle,
+}
+
+impl Surface {
+    pub(crate) const ORDER: [Surface; 20] = [
+        Surface::CancelProcess,
+        Surface::CloseConfirm,
+        Surface::HostKey,
+        Surface::Approval,
+        Surface::DeleteConnection,
+        Surface::ConnectionForm,
+        Surface::Notifications,
+        Surface::Import,
+        Surface::ExportFile,
+        Surface::SchemaDiagram,
+        Surface::SaveReview,
+        Surface::Insert,
+        Surface::DataCompare,
+        Surface::Structure,
+        Surface::SetCells,
+        Surface::Resolve,
+        Surface::Backup,
+        Surface::SqlFile,
+        Surface::TablesExport,
+        Surface::ConnectionBundle,
+    ];
+
+    fn blocks_keys(self) -> bool {
+        matches!(
+            self,
+            Surface::Approval
+                | Surface::HostKey
+                | Surface::CloseConfirm
+                | Surface::CancelProcess
+                | Surface::DeleteConnection
+                | Surface::SaveReview
+        )
     }
 }
 

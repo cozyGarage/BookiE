@@ -537,3 +537,42 @@ fn the_edit_dialog_names_the_connection_it_edits(cx: &mut TestAppContext) {
         assert_eq!(view.connection_dialog_title(cx), "New connection")
     });
 }
+
+#[gpui::test]
+fn deleting_a_connection_asks_in_a_dialog_that_names_it_and_has_no_default(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.connection_form.editing = Some(uuid::Uuid::new_v4());
+        view.connection_form
+            .name
+            .update(cx, |input, cx| input.set_content("minipc Redis", cx));
+        view.open_connection_dialog(cx);
+    });
+    cx.run_until_parked();
+    let delete = cx
+        .debug_bounds("delete-connection")
+        .expect("the edit form offers Delete");
+    cx.simulate_click(delete.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("delete-connection-dialog").is_some());
+    view.read_with(cx, |view, cx| {
+        assert_eq!(
+            view.delete_connection_question(cx).as_deref(),
+            Some("Delete the connection minipc Redis?")
+        );
+    });
+    cx.simulate_keystrokes("enter");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.connection_form.confirm_delete, "enter does not delete");
+        assert!(view.connection_form.editing.is_some());
+    });
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(!view.connection_form.confirm_delete);
+        assert!(view.connection_form.open, "escape closes only the question");
+        assert!(view.connection_form.editing.is_some());
+    });
+    assert!(cx.debug_bounds("delete-connection-dialog").is_none());
+}

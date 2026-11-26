@@ -111,11 +111,11 @@ impl GridView {
                 .save(id, schema.as_deref(), &table, name, set)
                 .and_then(|()| store.flush())
         });
-        self.status = match saved {
-            Some(Ok(())) => format!("Saved the filter \u{201c}{}\u{201d}", name.trim()),
-            Some(Err(message)) => format!("Could not save the filter: {message}"),
-            None => "Saved filters are unavailable on this system".into(),
-        };
+        match saved {
+            Some(Ok(())) => self.status = format!("Saved the filter \u{201c}{}\u{201d}", name.trim()),
+            Some(Err(message)) => self.report_failure("save the filter", &message),
+            None => self.status = "Saved filters are unavailable on this system".into(),
+        }
         self.refresh_saved_filter_names();
         cx.notify();
     }
@@ -165,12 +165,12 @@ impl GridView {
                 .delete(id, schema.as_deref(), &table, name)
                 .and_then(|gone| store.flush().map(|()| gone))
         });
-        self.status = match removed {
-            Some(Ok(true)) => format!("Deleted the filter \u{201c}{name}\u{201d}"),
-            Some(Ok(false)) => "That filter no longer exists".into(),
-            Some(Err(message)) => format!("Could not delete the filter: {message}"),
-            None => "Saved filters are unavailable on this system".into(),
-        };
+        match removed {
+            Some(Ok(true)) => self.status = format!("Deleted the filter \u{201c}{name}\u{201d}"),
+            Some(Ok(false)) => self.status = "That filter no longer exists".into(),
+            Some(Err(message)) => self.report_failure("delete the filter", &message),
+            None => self.status = "Saved filters are unavailable on this system".into(),
+        }
         self.refresh_saved_filter_names();
         cx.notify();
     }

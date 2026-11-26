@@ -260,7 +260,7 @@ impl GridView {
                         };
                     }
                     Err(_) if cancel.is_cancelled() => this.status = "Canceled the export; no file was created".into(),
-                    Err(message) => this.status = format!("Could not export: {message}"),
+                    Err(message) => this.report_failure("export", &message),
                 }
                 cx.notify();
             })

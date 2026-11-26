@@ -140,13 +140,7 @@ fn a_command_has_one_name_in_the_palette_and_the_shortcut_list(cx: &mut TestAppC
 #[gpui::test]
 fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut TestAppContext) {
     let (view, cx, _orders) = open_live(cx);
-    let menus = [
-        crate::menus::IMPORT_EXPORT_GROUPS,
-        crate::menus::EXPORT_GROUPS,
-        crate::menus::FILE_GROUPS,
-        crate::menus::OVERFLOW_GROUPS,
-        crate::menus::ROW_GROUPS,
-    ];
+    let menus = crate::menus::MENUS;
     view.read_with(cx, |view, _| {
         let actions = view.palette_actions();
         let missing: Vec<&str> = menus
@@ -155,6 +149,32 @@ fn every_toolbar_menu_item_is_a_palette_command_with_the_same_name(cx: &mut Test
             .filter(|id| !actions.iter().any(|action| action.id == *id))
             .collect();
         assert!(missing.is_empty(), "menu items without a palette command: {missing:?}");
+    });
+}
+
+#[gpui::test]
+fn every_menu_item_has_a_handler(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    cx.update(|_, cx| view.update(cx, |view, _| view.connection_bundle.busy = true));
+    let ids: Vec<&'static str> = crate::menus::MENUS
+        .iter()
+        .flat_map(|groups| groups.iter().flat_map(|group| group.iter().copied()))
+        .collect();
+    let unhandled: Vec<&str> = ids
+        .into_iter()
+        .filter(|id| !cx.update(|window, cx| view.update(cx, |view, cx| view.execute_palette_action(id, window, cx))))
+        .collect();
+    assert!(unhandled.is_empty(), "menu items that do nothing: {unhandled:?}");
+}
+
+#[gpui::test]
+fn choose_font_from_the_menu_opens_the_font_list(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("font", window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(view.palette.open, "the font list opens");
+        assert!(view.palette.fonts);
+        assert!(view.palette_actions().iter().all(|action| action.id == "font-choice"));
     });
 }
 

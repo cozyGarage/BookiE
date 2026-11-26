@@ -152,7 +152,7 @@ impl GridView {
                     }
                     this.status = "Filtered rows are shown as a result".into();
                 }
-                Err(message) => this.status = format!("Could not filter: {message}"),
+                Err(message) => this.report_failure("filter", &message),
             },
         );
     }

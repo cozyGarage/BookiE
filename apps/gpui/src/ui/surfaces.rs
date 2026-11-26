@@ -144,7 +144,7 @@ pub(crate) fn link_colour(theme: Theme) -> u32 {
 pub(crate) fn environment_color(environment: bookie_core::Environment, theme: Theme) -> Option<u32> {
     match environment {
         bookie_core::Environment::Local => None,
-        bookie_core::Environment::Dev => Some(theme.info),
+        bookie_core::Environment::Dev => Some(theme.success),
         bookie_core::Environment::Staging => Some(theme.warning),
         bookie_core::Environment::Prod => Some(theme.destructive),
     }
@@ -328,6 +328,78 @@ pub(crate) fn dialog_surface(width: f32, theme: Theme) -> Div {
         .bg(rgb(theme.popover))
         .text_color(rgb(theme.foreground))
         .shadow_lg()
+}
+
+pub(crate) fn sql_preview(
+    id: impl Into<ElementId>,
+    text: impl Into<SharedString>,
+    max_h: f32,
+    theme: Theme,
+) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex_none()
+        .max_h(px(max_h))
+        .overflow_y_scroll()
+        .p_2()
+        .bg(rgb(theme.chrome))
+        .rounded(px(theme.radius))
+        .font_family("monospace")
+        .text_size(px(size::TEXT_SMALL))
+        .child(text.into())
+}
+
+pub(crate) struct ConfirmDialog {
+    pub id: &'static str,
+    pub title: SharedString,
+    pub body: SharedString,
+    pub sql: Option<SharedString>,
+}
+
+pub(crate) fn confirm_dialog(
+    dialog: ConfirmDialog,
+    actions: impl IntoIterator<Item = Stateful<Div>>,
+    theme: Theme,
+) -> Stateful<Div> {
+    let id = dialog.id;
+    let surface = format!("{id}-dialog");
+    let selector = surface.clone();
+    scrim(theme).id(format!("{id}-overlay")).occlude().child(
+        dialog_surface(size::APPROVAL_DIALOG_WIDTH, theme)
+            .id(surface)
+            .debug_selector(move || selector)
+            .role(Role::Dialog)
+            .aria_label(dialog.title.clone())
+            .max_w(gpui::relative(0.92))
+            .max_h(gpui::relative(0.9))
+            .gap_2()
+            .p_3()
+            .on_mouse_down(gpui::MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(div().font_weight(gpui::FontWeight::SEMIBOLD).child(dialog.title))
+            .child(
+                div()
+                    .id(format!("{id}-detail"))
+                    .max_h(px(size::SAVE_PREVIEW_MAX_HEIGHT))
+                    .overflow_y_scroll()
+                    .text_size(px(size::TEXT_SMALL))
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(dialog.body),
+            )
+            .children(
+                dialog
+                    .sql
+                    .map(|sql| sql_preview(format!("{id}-sql"), sql, size::SAVE_PREVIEW_MAX_HEIGHT, theme)),
+            )
+            .child(
+                div()
+                    .debug_selector(move || format!("{id}-actions"))
+                    .flex()
+                    .items_center()
+                    .justify_end()
+                    .gap_2()
+                    .children(actions),
+            ),
+    )
 }
 
 pub(crate) fn task_bar_frame(theme: Theme) -> Div {

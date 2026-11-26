@@ -460,7 +460,7 @@ impl GridView {
         let editor = self.query_editor_pane(theme, compact, cx);
         let divider = self.query_split_divider(theme, cx);
         let result = self.result_pane(theme, grid, compact, cx);
-        let tools = self.tool_bars(theme, cx);
+        let tools = self.value_search_bar(theme, cx);
         div()
             .flex_1()
             .flex()

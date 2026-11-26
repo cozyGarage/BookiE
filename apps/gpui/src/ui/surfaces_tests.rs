@@ -104,3 +104,46 @@ fn a_failed_list_state_uses_the_destructive_colour() {
     assert_eq!(ListState::Failed("x").colour(theme), theme.destructive);
     assert_eq!(ListState::Empty("x").colour(theme), theme.muted_foreground);
 }
+
+struct ConfirmProbe;
+
+impl Render for ConfirmProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let theme = Theme::light();
+        let dialog = ConfirmDialog {
+            id: "probe",
+            title: "Drop table orders?".into(),
+            body: "This cannot be undone.".into(),
+            sql: Some("DROP TABLE orders".into()),
+        };
+        div().size_full().child(confirm_dialog(
+            dialog,
+            [
+                button(ButtonKind::Destructive, "probe-drop", "Drop", theme),
+                button(ButtonKind::Ghost, "probe-cancel", "Cancel", theme),
+            ],
+            theme,
+        ))
+    }
+}
+
+#[gpui::test]
+fn a_confirm_dialog_shows_its_sql_above_actions_in_order(cx: &mut TestAppContext) {
+    let (_view, cx) = cx.add_window_view(|_, _| ConfirmProbe);
+    cx.run_until_parked();
+    let dialog = cx.debug_bounds("probe-dialog").expect("the dialog is drawn");
+    let actions = cx.debug_bounds("probe-actions").expect("the actions are drawn");
+    let drop = cx.debug_bounds("probe-drop").expect("the destructive action is drawn");
+    let cancel = cx.debug_bounds("probe-cancel").expect("cancel is drawn");
+    assert!(dialog.contains(&actions.center()));
+    assert!(drop.origin.x < cancel.origin.x, "the action comes before Cancel");
+}
+
+#[test]
+fn a_sql_preview_scrolls_within_its_height() {
+    let mut preview = sql_preview("probe-sql", "SELECT 1", size::SAVE_PREVIEW_MAX_HEIGHT, Theme::light());
+    assert_eq!(
+        preview.style().max_size.height,
+        Some(gpui::Length::Definite(px(size::SAVE_PREVIEW_MAX_HEIGHT).into()))
+    );
+}
