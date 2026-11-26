@@ -80,6 +80,7 @@ pub struct BulkInsertScope {
     committed: u64,
     skipped: u64,
     open: bool,
+    multi_row: bool,
     started: Instant,
     audit_state: Arc<AuditState>,
 }
@@ -294,7 +295,9 @@ impl PolicyGuard {
         );
         let upserts = upserts_existing_rows(&parsed);
         let granted = self.settle_bulk_decision(&request, &facts, decision, upserts).await?;
-        let scope = self.new_scope(request, &facts, granted, upserts);
+        let multi_row = self.multi_row_is_safe(&request).await;
+        let mut scope = self.new_scope(request, &facts, granted, upserts);
+        scope.multi_row = multi_row;
         self.handle_intent_failure(self.record_intent(&scope.operation()).await)?;
         Ok(scope)
     }
@@ -321,7 +324,10 @@ impl PolicyGuard {
             .iter()
             .map(|row| (scope.statement.clone(), row.clone()))
             .collect();
-        let multi_row = self.multi_row_statements(&scope.statement, batch.rows);
+        let multi_row = scope
+            .multi_row
+            .then(|| self.multi_row_statements(&scope.statement, batch.rows))
+            .flatten();
         let mut result = self
             .caught_write(
                 "BULK INSERT BATCH",
@@ -344,6 +350,38 @@ impl PolicyGuard {
         let rows = per_row.len() as u64;
         scope.committed += rows;
         Ok(rows)
+    }
+
+    async fn multi_row_is_safe(&self, request: &BulkInsertRequest) -> bool {
+        if self.ctx.driver_id != "mysql" {
+            return true;
+        }
+        let schema = request.schema.clone().map_or(Value::Null, Value::Text);
+        let control = OperationControl::with_timeout(std::time::Duration::from_secs(10));
+        let settings = self
+            .inner
+            .query_params_controlled(
+                "SELECT @@SESSION.sql_mode, (SELECT ENGINE FROM information_schema.TABLES \
+                 WHERE TABLE_SCHEMA = COALESCE(?, DATABASE()) AND TABLE_NAME = ?)",
+                &[schema, Value::Text(request.table.clone())],
+                &control,
+            )
+            .await;
+        let Ok(settings) = settings else {
+            return false;
+        };
+        let text = |value: Option<&Value>| match value {
+            Some(Value::Text(text)) => Some(text.clone()),
+            Some(Value::Bytes(bytes)) => String::from_utf8(bytes.clone()).ok(),
+            _ => None,
+        };
+        let Some(row) = settings.rows.first() else {
+            return false;
+        };
+        let (Some(sql_mode), engine) = (text(row.first()), text(row.get(1))) else {
+            return false;
+        };
+        super::bulk_multirow::mysql_multi_row_safe(&sql_mode, engine.as_deref())
     }
 
     fn multi_row_statements(&self, statement: &str, rows: &[Vec<Value>]) -> Option<Vec<(String, Vec<Value>)>> {
@@ -582,6 +620,7 @@ impl PolicyGuard {
             committed: 0,
             skipped: 0,
             open: true,
+            multi_row: false,
             started: Instant::now(),
             audit_state: self.ctx.audit_state.clone(),
         }
