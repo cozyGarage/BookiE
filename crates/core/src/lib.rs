@@ -5,6 +5,7 @@ extern crate self as bookie_core;
 mod parser_contract;
 
 mod activity;
+pub mod atomic_file;
 mod catalog;
 mod commit;
 mod connection;

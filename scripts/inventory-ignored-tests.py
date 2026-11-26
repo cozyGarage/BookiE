@@ -160,6 +160,10 @@ for path in sorted(
             tier, enable = "App server", "scripts/run-test-layer.py app-server"
         elif relative.startswith("apps/gpui/") and "known issue" in reason.lower():
             tier, enable = "GPUI", "Keep ignored until the known issue is resolved"
+        elif reason.startswith("prints ") and "measured for #" in reason:
+            package = package_owning(path, packages)
+            tier = "Measurement"
+            enable = f"cargo test -p {package} --test {path.stem} {name} -- --ignored --nocapture"
         elif "docker" in reason.lower() and relative.startswith("crates/ssh/"):
             targets = re.findall(r"--test\s+([\w-]+)", (root / "scripts/test-ssh.sh").read_text())
             if path.stem not in targets:
