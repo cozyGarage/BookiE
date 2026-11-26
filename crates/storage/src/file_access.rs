@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
+use std::io::Read;
 use std::os::fd::{AsRawFd, RawFd};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
@@ -146,27 +146,7 @@ fn write_atomically_blocking(path: &Path, bytes: &[u8]) -> Result<(), StorageErr
         .and_then(std::ffi::OsStr::to_str)
         .ok_or_else(|| StorageError::Schema("storage path has no valid file name".into()))?;
     let temp_path = parent.join(format!(".{file_name}.{}.tmp", Uuid::new_v4()));
-    let result = write_and_replace(&temp_path, path, bytes);
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp_path);
-    }
-    result
-}
-
-fn write_and_replace(temp_path: &Path, path: &Path, bytes: &[u8]) -> Result<(), StorageError> {
-    let mut handle = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(temp_path)?;
-    handle.write_all(bytes)?;
-    handle.sync_all()?;
-    drop(handle);
-    std::fs::rename(temp_path, path)?;
-    let Some(parent) = path.parent() else {
-        return Ok(());
-    };
-    File::open(parent)?.sync_all()?;
+    bookie_core::atomic_file::replace_private_file(path, &temp_path, bytes)?;
     Ok(())
 }
 
