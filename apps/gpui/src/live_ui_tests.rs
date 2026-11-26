@@ -2700,3 +2700,75 @@ fn switching_between_the_tool_tabs_does_not_cancel_running_work(cx: &mut TestApp
     });
     assert!(!token.is_cancelled(), "a tab switch must not cancel the running load");
 }
+
+#[gpui::test]
+fn the_export_dialog_is_a_form_with_rows_format_and_csv_options(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    for selector in [
+        "export-form",
+        "export-info",
+        "export-rows",
+        "export-format-row",
+        "csv-separator",
+        "csv-null",
+        "csv-header",
+    ] {
+        assert!(cx.debug_bounds(selector).is_some(), "{selector} is shown for CSV");
+    }
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.export.file.format = bookie_core::export::ResultFormat::Json;
+            cx.notify();
+        })
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(
+        cx.debug_bounds("csv-separator").is_none(),
+        "CSV options are hidden for JSON"
+    );
+    assert!(cx.debug_bounds("export-rows").is_some());
+}
+
+#[gpui::test]
+fn the_top_bar_menu_is_for_connections_and_the_editor_has_the_file_menu(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let top: Vec<&str> = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::IMPORT_EXPORT_GROUPS)
+            .into_iter()
+            .flatten()
+            .map(|(id, _, _)| id)
+            .collect()
+    });
+    assert_eq!(top, ["import-connections", "export-connections"]);
+    let file: Vec<&str> = view.read_with(cx, |view, _| {
+        crate::menus::command_groups(view, crate::menus::FILE_GROUPS)
+            .into_iter()
+            .flatten()
+            .map(|(id, _, _)| id)
+            .collect()
+    });
+    assert_eq!(
+        file,
+        [
+            "open-sql-file",
+            "save-sql-file",
+            "export-file",
+            "export-csv",
+            "import-csv"
+        ]
+    );
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(
+        cx.debug_bounds("query-file-menu").is_some(),
+        "the editor toolbar has Import / Export"
+    );
+}
