@@ -21,6 +21,6 @@ pub(crate) fn options(acquire_timeout: Duration) -> PgPoolOptions {
             })
         })
         .after_release(|connection, _| {
-            Box::pin(async move { Ok(sqlx::query("DISCARD ALL").execute(connection).await.is_ok()) })
+            Box::pin(async move { Ok(sqlx::raw_sql("DISCARD ALL").execute(connection).await.is_ok()) })
         })
 }
