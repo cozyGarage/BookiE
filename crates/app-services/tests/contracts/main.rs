@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 mod activity_statements_policy;
 mod browse_planning;
 mod edge_cases;
