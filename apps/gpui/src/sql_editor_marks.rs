@@ -32,8 +32,8 @@ impl MarkSnapshot {
         }
     }
 
-    fn matches(&self, revision: u64, driver: &str) -> bool {
-        self.revision == revision && self.driver == driver
+    fn matches(&self, revision: u64, driver: &str, same_text: impl FnOnce(&str) -> bool) -> bool {
+        self.revision == revision && self.driver == driver && same_text(&self.text)
     }
 }
 
@@ -67,17 +67,19 @@ impl GridView {
                 editor.selected_range(),
                 driver.to_owned(),
             );
-            if last.as_ref() == Some(&key) {
+            let same_text = |text: &str| *editor.text() == text;
+            let fresh = length > MARK_DOCUMENT_BYTES
+                || snapshot
+                    .as_ref()
+                    .is_some_and(|snapshot: &MarkSnapshot| snapshot.matches(key.0, &key.4, same_text));
+            if fresh && last.as_ref() == Some(&key) {
                 return;
             }
             let (marks, decorations) = if length > MARK_DOCUMENT_BYTES {
                 snapshot = None;
                 (Vec::new(), Vec::new())
             } else {
-                if !snapshot
-                    .as_ref()
-                    .is_some_and(|snapshot: &MarkSnapshot| snapshot.matches(key.0, &key.4))
-                {
+                if !fresh {
                     snapshot = Some(MarkSnapshot::new(key.0, key.4.clone(), editor.value()));
                 }
                 match snapshot.as_ref() {
@@ -170,11 +172,13 @@ mod tests {
     }
 
     #[test]
-    fn mark_snapshots_are_reused_only_for_the_same_edit_and_driver() {
+    fn mark_snapshots_are_reused_only_for_the_same_edit_driver_and_text() {
         let snapshot = MarkSnapshot::new(4, "postgres".into(), SharedString::from("SELECT 1"));
 
-        assert!(snapshot.matches(4, "postgres"));
-        assert!(!snapshot.matches(5, "postgres"));
-        assert!(!snapshot.matches(4, "mysql"));
+        let same = |text: &str| text == "SELECT 1";
+        assert!(snapshot.matches(4, "postgres", same));
+        assert!(!snapshot.matches(5, "postgres", same));
+        assert!(!snapshot.matches(4, "mysql", same));
+        assert!(!snapshot.matches(4, "postgres", |text: &str| text == "SELECT 12"));
     }
 }

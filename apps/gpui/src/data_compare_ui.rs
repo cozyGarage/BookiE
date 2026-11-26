@@ -18,6 +18,7 @@ pub(crate) struct DataCompareState {
     pub target: Option<TableInfo>,
     pub outcome: Option<Result<DataCompare, String>>,
     pub include_deletes: bool,
+    pub driver: String,
 }
 
 pub(crate) fn failure_message(error: &DataCompareError) -> String {
@@ -96,6 +97,7 @@ impl GridView {
         state.outcome = None;
         state.include_deletes = false;
         state.target = Some(target.clone());
+        state.driver = session.driver_id.clone();
         let (generation, cancel) = (state.request.generation, state.request.cancel.clone());
         self.status = "Comparing table data…".into();
         cx.spawn(async move |this, cx| {
@@ -142,12 +144,12 @@ impl GridView {
 
     pub(crate) fn data_compare_script(&self) -> Result<String, String> {
         let state = &self.search.data_compare;
-        let (Some(Ok(result)), Some(target), Some(session)) = (&state.outcome, &state.target, &self.live) else {
+        let (Some(Ok(result)), Some(target)) = (&state.outcome, &state.target) else {
             return Err("Run a data compare first".into());
         };
         result
             .script(
-                &session.driver_id,
+                &state.driver,
                 target.schema.as_deref(),
                 &target.name,
                 state.include_deletes,
@@ -219,8 +221,7 @@ impl GridView {
             Some(Err(message)) => return body.child(list_state(ListState::Failed(message), theme)),
             Some(Ok(result)) => result,
         };
-        let driver = self.live.as_ref().map_or("", |session| session.driver_id.as_str());
-        let samples = result.sample_lines(driver).into_iter().take(SHOWN_SAMPLES);
+        let samples = result.sample_lines(&state.driver).into_iter().take(SHOWN_SAMPLES);
         body.children(
             summary_lines(result, source, target)
                 .into_iter()

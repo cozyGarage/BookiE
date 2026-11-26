@@ -28,7 +28,7 @@ impl TableMenuItem {
             TableMenuItem::OpenData => "Open data",
             TableMenuItem::Structure => "Structure",
             TableMenuItem::CreateScript => "Show CREATE statement",
-            TableMenuItem::SelectQuery => "New query with SELECT",
+            TableMenuItem::SelectQuery => "SELECT in the query editor",
             TableMenuItem::CopyName => "Copy name",
             TableMenuItem::Export => "Export table",
             TableMenuItem::Empty => "Empty table",

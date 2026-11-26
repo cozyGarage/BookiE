@@ -199,7 +199,9 @@ fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut 
             });
             cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
             cx.run_until_parked();
-            let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
+            let toolbar = cx
+                .debug_bounds("query-editor-toolbar")
+                .expect("query toolbar is visible");
             let results = cx.debug_bounds("results-header").expect("result header is visible");
             let toolbar_ids: &[&str] = if compact {
                 &[
@@ -275,29 +277,32 @@ fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut 
                 cx.run_until_parked();
                 let options = cx
                     .debug_bounds("query-run-options")
-                    .or_else(|| cx.update(|window, _| window.try_find_by_label("Run options").map(|node| node.bounds())))
+                    .or_else(|| {
+                        cx.update(|window, _| window.try_find_by_label("Run options").map(|node| node.bounds()))
+                    })
                     .expect("run options are visible");
                 cx.simulate_click(options.center(), Default::default());
                 cx.run_until_parked();
                 let run_items = cx.update(|window, cx| {
                     window.render_frame(cx);
-                    ["Run selection", "Run statement", "Run all"]
-                        .map(|label| window.try_find_by_label(label).is_some())
+                    ["Run selection", "Run statement", "Run all"].map(|label| window.try_find_by_label(label).is_some())
                 });
                 assert_eq!(run_items, [true, true, true]);
                 cx.simulate_keystrokes("escape");
                 let views = cx
                     .debug_bounds("result-view-menu")
-                    .or_else(|| cx.update(|window, _| window.try_find_by_label("Result view").map(|node| node.bounds())))
+                    .or_else(|| {
+                        cx.update(|window, _| window.try_find_by_label("Result view").map(|node| node.bounds()))
+                    })
                     .expect("view menu is visible");
                 cx.simulate_click(views.center(), Default::default());
                 cx.run_until_parked();
                 let view_items = cx.update(|window, cx| {
                     window.render_frame(cx);
                     ["Table data", "Summary", "Messages"]
-                        .map(|label| window.try_find_by_label(label).is_some())
+                        .map(|label| window.try_find_by_label(label).map(|item| item.checked() == Some(true)))
                 });
-                assert_eq!(view_items, [true, true, true]);
+                assert_eq!(view_items, [Some(true), Some(false), Some(false)]);
                 cx.simulate_keystrokes("escape");
             }
         }
