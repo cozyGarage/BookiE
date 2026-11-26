@@ -22,8 +22,8 @@ struct ForeignKeyReview {
 
 impl ForeignKeyReview {
     fn verify(&self, live: &LiveSession) -> Result<(), String> {
-        if live.table_columns(&self.source)? != self.source_columns
-            || live.table_columns(&self.target)? != self.target_columns
+        if live.diagram_columns(&self.source)? != self.source_columns
+            || live.diagram_columns(&self.target)? != self.target_columns
         {
             return Err("The relationship tables changed since review. Refresh the diagram and review again".into());
         }
@@ -213,7 +213,11 @@ impl GridView {
             let planned = cx
                 .background_executor()
                 .spawn(async move {
-                    let columns = live.table_columns(&table)?;
+                    let columns = if matches!(&request, SaveRequest::DiagramForeignKey(_)) {
+                        live.diagram_columns(&table)?
+                    } else {
+                        live.table_columns(&table)?
+                    };
                     let target = SaveTarget {
                         driver_id: &live.driver_id,
                         schema: table.schema.as_deref(),
@@ -278,7 +282,7 @@ impl GridView {
                     if create {
                         Ok(None)
                     } else {
-                        live.table_columns(&target).map(Some)
+                        live.diagram_columns(&target).map(Some)
                     }
                 })
                 .await;
@@ -452,7 +456,7 @@ impl GridView {
                         .map_or(Ok(()), |review| review.verify(&live))
                         .and_then(|()| {
                             if let Some(columns) = diagram_columns
-                                && live.table_columns(&table)? != columns
+                                && live.diagram_columns(&table)? != columns
                             {
                                 return Err(
                                     "The table changed since review. Refresh the diagram and review again".into()
@@ -672,7 +676,7 @@ fn prepare_diagram_foreign_key(
         schema: key.ref_schema.clone(),
         name: key.ref_table.clone(),
     };
-    let target_columns = live.table_columns(&target)?;
+    let target_columns = live.diagram_columns(&target)?;
     let target_spec = SaveTarget {
         driver_id: &live.driver_id,
         schema: source.schema.as_deref(),

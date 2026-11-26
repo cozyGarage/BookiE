@@ -412,14 +412,29 @@ impl LiveSession {
     }
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
-        self.read_columns(table, self.next_epoch(), Duration::from_secs(10))
+        self.read_columns(table, self.next_epoch(), &self.epoch, Duration::from_secs(10))
     }
 
     pub fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
-        self.read_columns(table, Epoch(self.epoch.load(Ordering::Relaxed)), Duration::from_secs(1))
+        self.read_columns(
+            table,
+            Epoch(self.epoch.load(Ordering::Relaxed)),
+            &self.epoch,
+            Duration::from_secs(1),
+        )
     }
 
-    fn read_columns(&self, table: &TableInfo, epoch: Epoch, timeout: Duration) -> Result<Vec<ColumnInfo>, String> {
+    pub fn diagram_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+        self.read_columns(table, Epoch(0), &AtomicU64::new(0), Duration::from_secs(10))
+    }
+
+    fn read_columns(
+        &self,
+        table: &TableInfo,
+        epoch: Epoch,
+        current: &AtomicU64,
+        timeout: Duration,
+    ) -> Result<Vec<ColumnInfo>, String> {
         let control = OperationControl::with_timeout(timeout);
         let event = self.runtime.block_on(dispatch_read(
             DispatchContext::Sessions(&self.sessions),
@@ -430,7 +445,7 @@ impl LiveSession {
             },
             &control,
             epoch,
-            &self.epoch,
+            current,
         ))?;
         let Event::ColumnsRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());
