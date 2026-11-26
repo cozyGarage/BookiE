@@ -33,15 +33,15 @@ pub(crate) fn next_boolean(current: &Cell, nullable: bool) -> Cell {
 
 pub(crate) fn choice_for(data_type: &str, info: Option<&ColumnInfo>, cell: &Cell) -> Option<Choice> {
     let declared = info.map_or(data_type, |info| info.data_type.as_str());
+    if let Some(type_name) = info.and_then(|info| info.enum_type.as_ref()) {
+        return (matches!(cell, Cell::Text(_) | Cell::Null) && !declared.ends_with("[]"))
+            .then(|| Choice::PostgresEnum(type_name.clone()));
+    }
     let boolean =
         matches!(cell, Cell::Bool(_) | Cell::Null) && (is_boolean_type(data_type) || is_boolean_type(declared));
     if matches!(cell, Cell::Bool(_)) || boolean {
         let nullable = info.is_some_and(|info| info.nullable);
         return Some(Choice::Toggle(next_boolean(cell, nullable)));
-    }
-    if let Some(type_name) = info.and_then(|info| info.enum_type.as_ref()) {
-        return (matches!(cell, Cell::Text(_) | Cell::Null) && !declared.ends_with("[]"))
-            .then(|| Choice::PostgresEnum(type_name.clone()));
     }
     declared_member_labels(declared.trim())
         .filter(|labels| !labels.is_empty())
