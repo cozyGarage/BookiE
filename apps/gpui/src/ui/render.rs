@@ -665,6 +665,7 @@ impl Render for GridView {
             .children(bar_dialog)
             .children(self.notifications_list(theme, cx))
             .children(connection_dialog)
+            .children(self.delete_connection_overlay(theme, cx))
             .children(approval)
             .children(host_key)
             .children(close_confirm)

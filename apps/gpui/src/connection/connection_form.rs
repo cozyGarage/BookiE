@@ -809,14 +809,42 @@ impl GridView {
     }
 
     fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        let confirm = self.connection_form.confirm_delete;
-        button(
-            ButtonKind::Destructive,
-            "delete-connection",
-            if confirm { "Confirm delete" } else { "Delete" },
-            theme,
-        )
-        .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx)))
+        button(ButtonKind::Destructive, "delete-connection", "Delete", theme)
+            .on_click(cx.listener(|this, _, _, cx| this.ask_delete_connection(cx)))
+    }
+
+    pub(crate) fn delete_connection_question(&self, cx: &gpui::App) -> Option<String> {
+        let id = self.connection_form.editing?;
+        if !self.connection_form.open || !self.connection_form.confirm_delete {
+            return None;
+        }
+        let name = self
+            .connections
+            .iter()
+            .find(|connection| connection.id == id)
+            .map_or_else(
+                || self.connection_form.name.read(cx).content().trim().to_string(),
+                |connection| connection.name.clone(),
+            );
+        Some(format!("Delete the connection {name}?"))
+    }
+
+    pub(crate) fn delete_connection_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+        let title = self.delete_connection_question(cx)?;
+        let dialog = crate::surfaces::ConfirmDialog {
+            id: "delete-connection",
+            title: title.into(),
+            body: "This removes the saved connection and its stored passwords and SSH secrets. It cannot be undone."
+                .into(),
+            sql: None,
+        };
+        let actions = [
+            button(ButtonKind::Destructive, "confirm-delete-connection", "Delete", theme)
+                .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx))),
+            button(ButtonKind::Ghost, "cancel-delete-connection", "Cancel", theme)
+                .on_click(cx.listener(|this, _, _, cx| this.cancel_delete_connection(cx))),
+        ];
+        Some(crate::surfaces::confirm_dialog(dialog, actions, theme))
     }
 
     fn read_only_toggle(&self, _theme: Theme, cx: &mut Context<Self>) -> Div {
@@ -1013,14 +1041,23 @@ impl GridView {
         .detach();
     }
 
+    pub(crate) fn ask_delete_connection(&mut self, cx: &mut Context<Self>) {
+        if self.connection_form.editing.is_some() {
+            self.connection_form.confirm_delete = true;
+            cx.notify();
+        }
+    }
+
+    pub(crate) fn cancel_delete_connection(&mut self, cx: &mut Context<Self>) {
+        self.connection_form.confirm_delete = false;
+        cx.notify();
+    }
+
     pub(crate) fn delete_connection(&mut self, cx: &mut Context<Self>) {
         let Some(id) = self.connection_form.editing else {
             return;
         };
-        if !std::mem::replace(&mut self.connection_form.confirm_delete, true) {
-            self.connection_form.status =
-                "Click Delete again to remove this connection and its stored passwords".into();
-            cx.notify();
+        if !std::mem::take(&mut self.connection_form.confirm_delete) {
             return;
         }
         cx.spawn(async move |this, cx| {
