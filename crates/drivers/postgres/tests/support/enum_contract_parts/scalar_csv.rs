@@ -47,11 +47,11 @@ async fn value_contract_custom_enum_csv_round_trip_preserves_labels_and_sql_null
         &bookie_core::export::CsvOptions::default(),
     );
     let exported_sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    assert_eq!(exported_sheet.rows[0], vec!["1", "NULL", "literal null"]);
-    assert_eq!(exported_sheet.rows[4], vec!["5", "", "empty label"]);
-    assert_eq!(exported_sheet.rows[5], vec!["6", "", "sql null"]);
-    assert_eq!(exported_sheet.rows[6], vec!["7", " leading", "leading space"]);
-    assert_eq!(exported_sheet.rows[7], vec!["8", "trailing ", "trailing space"]);
+    assert_eq!(exported_sheet.rows.get(0).unwrap().iter().collect::<Vec<_>>(), vec!["1", "NULL", "literal null"]);
+    assert_eq!(exported_sheet.rows.get(4).unwrap().iter().collect::<Vec<_>>(), vec!["5", "", "empty label"]);
+    assert_eq!(exported_sheet.rows.get(5).unwrap().iter().collect::<Vec<_>>(), vec!["6", "", "sql null"]);
+    assert_eq!(exported_sheet.rows.get(6).unwrap().iter().collect::<Vec<_>>(), vec!["7", " leading", "leading space"]);
+    assert_eq!(exported_sheet.rows.get(7).unwrap().iter().collect::<Vec<_>>(), vec!["8", "trailing ", "trailing space"]);
 
     let columns = connection
         .fetch_columns(Some("value_contract_enum_import"), "target_rows")

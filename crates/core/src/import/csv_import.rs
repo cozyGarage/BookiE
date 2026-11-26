@@ -1,3 +1,4 @@
+use super::text_rows::TextRows;
 use std::fs::OpenOptions;
 use std::io::Read;
 use std::os::unix::fs::OpenOptionsExt;
@@ -150,7 +151,7 @@ pub struct CsvSheet {
     /// One name per field, from the header record or made up from the
     /// position when there is none.
     pub headers: Vec<String>,
-    pub rows: Vec<Vec<String>>,
+    pub rows: TextRows,
     /// Rows past `limit` when the read was a preview, so the dialog can
     /// say there is more behind it.
     pub truncated: bool,
@@ -307,9 +308,9 @@ fn collect_rows(
     mut blanks: SkippedBlankRows<'_>,
     options: &CsvImportOptions,
     limit: Option<usize>,
-) -> Result<(Vec<Vec<String>>, bool), ImportError> {
+) -> Result<(TextRows, bool), ImportError> {
     let header_offset = usize::from(options.has_header);
-    let mut rows: Vec<Vec<String>> = Vec::new();
+    let mut rows = TextRows::default();
     let mut records = reader.records().enumerate();
     loop {
         if limit.is_some_and(|limit| rows.len() >= limit) {
@@ -326,7 +327,9 @@ fn collect_rows(
         if rows.len().saturating_add(blank_rows.min(room)) > MAX_IMPORT_ROWS {
             return Err(ImportError::TooManyRows { limit: MAX_IMPORT_ROWS });
         }
-        rows.extend(std::iter::repeat_n(vec![String::new()], blank_rows.min(room)));
+        for _ in 0..blank_rows.min(room) {
+            rows.push([""])?;
+        }
         let Some((index, record)) = next else {
             return Ok((rows, blank_rows > room));
         };
@@ -338,16 +341,13 @@ fn collect_rows(
         }
         let record = record?;
         check_width(record.len())?;
-        rows.push(record_strings(&record, index + header_offset + 1)?);
+        check_fields(&record, index + header_offset + 1)?;
+        rows.push(record.iter())?;
     }
 }
 
-pub(super) fn finish_sheet(
-    headers: Vec<String>,
-    mut rows: Vec<Vec<String>>,
-    truncated: bool,
-) -> Result<CsvSheet, ImportError> {
-    let width = headers.len().max(rows.iter().map(Vec::len).max().unwrap_or(0));
+pub(super) fn finish_sheet(headers: Vec<String>, mut rows: TextRows, truncated: bool) -> Result<CsvSheet, ImportError> {
+    let width = headers.len().max(rows.width());
     if width == 0 {
         return Err(ImportError::NoColumns);
     }
@@ -356,9 +356,7 @@ pub(super) fn finish_sheet(
         true => (1..=width).map(|index| format!("Column {index}")).collect(),
         false => headers,
     };
-    for row in &mut rows {
-        row.resize(width.max(row.len()), String::new());
-    }
+    rows.widen_to(width);
     Ok(CsvSheet {
         headers,
         rows,
@@ -367,7 +365,11 @@ pub(super) fn finish_sheet(
 }
 
 fn record_strings(record: &csv::StringRecord, line: usize) -> Result<Vec<String>, ImportError> {
-    let mut out = Vec::with_capacity(record.len());
+    check_fields(record, line)?;
+    Ok(record.iter().map(str::to_owned).collect())
+}
+
+fn check_fields(record: &csv::StringRecord, line: usize) -> Result<(), ImportError> {
     for field in record.iter() {
         if field.len() > MAX_FIELD_BYTES {
             return Err(ImportError::FieldTooLong {
@@ -375,9 +377,8 @@ fn record_strings(record: &csv::StringRecord, line: usize) -> Result<Vec<String>
                 limit: MAX_FIELD_BYTES,
             });
         }
-        out.push(field.to_owned());
     }
-    Ok(out)
+    Ok(())
 }
 
 fn check_width(width: usize) -> Result<(), ImportError> {
@@ -424,7 +425,7 @@ fn detect_delimiter(bytes: &[u8]) -> CsvDelimiter {
 /// scores zero and leaves the default in place.
 fn delimiter_score(bytes: &[u8], delimiter: CsvDelimiter) -> usize {
     let records = sample_records(bytes, delimiter);
-    let Some(width) = records.first().map(Vec::len) else {
+    let Some(width) = records.get(0).map(super::text_rows::TextRow::len) else {
         return 0;
     };
     if width < 2 {
@@ -435,22 +436,18 @@ fn delimiter_score(bytes: &[u8], delimiter: CsvDelimiter) -> usize {
     width
 }
 
-fn sample_records(bytes: &[u8], delimiter: CsvDelimiter) -> Vec<Vec<String>> {
+fn sample_records(bytes: &[u8], delimiter: CsvDelimiter) -> TextRows {
     sample_records_with(bytes, delimiter, None)
 }
 
-fn sample_records_with(
-    bytes: &[u8],
-    delimiter: CsvDelimiter,
-    custom_delimiter: Option<&CustomDelimiter>,
-) -> Vec<Vec<String>> {
+fn sample_records_with(bytes: &[u8], delimiter: CsvDelimiter, custom_delimiter: Option<&CustomDelimiter>) -> TextRows {
     let options = CsvImportOptions {
         delimiter,
         custom_delimiter: custom_delimiter.cloned(),
         has_header: false,
         ..CsvImportOptions::default()
     };
-    read_csv(bytes, &options, Some(DETECT_LINES)).map_or_else(|_| Vec::new(), |sheet| sheet.rows)
+    read_csv(bytes, &options, Some(DETECT_LINES)).map_or_else(|_| TextRows::default(), |sheet| sheet.rows)
 }
 
 fn detect_header(bytes: &[u8], delimiter: CsvDelimiter) -> bool {
@@ -461,8 +458,8 @@ pub fn detect_header_with_custom_delimiter(bytes: &[u8], custom_delimiter: &Cust
     header_in(sample_records_with(bytes, CsvDelimiter::Comma, Some(custom_delimiter)))
 }
 
-fn header_in(records: Vec<Vec<String>>) -> bool {
-    let Some(first) = records.first() else {
+fn header_in(records: TextRows) -> bool {
+    let Some(first) = records.get(0) else {
         return false;
     };
     if records.len() < 2 {

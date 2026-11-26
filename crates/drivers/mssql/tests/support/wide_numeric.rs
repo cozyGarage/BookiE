@@ -185,7 +185,7 @@ fn csv_round_trip(source: &bookie_core::QueryResult, columns: &[bookie_core::Col
         .iter()
         .enumerate()
         .map(|(index, fields)| {
-            bookie_core::import::row_to_values(fields, &mapping, columns, &options, index + 2).unwrap()
+            bookie_core::import::row_to_values(&fields, &mapping, columns, &options, index + 2).unwrap()
         })
         .collect()
 }

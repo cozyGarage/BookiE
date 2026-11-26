@@ -65,7 +65,7 @@ fn read_csv_file_observes_delimiter_header_and_preview_options() {
     let sheet = read_csv_file(file.path(), &options, Some(1)).expect("read from path");
 
     assert_eq!(sheet.headers, vec!["id", "name"]);
-    assert_eq!(sheet.rows, vec![vec!["1", "Ada"]]);
+    assert_eq!(sheet.rows.as_test_rows(), vec![vec!["1", "Ada"]]);
     assert!(sheet.truncated);
 }
 
@@ -104,7 +104,7 @@ fn a_header_row_names_the_fields() {
     let sheet = read_csv(b"id,name\n1,ada\n", &options(), None).expect("read");
 
     assert_eq!(sheet.headers, vec!["id", "name"]);
-    assert_eq!(sheet.rows, vec![vec!["1".to_owned(), "ada".to_owned()]]);
+    assert_eq!(sheet.rows.as_test_rows(), vec![vec!["1".to_owned(), "ada".to_owned()]]);
     assert!(!sheet.truncated);
 }
 
@@ -123,15 +123,15 @@ fn a_file_with_no_header_gets_names_from_the_positions() {
 fn a_quoted_field_keeps_its_delimiters_and_newlines() {
     let sheet = read_csv(b"a,b\n\"one, two\",\"line\nbreak\"\n", &options(), None).expect("read");
 
-    assert_eq!(sheet.rows[0][0], "one, two");
-    assert_eq!(sheet.rows[0][1], "line\nbreak");
+    assert_eq!(sheet.rows.get(0).unwrap().get(0).unwrap(), "one, two");
+    assert_eq!(sheet.rows.get(0).unwrap().get(1).unwrap(), "line\nbreak");
 }
 
 #[test]
 fn a_doubled_quote_inside_a_quoted_field_is_one_quote() {
     let sheet = read_csv(b"a\n\"say \"\"hi\"\"\"\n", &options(), None).expect("read");
 
-    assert_eq!(sheet.rows[0][0], "say \"hi\"");
+    assert_eq!(sheet.rows.get(0).unwrap().get(0).unwrap(), "say \"hi\"");
 }
 
 #[test]
@@ -139,7 +139,10 @@ fn carriage_returns_do_not_survive_into_the_last_field() {
     let sheet = read_csv(b"a,b\r\n1,two\r\n", &options(), None).expect("read");
 
     assert_eq!(sheet.headers, vec!["a", "b"]);
-    assert_eq!(sheet.rows[0], vec!["1".to_owned(), "two".to_owned()]);
+    assert_eq!(
+        sheet.rows.get(0).unwrap().iter().collect::<Vec<_>>(),
+        vec!["1".to_owned(), "two".to_owned()]
+    );
 }
 
 /// The csv crate strips a leading UTF-8 byte order mark itself. If it
@@ -156,14 +159,20 @@ fn a_byte_order_mark_is_not_part_of_the_first_column_name() {
 fn a_short_row_is_padded_rather_than_refused() {
     let sheet = read_csv(b"a,b,c\n1\n", &options(), None).expect("read");
 
-    assert_eq!(sheet.rows[0], vec!["1".to_owned(), String::new(), String::new()]);
+    assert_eq!(
+        sheet.rows.get(0).unwrap().iter().collect::<Vec<_>>(),
+        vec!["1".to_owned(), String::new(), String::new()]
+    );
 }
 
 #[test]
 fn a_long_row_keeps_the_fields_the_header_did_not_name() {
     let sheet = read_csv(b"a,b\n1,2,3\n", &options(), None).expect("read");
 
-    assert_eq!(sheet.rows[0], vec!["1".to_owned(), "2".to_owned(), "3".to_owned()]);
+    assert_eq!(
+        sheet.rows.get(0).unwrap().iter().collect::<Vec<_>>(),
+        vec!["1".to_owned(), "2".to_owned(), "3".to_owned()]
+    );
 }
 
 #[test]
@@ -224,7 +233,7 @@ fn a_field_at_the_length_limit_is_accepted() {
 
     let sheet = read_csv(file.as_bytes(), &options(), None).expect("exact maximum field");
 
-    assert_eq!(sheet.rows[0][0].len(), MAX_FIELD_BYTES);
+    assert_eq!(sheet.rows.get(0).unwrap().get(0).unwrap().len(), MAX_FIELD_BYTES);
 }
 
 #[test]
@@ -327,13 +336,19 @@ fn quote_character_can_be_single_or_absent() {
         ..options()
     };
     let sheet = read_csv(b"a,b\n'x,y',\"z\"\n", &single, None).expect("read");
-    assert_eq!(sheet.rows, vec![vec!["x,y".to_string(), "\"z\"".to_string()]]);
+    assert_eq!(
+        sheet.rows.as_test_rows(),
+        vec![vec!["x,y".to_string(), "\"z\"".to_string()]]
+    );
     let none = CsvImportOptions {
         quote: CsvImportQuote::None,
         ..options()
     };
     let sheet = read_csv(b"a,b\n\"x\",y\n", &none, None).expect("read");
-    assert_eq!(sheet.rows, vec![vec!["\"x\"".to_string(), "y".to_string()]]);
+    assert_eq!(
+        sheet.rows.as_test_rows(),
+        vec![vec!["\"x\"".to_string(), "y".to_string()]]
+    );
 }
 
 #[test]
@@ -344,7 +359,7 @@ fn backslash_escape_keeps_an_escaped_quote_inside_the_field() {
         ..options()
     };
     assert_eq!(
-        read_csv(text, &escaped, None).expect("read").rows,
+        read_csv(text, &escaped, None).expect("read").rows.as_test_rows(),
         vec![vec!["say \"hi\"".to_string()]]
     );
 }
@@ -356,14 +371,17 @@ fn other_encodings_decode_before_parsing() {
         ..options()
     };
     let sheet = read_csv(b"name\ncaf\xe9\n", &windows, None).expect("read");
-    assert_eq!(sheet.rows, vec![vec!["caf\u{e9}".to_string()]]);
+    assert_eq!(sheet.rows.as_test_rows(), vec![vec!["caf\u{e9}".to_string()]]);
     let utf16: Vec<u8> = "a\n\u{e9}\n".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let utf16_options = CsvImportOptions {
         encoding: CsvImportEncoding::Utf16Le,
         ..options()
     };
     assert_eq!(
-        read_csv(&utf16, &utf16_options, None).expect("read").rows,
+        read_csv(&utf16, &utf16_options, None)
+            .expect("read")
+            .rows
+            .as_test_rows(),
         vec![vec!["\u{e9}".to_string()]]
     );
     let broken = CsvImportOptions {
@@ -390,7 +408,7 @@ fn a_single_column_export_keeps_its_null_and_empty_rows_through_import() {
     ];
     let rendered = render_csv(&columns, &rows, &CsvOptions::default());
     let sheet = read_csv(rendered.as_bytes(), &options(), None).unwrap();
-    assert_eq!(sheet.rows, vec![vec![""], vec!["a"], vec![""], vec![""]]);
+    assert_eq!(sheet.rows.as_test_rows(), vec![vec![""], vec!["a"], vec![""], vec![""]]);
 
     let mut streamed = b"note\n".to_vec();
     for row in &rows {
@@ -406,7 +424,7 @@ fn a_single_column_export_keeps_its_null_and_empty_rows_through_import() {
         "blank lines stay skipped when there are several columns"
     );
     let windows = read_csv(b"note\r\n\r\na\r\n\r\n", &options(), None).unwrap();
-    assert_eq!(windows.rows, vec![vec![""], vec!["a"], vec![""]]);
+    assert_eq!(windows.rows.as_test_rows(), vec![vec![""], vec!["a"], vec![""]]);
     let preview = read_csv(b"note\n\n\na\n", &options(), Some(2)).unwrap();
     assert_eq!((preview.rows.len(), preview.truncated), (2, true));
 }
@@ -426,25 +444,28 @@ fn read_custom(text: &str, delimiter: &str) -> CsvSheet {
 fn a_multi_character_delimiter_gives_the_same_cells_as_a_hand_split_file() {
     let sheet = read_custom("id||name||note\n1||Ada||first\n2||Linus||second\n", "||");
     assert_eq!(sheet.headers, ["id", "name", "note"]);
-    assert_eq!(sheet.rows, [["1", "Ada", "first"], ["2", "Linus", "second"]]);
+    assert_eq!(
+        sheet.rows.as_test_rows(),
+        [["1", "Ada", "first"], ["2", "Linus", "second"]]
+    );
 }
 
 #[test]
 fn a_quoted_field_keeps_the_delimiter_it_contains() {
     let sheet = read_custom("a::b\n\"x::y\"::z\n", "::");
-    assert_eq!(sheet.rows, [["x::y", "z"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["x::y", "z"]]);
 }
 
 #[test]
 fn doubled_quotes_do_not_end_a_quoted_field_early() {
     let sheet = read_custom("a||b\n\"say \"\"hi||there\"\"\"||z\n", "||");
-    assert_eq!(sheet.rows, [["say \"hi||there\"", "z"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["say \"hi||there\"", "z"]]);
 }
 
 #[test]
 fn a_line_break_inside_a_quoted_field_stays_in_the_field() {
     let sheet = read_custom("a||b\n\"one\ntwo||three\"||z\n", "||");
-    assert_eq!(sheet.rows, [["one\ntwo||three", "z"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["one\ntwo||three", "z"]]);
 }
 
 #[test]
@@ -454,20 +475,20 @@ fn a_backslash_escaped_quote_does_not_end_the_field_when_escapes_are_on() {
         ..custom("||")
     };
     let sheet = read_csv(b"a||b\n\"q\\\"||r\"||z\n", &options, None).unwrap();
-    assert_eq!(sheet.rows, [["q\"||r", "z"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["q\"||r", "z"]]);
 }
 
 #[test]
 fn a_non_ascii_delimiter_works() {
     let sheet = read_custom("a→→b\n1→→2\n", "→→");
     assert_eq!(sheet.headers, ["a", "b"]);
-    assert_eq!(sheet.rows, [["1", "2"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["1", "2"]]);
 }
 
 #[test]
 fn the_reader_picks_a_stand_in_byte_the_file_does_not_contain() {
     let sheet = read_custom("a||b\n1\u{1f}x||2\n", "||");
-    assert_eq!(sheet.rows, [["1\u{1f}x", "2"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["1\u{1f}x", "2"]]);
 }
 
 #[test]

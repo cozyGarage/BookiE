@@ -182,7 +182,8 @@ async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_cons
         )
         .unwrap();
         let value_index = csv_sheet.headers.iter().position(|name| name == "value").unwrap();
-        let csv_json: serde_json::Value = serde_json::from_str(&csv_sheet.rows[0][value_index]).unwrap();
+        let csv_json: serde_json::Value =
+            serde_json::from_str(csv_sheet.rows.get(0).unwrap().get(value_index).unwrap()).unwrap();
         assert_eq!(csv_json, oracle, "CSV export must preserve nested {expected_type} JSON");
 
         let directory = tempfile::tempdir().unwrap();

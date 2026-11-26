@@ -124,7 +124,7 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     let import_options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &import_options, None).unwrap();
     let imported = bookie_core::import::row_to_values(
-        &sheet.rows[0],
+        &sheet.rows.get(0).unwrap(),
         &[Some(0), Some(1), Some(2)],
         &result.columns,
         &import_options,
@@ -144,7 +144,7 @@ async fn wide_integer_binding_and_sql_export_preserve_exact_server_values() {
     );
     let safe_sheet = bookie_core::import::read_csv(safe_csv.as_bytes(), &import_options, None).unwrap();
     let safe_imported = bookie_core::import::row_to_values(
-        &safe_sheet.rows[0],
+        &safe_sheet.rows.get(0).unwrap(),
         &[Some(0), Some(1), Some(2)],
         &result.columns,
         &import_options,
