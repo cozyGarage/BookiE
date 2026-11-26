@@ -162,6 +162,16 @@ impl GridView {
                 paged && self.pager.page + 1 < self.pager.pages(),
             ),
             action("last", "Go to last page", paged),
+            action(
+                "fit-visible-columns",
+                "Fit visible columns",
+                !self.source.columns().is_empty(),
+            ),
+            action(
+                "reset-grid-widths",
+                "Reset column widths",
+                !self.source.columns().is_empty(),
+            ),
             action("find", "Find in loaded rows", !filtering),
             action("filter", "Filter loaded rows", true),
             action("clear-filter", "Clear filter", filtering),
@@ -627,6 +637,8 @@ impl GridView {
             "previous" => self.pager.previous(),
             "next" => self.pager.next(),
             "last" => self.pager.last(),
+            "fit-visible-columns" => self.fit_visible_grid_columns(window, cx),
+            "reset-grid-widths" => self.reset_grid_widths(window, cx),
             "find" => window.focus(&self.search.find.read(cx).focus_handle(cx), cx),
             "filter" => {
                 self.search.filter_visible = true;

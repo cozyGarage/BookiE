@@ -226,8 +226,15 @@ impl GridView {
         use gpui_component::menu::DropdownMenu;
         use gpui_kit::component::Sizable as _;
         let compact = self.synced_width < 1000.0;
-        let groups =
-            crate::menus::command_groups(self, &[&["jump-column", "refresh-table", "export-file", "export-csv"]]);
+        let groups = crate::menus::command_groups(
+            self,
+            &[
+                &["jump-column", "fit-visible-columns", "reset-grid-widths"],
+                &["refresh-table", "export-file", "export-csv"],
+            ],
+        );
+        let columns =
+            crate::menus::command_groups(self, &[&["jump-column", "fit-visible-columns", "reset-grid-widths"]]);
         div()
             .flex()
             .flex_1()
@@ -304,12 +311,12 @@ impl GridView {
                     })
                     .children(self.add_row_button(theme, cx))
                     .child(
-                        compact_button(ButtonKind::Ghost, "jump-column", "Go to column", theme).on_click(cx.listener(
-                            |this, _, window, cx| {
-                                this.open_picker(crate::palette_state::PaletteMode::Columns, window, cx);
-                                cx.notify();
-                            },
-                        )),
+                        Button::new("grid-columns-menu")
+                            .ghost()
+                            .small()
+                            .compact()
+                            .label("Columns")
+                            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
                     )
                     .children(self.live.is_none().then(|| {
                         compact_button(ButtonKind::Ghost, "compare", "Compare", theme)

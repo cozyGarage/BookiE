@@ -684,6 +684,27 @@ fn a_small_result_keeps_fitted_width_and_wide_headers_keep_pin_in_the_menu(cx: &
 }
 
 #[gpui::test]
+fn fitting_visible_columns_preserves_the_width_of_hidden_columns(cx: &mut TestAppContext) {
+    let (view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(1400.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.remember_grid_widths(&[gpui::px(320.0); 4], cx);
+            view.hide_column(1, "label", window, cx);
+            view.fit_visible_grid_columns(window, cx);
+            view.show_all_hidden_columns(window, cx);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        let table = view.table.read(cx);
+        assert_eq!(table.col_width(1), Some(gpui::px(320.0)));
+        assert!(table.col_width(0).unwrap() < gpui::px(320.0));
+    });
+}
+
+#[gpui::test]
 fn narrow_column_headers_keep_pin_actions_in_the_menu(cx: &mut TestAppContext) {
     let source = Arc::new(WideSource(
         (0..40)
