@@ -5,7 +5,6 @@ use gpui_component::menu::{DropdownMenu, PopupMenuItem};
 use gpui_kit::component::Sizable as _;
 
 use super::*;
-use crate::catalog_nav::TableOpenAction;
 use crate::diagram_ui::DiagramView;
 use crate::surfaces::{ButtonKind, compact_button};
 
@@ -129,7 +128,7 @@ impl GridView {
         cx.notify();
     }
 
-    fn prepare_diagram_relationship(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn prepare_diagram_relationship(&mut self, cx: &mut Context<Self>) {
         let state = &self.search.diagram;
         let (Some(view), Some(draft)) = (&state.view, &state.relationship) else {
             return;
@@ -169,7 +168,7 @@ impl GridView {
             on_update: None,
         };
         let source = draft.source.clone();
-        self.open_table_for(&source, TableOpenAction::ForeignKey(key), window, cx);
+        self.review_diagram_foreign_key(source, key, cx);
     }
 
     pub(crate) fn diagram_relationship_editor(
@@ -215,7 +214,7 @@ impl GridView {
                     .gap_1()
                     .child(
                         compact_button(ButtonKind::Primary, "review-diagram-relationship", "Review SQL", theme)
-                            .on_click(cx.listener(|this, _, window, cx| this.prepare_diagram_relationship(window, cx))),
+                            .on_click(cx.listener(|this, _, _, cx| this.prepare_diagram_relationship(cx))),
                     )
                     .child(
                         compact_button(ButtonKind::Ghost, "cancel-diagram-relationship", "Cancel", theme).on_click(
@@ -290,5 +289,50 @@ impl GridView {
                 compact_button(ButtonKind::Ghost, "add-column-pair", "Add column pair", theme)
                     .on_click(cx.listener(|this, _, _, cx| this.add_relationship_pair(cx))),
             )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
+
+    #[gpui::test]
+    fn relationship_review_keeps_the_diagram_and_does_not_replace_the_active_load(cx: &mut gpui::TestAppContext) {
+        let path = fixture_copy("diagram-relationship-review");
+        let (view, cx) = saving_view(cx, &path);
+        let generation = cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.tabs.open_diagram();
+                let generation = view.loads.generation;
+                let source = TableInfo {
+                    schema: None,
+                    name: "customers".into(),
+                };
+                assert_ne!(source, view.catalog.grid_table);
+                view.review_diagram_foreign_key(
+                    source,
+                    ForeignKeyInfo {
+                        name: "test_relationship".into(),
+                        columns: vec!["id".into()],
+                        ref_schema: None,
+                        ref_table: "orders".into(),
+                        ref_columns: vec!["id".into()],
+                        on_delete: None,
+                        on_update: None,
+                    },
+                    cx,
+                );
+                generation
+            })
+        });
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            assert_eq!(view.loads.generation, generation);
+            assert!(matches!(view.tabs.current(), Tab::Diagram));
+            assert!(view.save.pending.is_none());
+            assert!(view.status.contains("cannot add foreign keys"), "{}", view.status);
+        });
+        std::fs::remove_file(path).ok();
     }
 }

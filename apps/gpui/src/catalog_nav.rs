@@ -18,7 +18,6 @@ fn result_column_index(columns: &[ColumnMeta], index: usize, name: &str) -> Opti
 pub(crate) enum TableOpenAction {
     Data,
     Structure,
-    ForeignKey(bookie_core::ForeignKeyInfo),
 }
 
 impl GridView {
@@ -459,7 +458,6 @@ impl GridView {
         match action {
             TableOpenAction::Data => {}
             TableOpenAction::Structure => self.show_structure(cx),
-            TableOpenAction::ForeignKey(key) => self.review_diagram_foreign_key(key, cx),
         }
     }
 
