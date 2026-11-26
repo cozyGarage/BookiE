@@ -3,7 +3,7 @@
 //! and a MySQL container and counts bursts. Run with `--ignored --nocapture`; it needs Docker and prints the
 //! counts. `ROUND_TRIP_TRACE=1` prints each burst.
 
-#[path = "../../shared/counting_proxy.rs"]
+#[path = "../../shared/tests/counting_proxy.rs"]
 mod counting_proxy;
 
 use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};

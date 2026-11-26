@@ -3,7 +3,7 @@
 //! PostgreSQL container and counts bursts: one client-to-server burst after server-to-client traffic is one
 //! round trip. Run with `--ignored --nocapture`; it needs Docker and prints the counts.
 
-#[path = "../../shared/counting_proxy.rs"]
+#[path = "../../shared/tests/counting_proxy.rs"]
 mod counting_proxy;
 
 use bookie_core::{ConnectOptions, DatabaseDriver, OperationControl, TlsConfig};
