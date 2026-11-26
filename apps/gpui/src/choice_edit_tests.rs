@@ -74,6 +74,24 @@ fn a_schema_qualified_postgres_enum_uses_the_picker_but_an_array_does_not() {
 }
 
 #[test]
+fn a_null_enum_named_bool_opens_the_enum_picker() {
+    let mut status = column("bool", true);
+    let type_name = bookie_core::QualifiedTypeName {
+        schema: "app".into(),
+        name: "bool".into(),
+    };
+    status.enum_type = Some(type_name.clone());
+    assert_eq!(
+        choice_for("bool", Some(&status), &Cell::Null),
+        Some(Choice::PostgresEnum(type_name))
+    );
+    assert_eq!(
+        choice_for("bool", Some(&column("boolean", true)), &Cell::Null),
+        Some(Choice::Toggle(Cell::Bool(true)))
+    );
+}
+
+#[test]
 fn a_member_is_staged_as_its_declared_text() {
     let labels = vec!["new".into(), "done".into()];
     assert_eq!(member_cell("done", &labels), Some(Cell::Text("done".into())));
