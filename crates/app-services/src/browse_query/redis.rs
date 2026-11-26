@@ -1,14 +1,14 @@
-use super::{BoundQuery, BrowseTarget};
+use super::{BoundQuery, BrowseQueryError, BrowseTarget};
 use bookie_core::Value;
 
 pub(super) fn value_query(
     target: &BrowseTarget<'_>,
     column_index: usize,
     pk_values: &[Value],
-) -> Result<BoundQuery, String> {
+) -> Result<BoundQuery, BrowseQueryError> {
     let keys: Vec<_> = target.columns.iter().filter(|column| column.primary_key).collect();
     let Some(column) = target.columns.get(column_index) else {
-        return Err("value column no longer exists".into());
+        return Err(BrowseQueryError::StaleValueColumn { index: column_index });
     };
     if target.schema.is_some()
         || target
@@ -21,7 +21,7 @@ pub(super) fn value_query(
         || pk_values.len() != 1
         || !matches!(pk_values[0], Value::Text(_) | Value::Bytes(_))
     {
-        return Err("Redis value fetch requires a Value cell and one key from a database table".into());
+        return Err(BrowseQueryError::InvalidRedisValueTarget);
     }
     Ok(BoundQuery {
         sql: format!("SELECT \"Value\" FROM \"{}\" WHERE \"Key\" = ?", target.table),
@@ -54,7 +54,16 @@ mod tests {
         let query = target.value_query(2, std::slice::from_ref(&binary_key)).unwrap();
         assert_eq!(query.sql, "SELECT \"Value\" FROM \"db3\" WHERE \"Key\" = ?");
         assert_eq!(query.params, vec![binary_key]);
-        assert!(target.value_query(1, &[Value::Text("key".into())]).is_err());
+        let invalid_target = target.value_query(1, &[Value::Text("key".into())]).unwrap_err();
+        assert!(matches!(&invalid_target, BrowseQueryError::InvalidRedisValueTarget));
+        assert_eq!(
+            invalid_target.to_string(),
+            "Redis value fetch requires a Value cell and one key from a database table"
+        );
+
+        let stale_column = target.value_query(3, &[Value::Text("key".into())]).unwrap_err();
+        assert!(matches!(&stale_column, BrowseQueryError::StaleValueColumn { index: 3 }));
+        assert_eq!(stale_column.to_string(), "value column no longer exists");
     }
 
     fn column(name: &str, primary_key: bool) -> ColumnInfo {

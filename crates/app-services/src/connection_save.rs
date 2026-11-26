@@ -6,9 +6,84 @@ use bookie_storage::{
 };
 
 use crate::connection_form::LocalSocketPathKind;
-use crate::ssh_chain_form::{ChainPlan, JumpAuth, JumpHopForm, plan_chain};
+use crate::ssh_chain_form::{ChainFormError, ChainPlan, JumpAuth, JumpHopForm, plan_chain};
 use secrecy::{ExposeSecret, SecretString};
+use thiserror::Error;
 use uuid::Uuid;
+
+#[derive(Debug, Error)]
+pub enum ConnectionSaveError {
+    #[error(transparent)]
+    Storage(#[from] bookie_storage::StorageError),
+    #[error(transparent)]
+    Validation(#[from] ConnectionValidationError),
+    #[error(transparent)]
+    SshChain(#[from] ChainFormError),
+    #[error(transparent)]
+    Transport(#[from] bookie_transport::TransportError),
+    #[error("driver {0} is not available")]
+    DriverUnavailable(String),
+    #[error("Save the connection first to test it through SSH.")]
+    SshConnectionMustBeSaved,
+    #[error("The SSH jump host secrets were not saved: {0}")]
+    JumpSecretsNotSaved(#[source] crate::ssh_chain_secrets::HopSecretError),
+    #[error("save: {0}")]
+    SaveStorage(#[source] bookie_storage::StorageError),
+    #[error("{action}: {source}")]
+    CredentialPersistence {
+        action: &'static str,
+        #[source]
+        source: bookie_storage::StorageError,
+    },
+    #[error("{action}: {source}; restore saved connection: {rollback}")]
+    CredentialPersistenceRollback {
+        action: &'static str,
+        #[source]
+        source: bookie_storage::StorageError,
+        rollback: bookie_storage::StorageError,
+    },
+    #[error(
+        "Connection settings were saved, but the SSH {credential} was not saved: {source}. Re-enter the {reenter} and connect again."
+    )]
+    HeadSecretNotSaved {
+        credential: &'static str,
+        reenter: &'static str,
+        #[source]
+        source: bookie_storage::StorageError,
+    },
+    #[error("The connection could not be deleted: {0}")]
+    DeleteConnection(#[source] bookie_storage::StorageError),
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum ConnectionValidationError {
+    #[error("Choose a database type.")]
+    DriverRequired,
+    #[error("Enter the database file.")]
+    DatabaseFileRequired,
+    #[error("Enter the host.")]
+    HostRequired,
+    #[error("The socket path must be absolute.")]
+    SocketMustBeAbsolute,
+    #[error("Enter a port from 1 to 65535.")]
+    PortRequired,
+    #[error("A client certificate needs its key, and a key needs its certificate.")]
+    ClientCertificatePair,
+    #[error("Enter the SSH host and user.")]
+    SshHeadFieldRequired { field: SshField },
+    #[error("Enter the host and user of jump host {index}.")]
+    SshJumpFieldRequired { index: usize, field: SshField },
+    #[error("Enter an SSH port from 1 to 65535.")]
+    SshPortRequired { index: usize },
+    #[error("Enter the private key file.")]
+    SshPrivateKeyRequired { index: usize },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SshField {
+    Host,
+    User,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SshAuthKind {
@@ -67,10 +142,9 @@ fn optional_path(text: &str) -> Option<PathBuf> {
     (!text.is_empty()).then(|| PathBuf::from(text))
 }
 
-pub async fn load_draft(registry: &DriverRegistry, id: Uuid) -> Result<Option<ConnectionDraft>, String> {
+pub async fn load_draft(registry: &DriverRegistry, id: Uuid) -> Result<Option<ConnectionDraft>, ConnectionSaveError> {
     let saved = bookie_storage::load_connections()
-        .await
-        .map_err(|error| error.to_string())?
+        .await?
         .into_iter()
         .find(|saved| saved.id == id);
     Ok(saved.map(|saved| draft_from_saved(&saved, registry)))
@@ -156,51 +230,64 @@ pub fn file_display_name(path: &str) -> String {
         .map_or_else(|| path.to_owned(), str::to_owned)
 }
 
-pub fn validate(draft: &ConnectionDraft) -> Result<(), String> {
+pub fn validate(draft: &ConnectionDraft) -> Result<(), ConnectionValidationError> {
     let file_based = draft.capabilities.is_file_based;
     if draft.driver_id.trim().is_empty() {
-        return Err("Choose a database type.".into());
+        return Err(ConnectionValidationError::DriverRequired);
     }
     if file_based {
         return if draft.database.trim().is_empty() {
-            Err("Enter the database file.".into())
+            Err(ConnectionValidationError::DatabaseFileRequired)
         } else {
             Ok(())
         };
     }
     let socket = draft.socket_endpoint.trim();
     if socket.is_empty() && draft.host.trim().is_empty() {
-        return Err("Enter the host.".into());
+        return Err(ConnectionValidationError::HostRequired);
     }
     if !socket.is_empty() && !crate::connection_form::socket_path_is_absolute(socket) {
-        return Err("The socket path must be absolute.".into());
+        return Err(ConnectionValidationError::SocketMustBeAbsolute);
     }
     if draft.port == 0 && socket.is_empty() {
-        return Err("Enter a port from 1 to 65535.".into());
+        return Err(ConnectionValidationError::PortRequired);
     }
     if draft.tls_client_cert.trim().is_empty() != draft.tls_client_key.trim().is_empty() {
-        return Err("A client certificate needs its key, and a key needs its certificate.".into());
+        return Err(ConnectionValidationError::ClientCertificatePair);
     }
     validate_ssh(draft.ssh.as_ref())
 }
 
-fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), String> {
+fn validate_ssh(ssh: Option<&SshDraft>) -> Result<(), ConnectionValidationError> {
     let Some(ssh) = ssh else {
         return Ok(());
     };
     for (index, hop) in std::iter::once(&ssh.head).chain(ssh.jumps.iter()).enumerate() {
-        if hop.host.trim().is_empty() || hop.username.trim().is_empty() {
+        if hop.host.trim().is_empty() {
             return Err(if index == 0 {
-                "Enter the SSH host and user.".into()
+                ConnectionValidationError::SshHeadFieldRequired { field: SshField::Host }
             } else {
-                format!("Enter the host and user of jump host {index}.")
+                ConnectionValidationError::SshJumpFieldRequired {
+                    index,
+                    field: SshField::Host,
+                }
+            });
+        }
+        if hop.username.trim().is_empty() {
+            return Err(if index == 0 {
+                ConnectionValidationError::SshHeadFieldRequired { field: SshField::User }
+            } else {
+                ConnectionValidationError::SshJumpFieldRequired {
+                    index,
+                    field: SshField::User,
+                }
             });
         }
         if hop.port == 0 {
-            return Err("Enter an SSH port from 1 to 65535.".into());
+            return Err(ConnectionValidationError::SshPortRequired { index });
         }
         if hop.auth == SshAuthKind::KeyFile && hop.key_path.trim().is_empty() {
-            return Err("Enter the private key file.".into());
+            return Err(ConnectionValidationError::SshPrivateKeyRequired { index });
         }
     }
     Ok(())
@@ -213,8 +300,8 @@ pub fn draft_url(draft: &ConnectionDraft) -> Option<String> {
 pub fn draft_from_url(
     registry: &DriverRegistry,
     text: &str,
-) -> Result<(ConnectionDraft, Option<SecretString>), String> {
-    let parsed = bookie_storage::parse_connection_url(text).map_err(|error| error.to_string())?;
+) -> Result<(ConnectionDraft, Option<SecretString>), ConnectionSaveError> {
+    let parsed = bookie_storage::parse_connection_url(text)?;
     let mut draft = draft_from_saved(&parsed.connection, registry);
     draft.id = None;
     Ok((draft, parsed.password))
@@ -350,13 +437,12 @@ fn head_secret(ssh: &SshDraft) -> HeadSecret {
     }
 }
 
-pub async fn save(draft: ConnectionDraft) -> Result<SavedConnection, String> {
+pub async fn save(draft: ConnectionDraft) -> Result<SavedConnection, ConnectionSaveError> {
     validate(&draft)?;
     let _turn = crate::connection_save_turn::take().await;
     let existing = match draft.id {
         Some(id) => bookie_storage::load_connections()
-            .await
-            .map_err(|error| error.to_string())?
+            .await?
             .into_iter()
             .find(|saved| saved.id == id),
         None => None,
@@ -368,8 +454,7 @@ pub async fn save(draft: ConnectionDraft) -> Result<SavedConnection, String> {
     let plan = match &draft.ssh {
         Some(ssh) => {
             let previous = existing.as_ref().and_then(|saved| saved.ssh.as_ref());
-            let plan = plan_chain(head_config(ssh, previous), &jump_forms(ssh), previous)
-                .map_err(|error| error.to_string())?;
+            let plan = plan_chain(head_config(ssh, previous), &jump_forms(ssh), previous)?;
             saved.ssh = Some(plan.head.clone());
             Some((plan, head_secret(ssh)))
         }
@@ -397,12 +482,12 @@ pub async fn persist_connection(
     password: Option<&SecretString>,
     label: &str,
     ssh: Option<(&ChainPlan, &HeadSecret)>,
-) -> Result<(), String> {
+) -> Result<(), ConnectionSaveError> {
     let committed = match ssh {
         Some((plan, _)) => Some(
             crate::ssh_chain_secrets::commit_hop_secrets(saved.id, plan, label)
                 .await
-                .map_err(|error| format!("The SSH jump host secrets were not saved: {error}"))?,
+                .map_err(ConnectionSaveError::JumpSecretsNotSaved)?,
         ),
         None => None,
     };
@@ -410,7 +495,7 @@ pub async fn persist_connection(
         Some(password) => persist_with_password(saved, existing, password, label).await,
         None => save_connections(std::slice::from_ref(saved))
             .await
-            .map_err(|error| format!("save: {error}")),
+            .map_err(ConnectionSaveError::SaveStorage),
     };
     if let Err(error) = stored {
         if let Some(committed) = &committed
@@ -429,15 +514,25 @@ pub async fn persist_connection(
     Ok(())
 }
 
-async fn store_head_secret(id: Uuid, secret: &HeadSecret, label: &str) -> Result<(), String> {
+async fn store_head_secret(id: Uuid, secret: &HeadSecret, label: &str) -> Result<(), ConnectionSaveError> {
     match secret {
         HeadSecret::None => Ok(()),
         HeadSecret::Password(password) => bookie_storage::store_ssh_password(id, password.expose_secret(), label)
             .await
-            .map_err(|error| format!("Connection settings were saved, but the SSH password was not saved: {error}. Re-enter the SSH password and connect again.")),
-        HeadSecret::Passphrase(passphrase) => bookie_storage::store_ssh_passphrase(id, passphrase.expose_secret(), label)
-            .await
-            .map_err(|error| format!("Connection settings were saved, but the SSH key passphrase was not saved: {error}. Re-enter the passphrase and connect again.")),
+            .map_err(|source| ConnectionSaveError::HeadSecretNotSaved {
+                credential: "password",
+                reenter: "SSH password",
+                source,
+            }),
+        HeadSecret::Passphrase(passphrase) => {
+            bookie_storage::store_ssh_passphrase(id, passphrase.expose_secret(), label)
+                .await
+                .map_err(|source| ConnectionSaveError::HeadSecretNotSaved {
+                    credential: "key passphrase",
+                    reenter: "passphrase",
+                    source,
+                })
+        }
     }
 }
 
@@ -445,7 +540,7 @@ pub struct Deleted {
     pub credential_failure: bool,
 }
 
-pub async fn delete(id: Uuid) -> Result<Deleted, String> {
+pub async fn delete(id: Uuid) -> Result<Deleted, ConnectionSaveError> {
     let _turn = crate::connection_save_turn::take().await;
     let chain = bookie_storage::load_connections()
         .await
@@ -454,7 +549,7 @@ pub async fn delete(id: Uuid) -> Result<Deleted, String> {
         .and_then(|saved| saved.ssh);
     bookie_storage::delete_connection(id)
         .await
-        .map_err(|error| format!("The connection could not be deleted: {error}"))?;
+        .map_err(ConnectionSaveError::DeleteConnection)?;
     let mut credential_failure = false;
     let results = [
         bookie_storage::delete_password(id).await.err(),
@@ -480,21 +575,17 @@ pub async fn test(
     cancellation: tokio_util::sync::CancellationToken,
     audit: Option<&bookie_transport::TransportAuditFactory>,
     host_key_prompter: Option<std::sync::Arc<dyn bookie_ssh::openssh::Prompter>>,
-) -> Result<String, String> {
+) -> Result<String, ConnectionSaveError> {
     validate(draft)?;
     if draft.ssh.is_some() && draft.id.is_none() {
-        return Err("Save the connection first to test it through SSH.".into());
+        return Err(ConnectionSaveError::SshConnectionMustBeSaved);
     }
     let driver = registry
         .get(&draft.driver_id)
-        .ok_or_else(|| format!("driver {} is not available", draft.driver_id))?;
+        .ok_or_else(|| ConnectionSaveError::DriverUnavailable(draft.driver_id.clone()))?;
     let saved = saved_from_draft(draft, draft.id.unwrap_or_else(Uuid::new_v4));
-    let hops = bookie_transport::saved_ssh_route(&saved)
-        .await
-        .map_err(|error| error.to_string())?;
-    let mut opts = bookie_transport::connect_options_for(&saved)
-        .await
-        .map_err(|error| error.to_string())?;
+    let hops = bookie_transport::saved_ssh_route(&saved).await?;
+    let mut opts = bookie_transport::connect_options_for(&saved).await?;
     if !draft.password.expose_secret().is_empty() {
         opts.password = SecretString::from(draft.password.expose_secret().to_owned());
     }
@@ -513,9 +604,7 @@ pub async fn test(
         ));
     }
     let (connection, _tunnel) =
-        bookie_transport::establish_with_cancellation(&*driver, opts, hops, &environment, cancellation.clone())
-            .await
-            .map_err(|error| error.to_string())?;
+        bookie_transport::establish_with_cancellation(&*driver, opts, hops, &environment, cancellation.clone()).await?;
     let control = crate::operation_control::bounded_with(15, cancellation);
     match connection.server_version_controlled(&control).await {
         Ok(Some(version)) => Ok(format!("Connected · {version}")),
@@ -528,10 +617,10 @@ pub async fn persist_with_password(
     existing: Option<&SavedConnection>,
     password: &SecretString,
     label: &str,
-) -> Result<(), String> {
+) -> Result<(), ConnectionSaveError> {
     save_connections(std::slice::from_ref(saved))
         .await
-        .map_err(|error| format!("save: {error}"))?;
+        .map_err(ConnectionSaveError::SaveStorage)?;
     match saved.auth_mode {
         AuthMode::Password if password.expose_secret().is_empty() => {
             if let Err(error) = delete_password(saved.id).await {
@@ -556,12 +645,16 @@ pub async fn persist_with_password(
 async fn rollback_failure(
     existing: Option<&SavedConnection>,
     id: Uuid,
-    action: &str,
+    action: &'static str,
     error: bookie_storage::StorageError,
-) -> String {
+) -> ConnectionSaveError {
     match rollback_saved_connection(existing, id).await {
-        Ok(()) => format!("{action}: {error}"),
-        Err(rollback_error) => format!("{action}: {error}; restore saved connection: {rollback_error}"),
+        Ok(()) => ConnectionSaveError::CredentialPersistence { action, source: error },
+        Err(rollback) => ConnectionSaveError::CredentialPersistenceRollback {
+            action,
+            source: error,
+            rollback,
+        },
     }
 }
 
@@ -702,15 +795,21 @@ mod tests {
     fn validation_names_what_is_missing() {
         let mut missing = draft();
         missing.host = " ".into();
-        assert_eq!(validate(&missing).unwrap_err(), "Enter the host.");
+        let error = validate(&missing).unwrap_err();
+        assert!(matches!(&error, ConnectionValidationError::HostRequired));
+        assert_eq!(error.to_string(), "Enter the host.");
         missing.host = "h".into();
         missing.port = 0;
-        assert!(validate(&missing).unwrap_err().contains("port"));
+        let error = validate(&missing).unwrap_err();
+        assert!(matches!(&error, ConnectionValidationError::PortRequired));
+        assert!(error.to_string().contains("port"));
         let mut file = draft();
         file.driver_id = "sqlite".into();
         file.capabilities.is_file_based = true;
         file.database.clear();
-        assert_eq!(validate(&file).unwrap_err(), "Enter the database file.");
+        let error = validate(&file).unwrap_err();
+        assert!(matches!(&error, ConnectionValidationError::DatabaseFileRequired));
+        assert_eq!(error.to_string(), "Enter the database file.");
         assert!(validate(&draft()).is_ok());
     }
 
@@ -783,24 +882,83 @@ mod tests {
     fn validation_rejects_half_a_client_certificate_a_relative_socket_and_a_blank_ssh_host() {
         let mut half = draft();
         half.tls_client_cert = "/etc/c.pem".into();
-        assert!(validate(&half).unwrap_err().contains("client certificate"));
+        let error = validate(&half).unwrap_err();
+        assert!(matches!(&error, ConnectionValidationError::ClientCertificatePair));
+        assert!(error.to_string().contains("client certificate"));
         let mut relative = draft();
         relative.socket_endpoint = "run/pg".into();
-        assert!(validate(&relative).unwrap_err().contains("absolute"));
+        let error = validate(&relative).unwrap_err();
+        assert!(matches!(&error, ConnectionValidationError::SocketMustBeAbsolute));
+        assert!(error.to_string().contains("absolute"));
         let mut blank = draft();
         blank.ssh = Some(SshDraft {
             head: hop(" ", SshAuthKind::Password),
             openssh: false,
             jumps: Vec::new(),
         });
-        assert!(validate(&blank).unwrap_err().contains("SSH host"));
+        let error = validate(&blank).unwrap_err();
+        assert!(matches!(
+            &error,
+            ConnectionValidationError::SshHeadFieldRequired { field: SshField::Host }
+        ));
+        assert!(error.to_string().contains("SSH host"));
+        let ssh = blank.ssh.as_mut().unwrap();
+        ssh.head.host = "host".into();
+        ssh.head.username.clear();
+        let error = validate(&blank).unwrap_err();
+        assert!(matches!(
+            &error,
+            ConnectionValidationError::SshHeadFieldRequired { field: SshField::User }
+        ));
+        assert!(error.to_string().contains("SSH host"));
         let mut jump = draft();
         jump.ssh = Some(SshDraft {
             head: hop("a", SshAuthKind::Password),
             openssh: false,
             jumps: vec![hop(" ", SshAuthKind::Agent)],
         });
-        assert!(validate(&jump).unwrap_err().contains("jump host 1"));
+        let error = validate(&jump).unwrap_err();
+        assert!(matches!(
+            &error,
+            ConnectionValidationError::SshJumpFieldRequired {
+                index: 1,
+                field: SshField::Host
+            }
+        ));
+        assert!(error.to_string().contains("jump host 1"));
+    }
+
+    #[test]
+    fn validation_identifies_a_missing_ssh_port_and_private_key() {
+        let mut missing_port = draft();
+        let mut head = hop("bastion", SshAuthKind::Password);
+        head.port = 0;
+        missing_port.ssh = Some(SshDraft {
+            head,
+            openssh: false,
+            jumps: Vec::new(),
+        });
+        let error = validate(&missing_port).unwrap_err();
+        assert!(matches!(
+            &error,
+            ConnectionValidationError::SshPortRequired { index: 0 }
+        ));
+        assert_eq!(error.to_string(), "Enter an SSH port from 1 to 65535.");
+
+        let mut missing_key = draft();
+        let mut head = hop("bastion", SshAuthKind::KeyFile);
+        head.key_path.clear();
+        missing_key.ssh = Some(SshDraft {
+            head,
+            openssh: false,
+            jumps: Vec::new(),
+        });
+        let error = validate(&missing_key).unwrap_err();
+        assert!(matches!(
+            &error,
+            ConnectionValidationError::SshPrivateKeyRequired { index: 0 }
+        ));
+        assert_eq!(error.to_string(), "Enter the private key file.");
     }
 
     #[test]
@@ -859,6 +1017,7 @@ mod tests {
             test(&registry, &ssh, cancel(), None, None)
                 .await
                 .unwrap_err()
+                .to_string()
                 .contains("Save the connection first")
         );
     }

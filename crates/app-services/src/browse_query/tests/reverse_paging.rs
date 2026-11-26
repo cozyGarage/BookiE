@@ -20,8 +20,19 @@ fn invalid_filter_refuses_both_page_and_count() {
         long_text_preview: false,
         supports_reverse_keyset: true,
     };
-    assert!(target.count().unwrap_err().contains("missing"));
-    assert!(target.page(0, 100, None, None).unwrap_err().contains("missing"));
+    let count_error = target.count().unwrap_err();
+    assert!(matches!(
+        &count_error,
+        BrowseQueryError::Filter(bookie_core::BuildFilterError::UnknownColumn(column)) if column == "missing"
+    ));
+    assert!(count_error.to_string().contains("missing"));
+
+    let page_error = target.page(0, 100, None, None).unwrap_err();
+    assert!(matches!(
+        &page_error,
+        BrowseQueryError::Filter(bookie_core::BuildFilterError::UnknownColumn(column)) if column == "missing"
+    ));
+    assert!(page_error.to_string().contains("missing"));
 }
 
 #[test]
