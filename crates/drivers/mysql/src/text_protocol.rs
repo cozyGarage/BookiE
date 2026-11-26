@@ -1,6 +1,5 @@
 use bookie_core::{
-    ColumnInfo, DriverError, MAX_QUERY_ROWS, QueryResult, QueryResultBatch, QueryResultBudget, QueryRows,
-    ServerMessages,
+    ColumnInfo, DriverError, QueryResult, QueryResultBatch, QueryResultBudget, QueryRows, ServerMessages,
 };
 use futures::TryStreamExt;
 use sqlparser::ast::Statement as SqlStatement;
@@ -8,9 +7,9 @@ use sqlparser::dialect::MySqlDialect;
 use sqlparser::parser::Parser;
 use sqlx::mysql::{MySql, MySqlColumn, MySqlRow};
 use sqlx::pool::PoolConnection;
-use sqlx::{Column, Row, TypeInfo, ValueRef};
+use sqlx::{Column, Row, TypeInfo};
 
-use crate::decode::extract_value;
+use crate::decode::{ColumnDecoder, column_decoders, decode_row_into};
 
 const MAX_MYSQL_RESULT_SETS: usize = 256;
 
@@ -23,8 +22,8 @@ pub(crate) async fn text_protocol(
     let mut stream = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).fetch_many(&mut **connection);
     let mut result_sets = Vec::new();
     let mut current = None;
+    let mut decoders = Vec::new();
     let mut budget = QueryResultBudget::default();
-    let mut retained_rows = 0usize;
     let mut truncated = false;
     let mut decoded = Vec::new();
     while let Some(item) = stream.try_next().await.map_err(crate::map_sqlx_error)? {
@@ -32,16 +31,16 @@ pub(crate) async fn text_protocol(
             Either::Right(row) => collect_row(
                 row,
                 &mut current,
+                &mut decoders,
                 &result_sets,
                 &mut budget,
-                &mut retained_rows,
                 &mut truncated,
                 &mut decoded,
             )?,
-            Either::Left(_) => finish_result_set(&mut current, &mut result_sets, &mut truncated),
+            Either::Left(_) => finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated),
         }
     }
-    finish_result_set(&mut current, &mut result_sets, &mut truncated);
+    finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated);
     drop(stream);
     crate::forget_statements_after_use(connection, sql)
         .await
@@ -64,8 +63,8 @@ pub(crate) async fn bounded_text_protocol(
     let mut stream = sqlx::raw_sql(sqlx::AssertSqlSafe(sql.to_string())).fetch_many(&mut **connection);
     let mut result_sets = Vec::new();
     let mut current = None;
+    let mut decoders = Vec::new();
     let mut budget = QueryResultBudget::with_limits(max_rows, max_bytes);
-    let mut retained_rows = 0;
     let mut truncated = false;
     let mut decoded = Vec::new();
     while let Some(item) = stream.try_next().await.map_err(crate::map_sqlx_error)? {
@@ -73,19 +72,19 @@ pub(crate) async fn bounded_text_protocol(
             Either::Right(row) => collect_row(
                 row,
                 &mut current,
+                &mut decoders,
                 &result_sets,
                 &mut budget,
-                &mut retained_rows,
                 &mut truncated,
                 &mut decoded,
             )?,
-            Either::Left(_) => finish_result_set(&mut current, &mut result_sets, &mut truncated),
+            Either::Left(_) => finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated),
         }
         if truncated {
             break;
         }
     }
-    finish_result_set(&mut current, &mut result_sets, &mut truncated);
+    finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated);
     drop(stream);
     if !truncated {
         crate::forget_statements_after_use(connection, sql)
@@ -103,9 +102,9 @@ pub(crate) async fn bounded_text_protocol(
 fn collect_row(
     row: MySqlRow,
     current: &mut Option<QueryResult>,
+    decoders: &mut Vec<ColumnDecoder>,
     result_sets: &[QueryResult],
     budget: &mut QueryResultBudget,
-    retained_rows: &mut usize,
     truncated: &mut bool,
     decoded: &mut Vec<bookie_core::Value>,
 ) -> Result<(), DriverError> {
@@ -119,26 +118,25 @@ fn collect_row(
             rows: QueryRows::new(),
             truncated: false,
         });
+        *decoders = column_decoders(row.columns());
     }
-    if *retained_rows >= MAX_QUERY_ROWS {
-        mark_truncated(current, truncated);
-        return Ok(());
-    }
-    if !budget.decode_and_admit_row_into(row.len(), mysql_row_payload_bytes(&row), decoded, |values| {
-        values.extend((0..row.len()).map(|index| extract_value(&row, index)));
-        Ok(())
-    })? {
+    if !decode_row_into(&row, decoders, budget, decoded) {
         mark_truncated(current, truncated);
         return Ok(());
     }
     if let Some(result_set) = current {
         result_set.rows.push_row(decoded);
-        *retained_rows += 1;
     }
     Ok(())
 }
 
-fn finish_result_set(current: &mut Option<QueryResult>, result_sets: &mut Vec<QueryResult>, truncated: &mut bool) {
+fn finish_result_set(
+    current: &mut Option<QueryResult>,
+    decoders: &mut Vec<ColumnDecoder>,
+    result_sets: &mut Vec<QueryResult>,
+    truncated: &mut bool,
+) {
+    decoders.clear();
     if let Some(result_set) = current.take() {
         if result_sets.len() < MAX_MYSQL_RESULT_SETS {
             result_sets.push(result_set);
@@ -189,15 +187,4 @@ pub(super) fn statement_columns(columns: &[MySqlColumn]) -> Vec<ColumnInfo> {
             domain_type: None,
         })
         .collect()
-}
-
-pub(super) fn mysql_row_payload_bytes(row: &MySqlRow) -> usize {
-    (0..row.len()).fold(0usize, |total, index| {
-        let length = match row.try_get_raw(index) {
-            Ok(value) if value.is_null() => 0,
-            Ok(value) => <&[u8] as sqlx::Decode<MySql>>::decode(value).map_or(usize::MAX, <[u8]>::len),
-            Err(_) => usize::MAX,
-        };
-        total.saturating_add(length)
-    })
 }

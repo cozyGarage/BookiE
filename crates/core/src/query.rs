@@ -265,6 +265,10 @@ impl QueryResultBudget {
         }
     }
 
+    pub fn can_admit_row_payload(&self, cell_count: usize, payload_bytes: usize) -> bool {
+        self.can_admit(cell_count, row_size_from_parts(cell_count, payload_bytes))
+    }
+
     pub fn admit(&mut self, row: &[Value]) -> bool {
         let row_bytes = row_size(row);
         if !self.can_admit(row.len(), row_bytes) {
@@ -282,7 +286,7 @@ impl QueryResultBudget {
         payload_bytes: usize,
         decode: impl FnOnce() -> Result<Vec<Value>, E>,
     ) -> Result<Option<Vec<Value>>, E> {
-        if !self.can_admit(cell_count, row_size_from_parts(cell_count, payload_bytes)) {
+        if !self.can_admit_row_payload(cell_count, payload_bytes) {
             return Ok(None);
         }
         let row = decode()?;
@@ -296,7 +300,7 @@ impl QueryResultBudget {
         row: &mut Vec<Value>,
         decode: impl FnOnce(&mut Vec<Value>) -> Result<(), E>,
     ) -> Result<bool, E> {
-        if !self.can_admit(cell_count, row_size_from_parts(cell_count, payload_bytes)) {
+        if !self.can_admit_row_payload(cell_count, payload_bytes) {
             row.clear();
             return Ok(false);
         }

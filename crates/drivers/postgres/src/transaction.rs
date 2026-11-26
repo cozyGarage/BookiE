@@ -1,3 +1,6 @@
+use async_trait::async_trait;
+use sqlx::Connection as SqlxConnection;
+
 use super::*;
 
 pub(super) async fn begin_and_run_checked(
@@ -63,5 +66,138 @@ pub(super) async fn run_checked(
             })),
         }),
         Err(error) => Err(map_sqlx_error(error)),
+    }
+}
+
+async fn transaction_failure(
+    tx: sqlx::Transaction<'_, Postgres>,
+    statement_index: usize,
+    source: DriverError,
+) -> DriverError {
+    match tx.rollback().await {
+        Ok(()) => DriverError::Transaction {
+            statement_index,
+            source: Box::new(source),
+        },
+        Err(error) => DriverError::TransactionRollbackFailed {
+            statement_index,
+            source: Box::new(source),
+            rollback_error: Box::new(map_sqlx_error(error)),
+        },
+    }
+}
+
+impl Drop for PgTransaction {
+    fn drop(&mut self) {
+        if let Some(connection) = self.connection.as_mut() {
+            connection.close_on_drop();
+        }
+    }
+}
+
+#[async_trait]
+impl bookie_core::Transaction for PgTransaction {
+    async fn query(&mut self, sql: &str) -> Result<QueryResult, DriverError> {
+        let stop = Some(QueryStop {
+            cancel_token: self.cancel_token.clone(),
+        });
+        let connection = self.connection_mut()?;
+        query_connection_once(connection, sql, &[], stop).await
+    }
+
+    async fn query_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
+        self.query_params_controlled(sql, &[], control).await
+    }
+
+    async fn query_params(&mut self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
+        let stop = Some(QueryStop {
+            cancel_token: self.cancel_token.clone(),
+        });
+        let connection = self.connection_mut()?;
+        query_connection_once(connection, sql, params, stop).await
+    }
+
+    async fn query_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<QueryResult, DriverError> {
+        check_pre_dispatch(control)?;
+        let connection = self.take_connection()?;
+        let (connection, result) = controlled_query(
+            connection, sql, params,
+            // An error aborts an explicit transaction; the caller must roll it back.
+            false, control,
+        )
+        .await;
+        self.connection = connection;
+        result
+    }
+
+    async fn execute(&mut self, sql: &str) -> Result<ExecResult, DriverError> {
+        let connection = self.connection_mut()?;
+        execute_connection_once(connection, sql, &[]).await
+    }
+
+    async fn execute_controlled(&mut self, sql: &str, control: &OperationControl) -> Result<ExecResult, DriverError> {
+        self.execute_params_controlled(sql, &[], control).await
+    }
+
+    async fn execute_params(&mut self, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError> {
+        let connection = self.connection_mut()?;
+        execute_connection_once(connection, sql, params).await
+    }
+
+    async fn execute_params_controlled(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+        control: &OperationControl,
+    ) -> Result<ExecResult, DriverError> {
+        check_pre_dispatch(control)?;
+        let connection = self.take_connection()?;
+        let (connection, result) = controlled_execute(
+            connection, sql, params,
+            // An error aborts an explicit transaction; the caller must roll it back.
+            false, control,
+        )
+        .await;
+        self.connection = connection;
+        result
+    }
+
+    async fn commit(mut self: Box<Self>) -> Result<(), DriverError> {
+        let connection = self.connection_mut()?;
+        sqlx::query("COMMIT")
+            .execute(&mut **connection)
+            .await
+            .map_err(map_sqlx_error)?;
+        let _ = self.take_connection()?;
+        Ok(())
+    }
+
+    async fn rollback(mut self: Box<Self>) -> Result<(), DriverError> {
+        let connection = self.connection_mut()?;
+        sqlx::query("ROLLBACK")
+            .execute(&mut **connection)
+            .await
+            .map_err(map_sqlx_error)?;
+        let _ = self.take_connection()?;
+        Ok(())
+    }
+}
+
+impl PgTransaction {
+    fn connection_mut(&mut self) -> Result<&mut PoolConnection<Postgres>, DriverError> {
+        self.connection
+            .as_mut()
+            .ok_or_else(|| DriverError::Internal("transaction is unusable".into()))
+    }
+
+    fn take_connection(&mut self) -> Result<PoolConnection<Postgres>, DriverError> {
+        self.connection
+            .take()
+            .ok_or_else(|| DriverError::Internal("transaction is unusable".into()))
     }
 }
