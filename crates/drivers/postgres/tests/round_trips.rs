@@ -153,18 +153,26 @@ async fn the_round_trips_each_statement_costs_are_counted() {
     for _ in 0..RUNS {
         connection.query("SELECT 1").await.unwrap();
     }
-    per_statement("SELECT 1 (query)", proxy.bursts());
+    let plain = per_statement("SELECT 1 (query)", proxy.bursts());
 
     proxy.reset();
     for _ in 0..RUNS {
         let control = OperationControl::with_timeout(std::time::Duration::from_secs(30));
         connection.query_controlled("SELECT 1", &control).await.unwrap();
     }
-    per_statement("SELECT 1 (query_controlled)", proxy.bursts());
+    let controlled = per_statement("SELECT 1 (query_controlled)", proxy.bursts());
 
     proxy.reset();
     for _ in 0..RUNS {
         connection.query("SELECT id, name FROM trips").await.unwrap();
     }
-    per_statement("table SELECT (query)", proxy.bursts());
+    let table = per_statement("table SELECT (query)", proxy.bursts());
+    assert!(
+        plain < 4.0 && controlled < 4.3,
+        "a plain statement was 4.25 to 4.75 round trips before the ping skip"
+    );
+    assert!(
+        table < 6.5,
+        "a table statement was 7.4 round trips before the domain lookup shrank"
+    );
 }
