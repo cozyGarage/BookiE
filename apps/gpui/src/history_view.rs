@@ -1,3 +1,4 @@
+use bookie_app_services::service_runtime::block_on;
 use std::time::SystemTime;
 
 use bookie_app_services::statement_history::{self, HistoryQuery, HistoryRow, StatusFilter, TimeWindow};
@@ -61,16 +62,6 @@ impl HistoryPage {
     }
 }
 
-pub(crate) fn block_on_history<T: Send + 'static>(
-    work: impl std::future::Future<Output = Result<T, String>> + Send + 'static,
-) -> Result<T, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| error.to_string())?;
-    runtime.block_on(work)
-}
-
 pub(crate) fn ago(seconds: u64) -> String {
     match seconds {
         0..=59 => "just now".into(),
@@ -99,7 +90,7 @@ impl GridView {
             let recent = cx
                 .background_executor()
                 .spawn(async move {
-                    block_on_history(async {
+                    block_on(async {
                         if !PRUNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
                             let _ = statement_history::prune().await;
                         }
@@ -130,7 +121,7 @@ impl GridView {
         cx.spawn(async move |this, cx| {
             let rows = cx
                 .background_executor()
-                .spawn(async move { block_on_history(statement_history::search(query)) })
+                .spawn(async move { block_on(statement_history::search(query)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 if this.history_page.generation != generation {
@@ -155,10 +146,7 @@ impl GridView {
         cx: &mut Context<Self>,
     ) {
         cx.spawn(async move |this, cx| {
-            let done = cx
-                .background_executor()
-                .spawn(async move { block_on_history(work) })
-                .await;
+            let done = cx.background_executor().spawn(async move { block_on(work) }).await;
             let _ = this.update(cx, |this, cx| {
                 if let Err(message) = done {
                     this.status = message;
