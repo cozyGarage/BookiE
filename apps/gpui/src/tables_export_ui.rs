@@ -130,8 +130,8 @@ impl GridView {
             cx.notify();
             return;
         }
-        let parsed = export_folder(folder.read(cx).content().as_ref())
-            .and_then(|directory| row_limit(limit.read(cx).content().as_ref()).map(|rows| (directory, rows)));
+        let parsed = export_folder(folder.read(cx).content())
+            .and_then(|directory| row_limit(limit.read(cx).content()).map(|rows| (directory, rows)));
         let (directory, rows) = match parsed {
             Ok(parsed) => parsed,
             Err(message) => {
