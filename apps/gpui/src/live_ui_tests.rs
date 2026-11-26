@@ -1495,6 +1495,31 @@ fn run_all_keeps_each_statement_result(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn run_all_stops_at_the_first_failing_statement_and_names_it(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let before = cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            let before = view.run_tabs.slots.len();
+            view.sql_input.update(cx, |input, cx| {
+                input.set_value("SELECT 19; SELECT * FROM no_such_table; SELECT 23", window, cx)
+            });
+            view.run_query(cx);
+            before
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        let added = &view.run_tabs.slots[before..];
+        assert_eq!(added.len(), 2, "{}", view.status);
+        assert_eq!(added[0].source.as_ref().expect("result").row(0), vec![Cell::Int(19)]);
+        assert!(added[1].failure.is_some());
+        assert!(view.status.contains("Statement 2 of 3"), "{}", view.status);
+    });
+}
+
+#[gpui::test]
 fn a_parameter_typed_as_text_keeps_its_leading_zeros_while_auto_turns_it_into_a_number(cx: &mut TestAppContext) {
     use bookie_core::ParameterKind;
     use bookie_gpui::model::CellText;
