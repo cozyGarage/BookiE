@@ -154,9 +154,10 @@ impl DatabaseDriver for MysqlDriver {
             .before_acquire(move |connection, _| {
                 let database = std::sync::Arc::clone(&database);
                 Box::pin(async move {
-                    restore_sqlx_session_options(connection).await?;
-                    prepare_session(connection, read_only).await?;
-                    restore_database(connection, &database).await?;
+                    restore_session(connection, &database).await?;
+                    if read_only {
+                        set_session_read_only(connection).await?;
+                    }
                     Ok(true)
                 })
             })
@@ -866,23 +867,22 @@ async fn set_utc_timezone(connection: &mut sqlx::MySqlConnection) -> Result<(), 
     Ok(())
 }
 
-async fn restore_sqlx_session_options(connection: &mut sqlx::MySqlConnection) -> Result<(), sqlx::Error> {
-    sqlx::raw_sql(
-        "SET NAMES utf8mb4; SET sql_mode=(SELECT CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION'))",
-    )
-    .execute(connection)
-    .await?;
-    Ok(())
-}
-
-async fn restore_database(connection: &mut sqlx::MySqlConnection, database: &str) -> Result<(), sqlx::Error> {
-    if database.is_empty() {
-        return Ok(());
-    }
-    let statement = format!("USE `{}`", database.replace('`', "``"));
+async fn restore_session(connection: &mut sqlx::MySqlConnection, database: &str) -> Result<(), sqlx::Error> {
+    let use_database = if database.is_empty() {
+        String::new()
+    } else {
+        format!("; USE `{}`", database.replace('`', "``"))
+    };
+    let statement = format!(
+        "SET NAMES utf8mb4; SET sql_mode=(SELECT CONCAT(@@sql_mode, ',PIPES_AS_CONCAT,NO_ENGINE_SUBSTITUTION')); \
+         SET time_zone = '+00:00'{use_database}"
+    );
     sqlx::raw_sql(sqlx::AssertSqlSafe(statement))
         .execute(&mut *connection)
         .await?;
+    if database.is_empty() {
+        return Ok(());
+    }
     connection.clear_cached_statements().await
 }
 
@@ -901,6 +901,10 @@ async fn prepare_session(connection: &mut sqlx::MySqlConnection, read_only: bool
     if !read_only {
         return Ok(true);
     }
+    set_session_read_only(connection).await
+}
+
+async fn set_session_read_only(connection: &mut sqlx::MySqlConnection) -> Result<bool, sqlx::Error> {
     match sqlx::query("SET SESSION TRANSACTION READ ONLY")
         .execute(connection)
         .await
