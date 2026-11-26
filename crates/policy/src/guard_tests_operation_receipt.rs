@@ -360,3 +360,53 @@ async fn a_write_does_not_get_the_read_deadline_but_a_read_does() {
         outcome.result
     );
 }
+
+struct ApprovesAfter(Duration);
+
+#[async_trait]
+impl crate::approval::ApprovalSink for ApprovesAfter {
+    async fn request(&self, _request: crate::approval::ApprovalRequest) -> crate::approval::ApprovalOutcome {
+        tokio::time::sleep(self.0).await;
+        crate::approval::ApprovalOutcome::AllowOnce
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_write_approved_after_the_read_deadline_still_runs_until_stopped() {
+    let context = super::context(
+        Principal::human_gui(),
+        Environment::Prod,
+        PolicyConfig::default(),
+        Arc::new(ApprovesAfter(Duration::from_secs(60))),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    let guard = PolicyGuard::new(
+        Arc::new(InterruptedQueryConn {
+            started: Arc::new(Notify::new()),
+        }),
+        context,
+    );
+    let token = CancellationToken::new();
+    let control = OperationControl::new(
+        token.clone(),
+        Some(tokio::time::Instant::now() + Duration::from_secs(30)),
+    );
+    let write = tokio::spawn(async move {
+        guard
+            .query_result_sets_controlled_with_audit("ALTER TABLE t ADD COLUMN b integer", &[], &control)
+            .await
+    });
+    tokio::time::sleep(Duration::from_secs(600)).await;
+    assert!(
+        !write.is_finished(),
+        "a write approved after its read deadline passed must not get that deadline back"
+    );
+    token.cancel();
+    let outcome = write.await.expect("the write task");
+    assert!(
+        matches!(outcome.result, Err(DriverError::Cancelled)),
+        "Stop still cancels the write: {:?}",
+        outcome.result
+    );
+}
