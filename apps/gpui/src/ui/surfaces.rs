@@ -144,7 +144,7 @@ pub(crate) fn link_colour(theme: Theme) -> u32 {
 pub(crate) fn environment_color(environment: bookie_core::Environment, theme: Theme) -> Option<u32> {
     match environment {
         bookie_core::Environment::Local => None,
-        bookie_core::Environment::Dev => Some(theme.info),
+        bookie_core::Environment::Dev => Some(theme.success),
         bookie_core::Environment::Staging => Some(theme.warning),
         bookie_core::Environment::Prod => Some(theme.destructive),
     }
