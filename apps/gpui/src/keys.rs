@@ -166,9 +166,27 @@ impl GridView {
         }
     }
 
+    pub(crate) fn modal_open(&self) -> bool {
+        self.connection_form.open
+            || self.host_key.current.is_some()
+            || self.resolve.open
+            || self.import.open
+            || self.insert.open
+            || self.export.file.open
+            || self.search.diagram.open
+            || self.save.pending.is_some()
+            || self.approval.current.is_some()
+            || self.close_confirm
+            || self.cancel_confirm.is_some()
+            || self.cell_edit.active.as_ref().is_some_and(|editing| editing.full_value)
+    }
+
     pub(super) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.approval.current.is_some() || self.save.pending.is_some() {
             cx.stop_propagation();
+            return;
+        }
+        if self.modal_open() {
             return;
         }
         let stroke = &event.keystroke;

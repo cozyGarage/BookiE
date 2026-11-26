@@ -12,6 +12,17 @@ pub(crate) struct StructureState {
     pub input: Option<Entity<TextInput>>,
 }
 
+pub(crate) fn is_destructive(kind: StructureChangeKind) -> bool {
+    matches!(
+        kind,
+        StructureChangeKind::DropColumn
+            | StructureChangeKind::DropIndex
+            | StructureChangeKind::DropForeignKey
+            | StructureChangeKind::TruncateTable
+            | StructureChangeKind::DropTable
+    )
+}
+
 impl GridView {
     pub(crate) fn structure_change_enabled(&self) -> bool {
         self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()
@@ -183,6 +194,7 @@ impl GridView {
             done: format!("{confirm} {name}: done"),
             review: "Review the change, then apply or cancel".into(),
             confirm,
+            destructive: is_destructive(kind),
             note: Some(
                 if matches!(
                     kind,

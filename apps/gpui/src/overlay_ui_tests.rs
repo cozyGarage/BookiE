@@ -80,3 +80,21 @@ fn the_palette_stops_above_the_status_bar_in_a_short_window(cx: &mut TestAppCont
         surface.origin.y + surface.size.height
     );
 }
+
+#[gpui::test]
+fn window_shortcuts_do_not_run_behind_an_open_dialog(cx: &mut TestAppContext) {
+    let (view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    let tabs = view.read_with(cx, |view, _| view.tabs.items.clone());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_connection_dialog(cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.simulate_keystrokes("ctrl-w ctrl-t ctrl-shift-p");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.connection_form.open);
+        assert_eq!(view.tabs.items, tabs, "no tab was closed or opened behind the dialog");
+        assert!(!view.palette.open);
+    });
+}

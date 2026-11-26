@@ -81,6 +81,7 @@ impl GridView {
             done: "Imported {n} row(s)".into(),
             review: "Review the import, then import or cancel".into(),
             confirm: "Import",
+            destructive: false,
             note: Some(
                 "Fields are matched to columns by name; unmatched fields are ignored. At most 1,000 rows are \
                  imported per run, all in one transaction; running it again repeats the first rows.",

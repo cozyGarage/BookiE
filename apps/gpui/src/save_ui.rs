@@ -53,6 +53,7 @@ pub(crate) struct PendingSave {
     pub title: String,
     pub done: String,
     pub confirm: &'static str,
+    pub destructive: bool,
     pub note: Option<&'static str>,
     pub reconnect: Option<bookie_core::TableInfo>,
     pub generation: u64,
@@ -73,11 +74,14 @@ pub(crate) struct ReviewLabels {
     pub done: String,
     pub review: String,
     pub confirm: &'static str,
+    pub destructive: bool,
     pub note: Option<&'static str>,
     pub reconnect: Option<bookie_core::TableInfo>,
 }
 
 const MAX_DELETE_ROWS: u64 = 500;
+
+pub(crate) const TRANSACTION_BLOCKS_SAVE: &str = "Commit or roll back the open transaction first";
 
 impl GridView {
     pub(crate) fn edits_changed(&mut self) {
@@ -103,7 +107,7 @@ impl GridView {
 
     pub(crate) fn save_session(&mut self) -> Option<Arc<LiveSession>> {
         if self.transaction_open() {
-            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
             return None;
         }
         let Some(live) = self.live.clone().filter(|_| self.can_save_edits()) else {
@@ -140,6 +144,7 @@ impl GridView {
             done: format!("Saved {count} change(s)"),
             review: format!("Review {count} change(s), then save or cancel"),
             confirm: "Save",
+            destructive: false,
             note: None,
             reconnect: None,
         };
@@ -184,6 +189,7 @@ impl GridView {
             done: format!("Deleted {count} row(s)"),
             review: format!("Review the {count} row(s) to delete, then delete or cancel"),
             confirm: "Delete",
+            destructive: true,
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too"),
             reconnect: None,
         };
@@ -197,6 +203,10 @@ impl GridView {
         labels: ReviewLabels,
         cx: &mut Context<Self>,
     ) {
+        if self.transaction_open() {
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
+            return;
+        }
         self.save.busy = true;
         let generation = self.save.generation;
         let table = self.catalog.grid_table.clone();
@@ -309,6 +319,7 @@ impl GridView {
             done: format!("Added foreign key {} on {name}", key.name),
             review: "Review the relationship change, then apply or cancel".into(),
             confirm: "Add foreign key",
+            destructive: false,
             note: Some("The database checks existing rows and may block writes while validating the new constraint."),
             reconnect: None,
         };
@@ -399,6 +410,7 @@ impl GridView {
                     title: labels.title.replace("{n}", &rows),
                     done: labels.done.replace("{n}", &rows),
                     confirm: labels.confirm,
+                    destructive: labels.destructive,
                     note: labels.note,
                     reconnect: labels.reconnect,
                     generation,
@@ -462,7 +474,7 @@ impl GridView {
 
     pub(crate) fn confirm_save(&mut self, cx: &mut Context<Self>) {
         if self.transaction_open() {
-            self.status = "Commit or roll back the transaction before saving grid changes".into();
+            self.status = TRANSACTION_BLOCKS_SAVE.into();
             cx.notify();
             return;
         }
@@ -682,9 +694,14 @@ impl GridView {
                         .gap_3()
                         .child(task_title(pending.title.clone()))
                         .child(
-                            button(ButtonKind::Primary, "confirm-save", pending.confirm, theme)
-                                .tooltip(tip("Run these statements in one transaction"))
-                                .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
+                            button(
+                                confirm_kind(pending.destructive),
+                                "confirm-save",
+                                pending.confirm,
+                                theme,
+                            )
+                            .tooltip(tip("Run these statements in one transaction"))
+                            .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
                         )
                         .child(
                             button(ButtonKind::Ghost, "cancel-save", "Cancel", theme)
@@ -718,6 +735,14 @@ impl GridView {
                         ))
                 })),
         )
+    }
+}
+
+pub(crate) fn confirm_kind(destructive: bool) -> ButtonKind {
+    if destructive {
+        ButtonKind::Destructive
+    } else {
+        ButtonKind::Primary
     }
 }
 
