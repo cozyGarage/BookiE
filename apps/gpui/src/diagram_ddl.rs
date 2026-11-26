@@ -256,6 +256,57 @@ impl GridView {
 mod tests {
     use super::*;
 
+    #[gpui::test]
+    fn diagram_creation_waits_for_review_and_refreshes_the_diagram(cx: &mut gpui::TestAppContext) {
+        use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving, write_session};
+        use bookie_gpui::live::{LiveSession, Origin};
+        let path = fixture_copy("diagram-create-review");
+        let (view, cx) = saving_view(cx, &path);
+        let write = write_session(&path, false);
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.tabs.open_diagram();
+                let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+                view.save.write = Some((id, write));
+                view.begin_diagram_ddl(None, window, cx);
+                let draft = view.search.diagram.ddl.as_ref().expect("draft");
+                draft.name.update(cx, |input, cx| input.set_content("draft table", cx));
+                draft.columns[0]
+                    .0
+                    .update(cx, |input, cx| input.set_content("entry", cx));
+                draft.columns[0].1.update(cx, |input, cx| input.set_content("text", cx));
+                view.review_diagram_ddl(cx);
+            })
+        });
+        settle_saving(cx);
+        view.read_with(cx, |view, _| {
+            let review = view.save.pending.as_ref().expect("SQL review");
+            assert!(review.plan.preview.contains("CREATE TABLE"));
+        });
+        let current = || LiveSession::open(&Origin::File(path.clone())).expect("open current database");
+        assert!(!current().tables.iter().any(|table| table.name == "draft table"));
+
+        cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
+        for _ in 0..100 {
+            settle_saving(cx);
+            if view.read_with(cx, |view, _| !view.save.busy && !view.search.diagram.loading) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        view.read_with(cx, |view, _| {
+            assert!(matches!(view.tabs.current(), Tab::Diagram));
+            let diagram = view.search.diagram.view.as_ref().expect(&view.status);
+            assert!(
+                diagram.diagram.tables.iter().any(|table| table.name == "draft table"),
+                "{}",
+                view.status
+            );
+        });
+        assert!(current().tables.iter().any(|table| table.name == "draft table"));
+        std::fs::remove_file(path).ok();
+    }
+
     #[test]
     fn diagram_ddl_quotes_exact_targets_and_rejects_sql_in_types() {
         let table = TableInfo {
