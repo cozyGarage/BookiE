@@ -226,14 +226,42 @@ impl GridView {
                     }
                 },
             );
-            self.panel.running = Some(self.loads.generation);
+            self.track_running_query(cx);
             return;
         }
         self.add_run(None);
     }
 
+    fn track_running_query(&mut self, cx: &mut Context<Self>) {
+        let running = (self.loads.generation, Instant::now());
+        self.panel.running = Some(running);
+        cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(Duration::from_secs(1)).await;
+                let still_running = this
+                    .update(cx, |view, cx| {
+                        let still_running = view.panel.running == Some(running);
+                        if still_running && matches!(view.tabs.current(), Tab::Query) {
+                            cx.notify();
+                        }
+                        still_running
+                    })
+                    .unwrap_or(false);
+                if !still_running {
+                    break;
+                }
+            }
+        })
+        .detach();
+    }
+
     pub(crate) fn stop_query(&mut self) {
-        if self.panel.running == Some(self.loads.generation) && !self.loads.cancel.is_cancelled() {
+        if self
+            .panel
+            .running
+            .is_some_and(|(generation, _)| generation == self.loads.generation)
+            && !self.loads.cancel.is_cancelled()
+        {
             self.loads.cancel.cancel();
             self.status = "Cancellation requested…".into();
         }

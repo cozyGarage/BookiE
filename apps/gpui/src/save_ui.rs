@@ -41,12 +41,14 @@ pub(crate) struct SaveState {
     pub generation: u64,
     pub banner: Option<(String, bool)>,
     pub banner_serial: u64,
+    refresh_diagram: bool,
     pub reconnect_after: Option<bookie_core::TableInfo>,
     pub checks: Vec<CellCheck>,
 }
 
 pub(crate) struct PendingSave {
     relationship: Option<ForeignKeyReview>,
+    diagram: Option<(u64, Option<Vec<bookie_core::ColumnInfo>>)>,
     pub plan: CellSavePlan,
     pub title: String,
     pub done: String,
@@ -253,6 +255,48 @@ impl GridView {
         .detach();
     }
 
+    pub(crate) fn prepare_diagram_ddl(
+        &mut self,
+        live: Arc<LiveSession>,
+        table: bookie_core::TableInfo,
+        create: bool,
+        plan: CellSavePlan,
+        labels: ReviewLabels,
+        cx: &mut Context<Self>,
+    ) {
+        let generation = self.save.generation;
+        let revision = self.search.diagram.request.generation;
+        self.save.busy = true;
+        self.status = "Preparing the schema changes…".into();
+        cx.spawn(async move |this, cx| {
+            let target = table.clone();
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    if create {
+                        Ok(None)
+                    } else {
+                        live.table_columns(&target).map(Some)
+                    }
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if this.search.diagram.request.generation != revision || !matches!(this.tabs.current(), Tab::Diagram) {
+                    this.save.busy = false;
+                    this.status = "The diagram changed while preparing the review".into();
+                } else {
+                    let reviewed_columns = result.as_ref().ok().cloned().flatten();
+                    this.receive_plan(result.map(|_| (plan, None)), labels, (generation, table), Vec::new());
+                    if let Some(pending) = &mut this.save.pending {
+                        pending.diagram = Some((revision, reviewed_columns));
+                    }
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     fn receive_plan(
         &mut self,
         planned: Result<PreparedSave, String>,
@@ -276,6 +320,7 @@ impl GridView {
                 self.status = labels.review;
                 self.save.pending = Some(PendingSave {
                     relationship,
+                    diagram: None,
                     plan,
                     title: labels.title.replace("{n}", &rows),
                     done: labels.done.replace("{n}", &rows),
@@ -348,12 +393,18 @@ impl GridView {
         let Some(connection_id) = live.writable else {
             return;
         };
-        let on_the_table = matches!(self.tabs.current(), Tab::Table(table) if *table == self.catalog.grid_table);
-        if self.save.busy
-            || pending.generation != self.save.generation
-            || pending.table != self.catalog.grid_table
-            || !on_the_table
-        {
+        let target_current = match &pending.diagram {
+            Some((revision, _)) => {
+                matches!(self.tabs.current(), Tab::Diagram)
+                    && *revision == self.search.diagram.request.generation
+                    && !self.transaction_open()
+            }
+            None => {
+                pending.table == self.catalog.grid_table
+                    && matches!(self.tabs.current(), Tab::Table(table) if *table == pending.table)
+            }
+        };
+        if self.save.busy || pending.generation != self.save.generation || !target_current {
             self.status = "The table or the edits changed since the review; press Ctrl+S to review again".into();
             cx.notify();
             return;
@@ -371,6 +422,9 @@ impl GridView {
         let approvals = self.approval.tx.clone();
         let opened_with = live.stamp.clone();
         let done = pending.done;
+        self.save.refresh_diagram = pending.diagram.is_some();
+        let diagram_columns = pending.diagram.and_then(|(_, columns)| columns);
+        let table = pending.table;
         let relationship = pending.relationship;
         let is_relationship = relationship.is_some();
         let (statements, expect_one) = (pending.plan.statements, pending.plan.expect_one);
@@ -386,7 +440,18 @@ impl GridView {
                             opened_with.as_deref(),
                         )?),
                     };
-                    let precheck = relationship.map_or(Ok(()), |review| review.verify(&live));
+                    let precheck = relationship
+                        .map_or(Ok(()), |review| review.verify(&live))
+                        .and_then(|()| {
+                            if let Some(columns) = diagram_columns
+                                && live.table_columns(&table)? != columns
+                            {
+                                return Err(
+                                    "The table changed since review. Refresh the diagram and review again".into()
+                                );
+                            }
+                            Ok(())
+                        });
                     let applied = match precheck {
                         Ok(()) => write.apply(&statements, &expect_one, &tokio_util::sync::CancellationToken::new()),
                         Err(message) => Err(SaveFailure {
@@ -417,7 +482,15 @@ impl GridView {
         reconnect: Option<bookie_core::TableInfo>,
         cx: &mut Context<Self>,
     ) {
-        if let Some(table) = reconnect {
+        if std::mem::take(&mut self.save.refresh_diagram) {
+            self.status = text;
+            self.search.diagram.ddl = None;
+            if matches!(self.tabs.current(), Tab::Diagram) {
+                self.open_schema_diagram(cx);
+            } else {
+                self.reset_diagram();
+            }
+        } else if let Some(table) = reconnect {
             self.status = text;
             self.connect_preferring(
                 bookie_gpui::live::Origin::Saved(connection_id.to_string()),
@@ -442,6 +515,7 @@ impl GridView {
             Err(message) => {
                 self.save.busy = false;
                 self.save.checks.clear();
+                self.save.refresh_diagram = false;
                 self.status = format!("Could not open a connection for saving: {message}");
                 self.show_banner(self.status.clone(), true, cx);
                 return;
@@ -471,6 +545,7 @@ impl GridView {
             Err(failure) => {
                 self.save.busy = false;
                 self.save.checks.clear();
+                self.save.refresh_diagram = false;
                 self.status = format!("Could not save: {}", with_resolve_hint(&failure.message));
                 self.show_banner(self.status.clone(), true, cx);
             }

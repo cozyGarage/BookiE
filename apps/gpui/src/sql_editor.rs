@@ -9,7 +9,9 @@ use gpui::{App, Context, SharedString, Task, WeakEntity, Window};
 use gpui_component::input::{CompletionProvider, EditorState, Rope, RopeExt};
 use lsp_types::{CompletionContext, CompletionItem, CompletionResponse, CompletionTextEdit, Range, TextEdit};
 
-use crate::{GridView, live::LiveSession};
+use bookie_gpui::live::LiveSession;
+
+use crate::GridView;
 
 const MAX_COMPLETION_BYTES: usize = 256 * 1024;
 const MAX_COMPLETION_ITEMS: usize = 50;
@@ -22,7 +24,7 @@ impl CompletionProvider for SqlCompletion {
         &self,
         text: &Rope,
         offset: usize,
-        _: CompletionContext,
+        trigger: CompletionContext,
         _: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<CompletionResponse>> {
@@ -33,18 +35,56 @@ impl CompletionProvider for SqlCompletion {
             let view = view.read(cx);
             Some((view.live.clone()?, view.schema_context.clone()))
         });
+        if trigger.trigger_kind == lsp_types::CompletionTriggerKind::TRIGGER_CHARACTER && !auto_suggest(text, offset) {
+            return Task::ready(Ok(CompletionResponse::Array(Vec::new())));
+        }
+        let Some((session, schema)) = context else {
+            return Task::ready(Ok(CompletionResponse::Array(Vec::new())));
+        };
         let text = text.clone();
-        cx.background_executor().spawn(async move {
-            let items = context.map_or_else(Vec::new, |(session, schema)| {
-                completion_items(&text, offset, &session, schema.as_deref())
-            });
-            Ok(CompletionResponse::Array(items))
+        let view = self.0.clone();
+        let current_session = session.clone();
+        let current_schema = schema.clone();
+        let task = cx
+            .background_executor()
+            .spawn(async move { completion_items(&text, offset, &session, schema.as_deref()) });
+        cx.spawn(async move |cx| {
+            let items = task.await;
+            let still_current = view
+                .read_with(cx, |view, _| {
+                    view.live
+                        .as_ref()
+                        .is_some_and(|session| Arc::ptr_eq(session, &current_session))
+                        && view.schema_context == current_schema
+                })
+                .unwrap_or(false);
+            Ok(CompletionResponse::Array(if still_current {
+                items
+            } else {
+                Vec::new()
+            }))
         })
     }
 
     fn is_completion_trigger(&self, _: usize, inserted: &str, _: &mut App) -> bool {
         matches!(inserted, " " | ".")
     }
+}
+
+fn auto_suggest(text: &Rope, offset: usize) -> bool {
+    let point = text.offset_to_position(offset);
+    let start = text.position_to_offset(&lsp_types::Position::new(point.line, 0));
+    let line = text.slice(start..offset).to_string();
+    if line.ends_with('.') {
+        return true;
+    }
+    line.split_whitespace().next_back().is_some_and(|word| {
+        [
+            "FROM", "JOIN", "INTO", "UPDATE", "SELECT", "WHERE", "ON", "AND", "OR", "BY",
+        ]
+        .iter()
+        .any(|keyword| word.eq_ignore_ascii_case(keyword))
+    })
 }
 
 fn completion_items(
@@ -156,17 +196,44 @@ pub(crate) fn snippet_menu(
     mut menu: gpui_component::menu::PopupMenu,
     owner: &WeakEntity<GridView>,
 ) -> gpui_component::menu::PopupMenu {
+    use bookie_app_services::snippets::{Snippet, SnippetStore};
     use gpui_component::menu::PopupMenuItem;
-    let snippets = bookie_app_services::snippets::SnippetStore::open().map_or_else(Vec::new, |store| store.list());
+    let snippets = SnippetStore::open().map_or_else(Vec::new, |store| store.list());
     menu = menu.separator();
-    if snippets.is_empty() {
-        return menu.item(PopupMenuItem::new("No saved SQL snippets").disabled(true));
-    }
-    for snippet in snippets {
+    let examples = [
+        ("SELECT template", "SELECT $0\nFROM "),
+        (
+            "Common table expression",
+            "WITH query AS (\n    $0\n)\nSELECT * FROM query;",
+        ),
+    ]
+    .into_iter()
+    .map(|(name, body)| Snippet {
+        name: name.into(),
+        body: body.into(),
+    });
+    for snippet in examples.chain(snippets) {
         let owner = owner.clone();
         menu = menu.item(PopupMenuItem::new(snippet.name).on_click(move |_, window, cx| {
             let _ = owner.update(cx, |view, cx| view.insert_sql_snippet(&snippet.body, window, cx));
         }));
     }
     menu
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn automatic_completion_is_limited_to_sql_boundaries() {
+        for (sql, expected) in [
+            ("SELECT 1 ", false),
+            ("select x FROM ", true),
+            ("o.", true),
+            ("雪 JOIN ", true),
+        ] {
+            assert_eq!(auto_suggest(&Rope::from(sql), sql.len()), expected, "{sql}");
+        }
+    }
 }

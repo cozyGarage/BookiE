@@ -4,7 +4,7 @@ use bookie_app_services::completion_proposals::completion_plan;
 use bookie_app_services::result_editability::grammar_for_driver;
 use bookie_core::sql_syntax::{SqlGrammar, script::ScriptTokenKind};
 use gpui::{Context, Entity, px};
-use gpui_component::input::{EditorState, GutterDecoration, RangeDecoration};
+use gpui_component::input::{EditorState, GutterDecoration, RangeDecoration, RopeExt as _};
 
 use crate::GridView;
 
@@ -20,13 +20,13 @@ impl GridView {
                 editor.create_range_decorations_collection(Vec::new(), cx),
             )
         });
-        let last = std::cell::RefCell::new(None);
+        let mut last = None;
         cx.observe(input, move |view, input, cx| {
             let editor = input.read(cx);
             let driver = view.live.as_ref().map_or("postgres", |session| &session.driver_id);
             let text = (editor.text().len() <= MARK_DOCUMENT_BYTES).then(|| editor.value());
             let key = (text, editor.cursor(), editor.selected_range(), driver.to_owned());
-            if last.borrow().as_ref() == Some(&key) {
+            if last.as_ref() == Some(&key) {
                 return;
             }
             let (marks, decorations) = if let Some(text) = key.0.as_ref() {
@@ -43,7 +43,7 @@ impl GridView {
             } else {
                 (Vec::new(), Vec::new())
             };
-            *last.borrow_mut() = Some(key);
+            last = Some(key);
             gutter.set(marks, cx);
             ranges.set(decorations, cx);
             cx.notify();

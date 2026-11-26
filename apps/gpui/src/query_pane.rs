@@ -98,12 +98,12 @@ impl GridView {
 
     fn query_run_controls(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let selected = !self.sql_input.read(cx).selected_range().is_empty();
-        let running = self.panel.running.is_some();
+        let running = self.panel.running.map(|(_, at)| at.elapsed().as_secs());
         div()
             .flex()
             .gap_1()
             .items_center()
-            .when(!running, |bar| {
+            .when(running.is_none(), |bar| {
                 bar.child(
                     button(
                         ButtonKind::Primary,
@@ -126,7 +126,12 @@ impl GridView {
                         })),
                 )
             })
-            .when(running, |bar| {
+            .children(running.map(|seconds| {
+                div()
+                    .text_color(rgb(theme.muted_foreground))
+                    .child(format!("{seconds}s"))
+            }))
+            .when(running.is_some(), |bar| {
                 if self.loads.cancel.is_cancelled() {
                     bar.child(crate::surfaces::unavailable_button(
                         ButtonKind::Ghost,
@@ -181,12 +186,14 @@ impl GridView {
                     }));
                 }
                 let complete = owner.clone();
-                menu = menu.item(PopupMenuItem::new("Suggest SQL").on_click(move |_, window, cx| {
-                    let _ = complete.update(cx, |view, cx| {
-                        view.sql_input
-                            .update(cx, |editor, cx| editor.show_completions(window, cx));
-                    });
-                }));
+                menu = menu.item(
+                    PopupMenuItem::new("Suggest SQL (Ctrl+Space)").on_click(move |_, window, cx| {
+                        let _ = complete.update(cx, |view, cx| {
+                            view.sql_input
+                                .update(cx, |editor, cx| editor.show_completions(window, cx));
+                        });
+                    }),
+                );
                 crate::sql_editor::snippet_menu(menu, &owner)
             })
     }

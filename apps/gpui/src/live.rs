@@ -415,7 +415,7 @@ impl LiveSession {
         self.read_columns(table, self.next_epoch(), Duration::from_secs(10))
     }
 
-    pub(crate) fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
+    pub fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
         self.read_columns(table, Epoch(self.epoch.load(Ordering::Relaxed)), Duration::from_secs(1))
     }
 

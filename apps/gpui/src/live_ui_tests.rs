@@ -1561,6 +1561,23 @@ fn running_a_query_with_ctrl_enter_does_not_add_a_line(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn stop_targets_only_the_current_sql_run(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.panel.running = Some((view.loads.generation.saturating_add(1), std::time::Instant::now()));
+            view.stop_query();
+            assert!(!view.loads.cancel.is_cancelled());
+
+            view.panel.running = Some((view.loads.generation, std::time::Instant::now()));
+            view.stop_query();
+            assert!(view.loads.cancel.is_cancelled());
+            assert!(view.panel.running.is_some());
+        });
+    });
+}
+
+#[gpui::test]
 fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

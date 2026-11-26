@@ -11,7 +11,7 @@ pub(crate) struct PanelState {
     pub chart_loading: bool,
     pub chart_error: Option<&'static str>,
     pub explaining: bool,
-    pub running: Option<u64>,
+    pub running: Option<(u64, std::time::Instant)>,
     pub ratio: f32,
     pub open: bool,
     pub resizing: bool,

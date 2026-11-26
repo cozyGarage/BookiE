@@ -19,6 +19,7 @@ mod connection_form;
 mod connection_info_ui;
 mod copy_selection;
 mod detail_panel;
+mod diagram_ddl;
 mod diagram_relationship;
 mod diagram_scene;
 mod diagram_ui;
@@ -365,6 +366,8 @@ impl GridView {
                 .language("sql")
                 .line_number(true)
                 .folding(true)
+                .searchable(true)
+                .replaceable(true)
                 .placeholder("SELECT … (Ctrl+Enter runs the selection or statement)");
             Self::install_sql_completion(&mut editor, owner);
             editor
@@ -1115,6 +1118,11 @@ fn main() {
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
             text_input::bind_keys(cx);
+            cx.bind_keys([gpui::KeyBinding::new(
+                "ctrl-space",
+                gpui_component::input::ShowCompletions,
+                Some("Input && mode == editor"),
+            )]);
             ui_theme::load_bundled_themes(cx);
             let settings = font_settings::load();
             ui_theme::apply_editor_size(settings.editor_size, cx);
