@@ -4,7 +4,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 
 ## Project
 
-**BookiE** is a Linux-first native database client. GTK is the shipped Linux application; GPUI is the parallel cross-platform frontend under ADR 0052. The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `main` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`).
+**BookiE** is a native database client. GPUI is the primary frontend for new work; GTK is the historical frontend and the current supported Linux release ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)). The product repository is [`cozyGarage/BookiE`](https://github.com/cozyGarage/BookiE). Work happens on the `main` branch in the Rust 1.98 Cargo workspace at the repository root (`crates/`, `apps/linux/`, `tests/`, `scripts/`, `docs/`). `apps/gpui` is a separate Cargo workspace with its own `Cargo.lock`; build and test it through `scripts/gpui-cargo.sh`.
 
 The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
 
@@ -73,17 +73,26 @@ The [`fix-issue` skill](.claude/skills/fix-issue/SKILL.md) runs these steps in o
 
 The workspace manifest is `Cargo.toml`. [ARCHITECTURE.md](ARCHITECTURE.md) has the data flow.
 
-- `crates/core`: domain types, driver traits, query results, filters, transactions and the driver registry. Depends on no other workspace crate.
+- `crates/core`: domain types, driver traits, query results, filters, transactions and the `DriverRegistry` type. Depends on no other workspace crate.
+- `crates/registry`: registers every static driver in `default_registry()` for the composition roots. Depends on `core` and the driver crates.
 - `crates/policy`: statement classification, rules, approvals, masking, blast-radius checks and audit types. Depends on `core` only.
 - `crates/storage`: saved connections, Secret Service access, query history and the audit journal.
 - `crates/ssh`: SSH tunnels through built-in `russh` or system OpenSSH.
 - `crates/transport`: connection assembly for the GUI and `agentd`: driver options, SSH chain, tunnel and the service endpoint used for certificate verification.
-- `crates/results`: pure result logic (compare, filter, find, predicate, scan, spool, exact values, sidebar tree, paging window, grid cursor, stream page index and window) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
-- `crates/app-services`: GTK-free application logic (result copy formats and TSV in `result_copy`, `tr!`/`trn!` in `i18n`) moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib` or `relm4`.
+- `crates/results`: pure result logic (compare, filter, find, predicate, scan, result page, grid cursor, highlight and text match, sidebar tree, stream page budget, index and window, stream result spool, UUID display and exact values) that depends only on `crates/core` ([ADR 0037](docs/decisions/0037-results-crate-split.md)); `crates/app-services` re-exports it.
+- `crates/app-services`: UI-free application logic shared by both frontends and `bookie-audit` (result copy formats and TSV in `result_copy`, `tr!`/`trn!` in `i18n`), first moved out of `apps/linux/app/src/services` in stages ([ADR 0018](docs/decisions/0018-headless-app-services-crate.md)); it must not depend on `gtk4`, `libadwaita`, `glib`, `relm4` or `gpui`.
+- `crates/dump`: vendor-tool supervision and PostgreSQL dump and restore requests. Depends on `core` only.
+- `crates/checks`: TCP reachability checks and their result history. No workspace dependency.
+- `crates/pg-sessions`: the PostgreSQL session list query and its row type. Depends on `core` only.
+- `crates/kafka-browser`: read-only Kafka topic listing and bounded record tail. No workspace dependency.
+- `crates/avro-container`: bounded Avro object container decoding ([ADR 0050](docs/decisions/0050-avro-container-decode.md)). No workspace dependency.
 - `crates/mcp`: MCP authentication, scopes, connection allowlists, rate limits, tools and transport.
 - `crates/agentd`: headless MCP process and composition root without GTK.
+- `crates/audit`: the local `bookie-audit` command for unknown write outcomes ([ADR 0056](docs/decisions/0056-audited-reconciliation-of-unknown-write-outcomes.md)). Depends on `app-services` only.
 - `crates/drivers/*`: one static crate per engine, implementing `core` traits, never depending on the app.
-- `apps/linux/app`: the GTK application and composition root.
+- `apps/linux/app`: the historical GTK application and composition root.
+- `apps/gpui`: the primary GPUI application and composition root, in its own Cargo workspace. It may depend only on `core`, `results`, `app-services` and `driver-registry` (`scripts/check-crate-boundaries.py`).
+- `tests/release` and `tests/driver-tls`: test-only crates for the release fixture and driver TLS fixtures.
 
 Dependencies point toward `core`. Domain and driver crates never import GTK or Relm4. A new engine is a driver crate implementing the `core` contracts, added to `crates/registry`, with documented maturity ([adding drivers](docs/adding-drivers.md)) and tests against a real engine.
 
@@ -186,7 +195,7 @@ Driver integration tests need Docker. If a prerequisite is missing, say which ch
 
 ## Changelog and commits
 
-- Release notes ([ADR 0053](docs/decisions/0053-changelog-fragments.md)): do not edit `CHANGELOG.md` except in a `chore(release)` pull request. A user-facing change adds one file `changelog.d/<slug>.<category>.md` in the same commit. `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security` ([Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)). The file holds one line of user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add a `fixed` fragment for a defect introduced and fixed before release. A change with no user-visible effect adds no fragment. Tagged releases ship the GPUI preview ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)), so a user-visible GPUI change adds a fragment whose line starts with `GPUI`. Preflight runs `python3 scripts/release-notes.py fragments`. The release cut moves fragments into `CHANGELOG.md` with `python3 scripts/release-notes.py release X.Y.Z YYYY-MM-DD`.
+- Release notes ([ADR 0053](docs/decisions/0053-changelog-fragments.md)): do not edit `CHANGELOG.md` except in a `chore(release)` pull request. A user-facing change adds one file `changelog.d/<slug>.<category>.md` in the same commit. `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security` ([Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/)). The file holds one line of user impact, with no paths, type or function names. Test coverage, evidence runs and audits are not changelog entries; keep run-specific reports and research outside the public source tree. Do not add a `fixed` fragment for a defect introduced and fixed before release. A change with no user-visible effect adds no fragment. Tagged releases ship the GPUI preview ([ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md)), so a user-visible GPUI change adds a fragment whose line starts with `GPUI`. Preflight runs `python3 scripts/release-notes.py fragments`. The release cut moves fragments into `CHANGELOG.md` with `python3 scripts/release-notes.py release X.Y.Z YYYY-MM-DD`.
 - Conventional Commits with a single-line subject and no body on branch commits (a squash commit's body is the PR description). Types: `feat`, `fix`, `refactor`, `perf`, `test`, `docs`, `build`, `ci`, `chore`, `style`, `revert`, `security`. Scopes such as `app`, `core`, `policy`, `mcp`, `agentd`, `storage`, `ssh`, `drivers`, `driver-postgres`.
 - A public API change updates every caller and test in the same commit.
 

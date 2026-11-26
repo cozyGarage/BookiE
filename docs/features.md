@@ -1,6 +1,6 @@
 # BookiE features
 
-This page describes current BookiE behavior. Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
+This page describes current BookiE behavior in the GTK app, the supported Linux release. GPUI is the primary frontend for new work and is an unsupported preview; its limits are in [known limitations](known-limitations.md#gpui-frontend-appsgpui-unsupported-preview) and the [GPUI README](../apps/gpui/README.md). Published artifact versions and package requirements are listed in [platforms](platforms.md). Steps and shortcuts are in the [user guide](user-guide.md). Limits are in [known limitations](known-limitations.md). Per-engine capabilities are in the [driver maturity table](adding-drivers.md#driver-maturity).
 
 ## Databases
 
@@ -163,6 +163,6 @@ BookiE can let an AI assistant use saved connections through the Model Context P
 - No account, hosted service or paid tier.
 - No browser interface and no runtime driver plugins.
 - No database snapshots. [ADR 0015](decisions/0015-database-snapshots.md) records the accepted design; snapshots are not available in the current application.
-- Shipped packages are currently focused on Linux first ([platforms](platforms.md)). Cross-platform desktop support is actively underway with the GPUI frontend ([ADR 0052](decisions/0052-gpui-is-the-cross-platform-frontend.md)).
+- Supported packages are Linux GTK builds ([platforms](platforms.md)). The GPUI frontend ships only as an unsupported Linux preview until it passes the release gate in [ADR 0058](decisions/0058-gpui-primary-gtk-historical.md).
 
 Detailed behavior, keyboard shortcuts, and limits are documented in the [user guide](user-guide.md) and [known limitations](known-limitations.md).

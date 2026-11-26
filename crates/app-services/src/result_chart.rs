@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use bookie_core::{ColumnInfo, Value};
+use bookie_core::{ColumnInfo, QueryRowSet, Value};
 use rust_decimal::Decimal;
 use rust_decimal::prelude::ToPrimitive;
 
@@ -73,15 +73,15 @@ pub struct Profile {
     pub avg_len: f32,
 }
 
-pub fn profile(columns: &[ColumnInfo], rows: &[Vec<Value>]) -> Vec<Profile> {
-    let rows = &rows[..rows.len().min(PROFILE_ROWS)];
+pub fn profile<R: QueryRowSet + ?Sized>(columns: &[ColumnInfo], rows: &R) -> Vec<Profile> {
+    let row_count = rows.row_count().min(PROFILE_ROWS);
     columns
         .iter()
         .enumerate()
         .map(|(column, info)| {
             let (mut filled, mut numbers, mut dates, mut chars) = (0, 0, 0, 0);
             let mut seen = HashSet::new();
-            for value in rows.iter().filter_map(|row| row.get(column)) {
+            for value in (0..row_count).filter_map(|index| rows.row(index).and_then(|row| row.get(column))) {
                 let Some(text) = label_text(value) else { continue };
                 filled += 1;
                 chars += text.chars().count();
@@ -230,8 +230,9 @@ struct Groups {
     totals: Totals,
 }
 
-fn group_rows(
-    rows: &[Vec<Value>],
+fn group_rows<R: QueryRowSet + ?Sized>(
+    rows: &R,
+    row_count: usize,
     settings: &Settings,
     picked: &[(usize, Option<usize>)],
     profiles: &[Profile],
@@ -240,7 +241,8 @@ fn group_rows(
     let mut index: HashMap<Option<String>, usize> = HashMap::new();
     let mut labels = Vec::new();
     let mut totals: Totals = vec![Vec::new(); picked.len()];
-    for row in rows {
+    for row_index in 0..row_count {
+        let Some(row) = rows.row(row_index) else { continue };
         let label = row.get(settings.label).and_then(label_text);
         let group = *index.entry(label.clone()).or_insert_with(|| {
             labels.push(label);
@@ -266,14 +268,14 @@ fn group_rows(
     Groups { labels, totals }
 }
 
-pub fn compute(rows: &[Vec<Value>], profiles: &[Profile], settings: &Settings) -> ChartData {
-    let read = &rows[..rows.len().min(MAX_ROWS)];
+pub fn compute<R: QueryRowSet + ?Sized>(rows: &R, profiles: &[Profile], settings: &Settings) -> ChartData {
+    let row_count = rows.row_count().min(MAX_ROWS);
     let mut picked: Vec<(usize, Option<usize>)> = settings.picked().map(|(slot, c)| (slot, Some(c))).collect();
     if picked.is_empty() && settings.aggregate == Aggregate::Count {
         picked.push((0, None));
     }
-    let Groups { labels, totals } = group_rows(read, settings, &picked, profiles);
-    let aggregate = if labels.len() < read.len() {
+    let Groups { labels, totals } = group_rows(rows, row_count, settings, &picked, profiles);
+    let aggregate = if labels.len() < row_count {
         settings.aggregate
     } else {
         Aggregate::Sum
@@ -305,8 +307,8 @@ pub fn compute(rows: &[Vec<Value>], profiles: &[Profile], settings: &Settings) -
                 values: order.iter().map(|&g| values[g]).collect(),
             })
             .collect(),
-        rows: read.len(),
-        rows_cut: rows.len() > MAX_ROWS,
+        rows: row_count,
+        rows_cut: rows.row_count() > MAX_ROWS,
         groups: labels.len(),
         cut,
     }

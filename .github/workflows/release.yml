@@ -265,7 +265,7 @@ jobs:
           Extract this archive, change into the extracted directory, and run ./bookie-gpui from a graphical X11 or Wayland session.
           Requires glibc 2.39 or newer, a Vulkan-capable graphics driver, and the host runtime
           libraries: fontconfig, freetype, Wayland client, xkbcommon and Vulkan loader.
-          This preview is read-only. Keyboard and screen-reader accessibility are unverified;
+          Table writes go through review, policy and audit on writable saved connections. Keyboard and screen-reader accessibility are unverified;
           this artifact does not claim supported Linux platform status.
           EOF
           ldd "dist/${name}/bookie-gpui" > "dist/${name}/RUNTIME_DEPENDENCIES.txt"
