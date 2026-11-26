@@ -28,4 +28,4 @@ pub use plan::{
     DEFAULT_IMPORT_BATCH_ROWS, ImportTarget, InsertPlan, MAX_REPORTED_ROW_ERRORS, PlanError, build_insert_plan,
 };
 pub use upsert::{ConflictKey, MAX_CONFLICT_KEYS, WriteMode, apply_upsert, conflict_key_candidates};
-pub use xlsx_import::{is_xlsx, xlsx_to_csv};
+pub use xlsx_import::{is_xlsx, read_xlsx, xlsx_to_csv};

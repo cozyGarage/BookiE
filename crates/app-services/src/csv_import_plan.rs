@@ -2,8 +2,8 @@ use std::path::Path;
 
 use bookie_core::DriverCapabilities;
 use bookie_core::import::{
-    CsvImportOptions, ImportTarget, PlanError, build_insert_plan, detect_format, read_csv, read_import_file,
-    suggest_mapping,
+    CsvImportOptions, ImportTarget, PlanError, build_insert_plan, detect_format, is_xlsx, read_csv, read_import_file,
+    read_xlsx, suggest_mapping,
 };
 
 use crate::cell_save_plan::SaveTarget;
@@ -50,20 +50,26 @@ pub fn plan_csv_import(
     choices: &ImportChoices,
 ) -> Result<CsvImportPlan, CsvImportError> {
     let bytes = read_import_file(path).map_err(|error| CsvImportError::File(error.to_string()))?;
-    let bytes = if bookie_core::import::is_xlsx(&bytes) {
-        bookie_core::import::xlsx_to_csv(&bytes).map_err(|error| CsvImportError::File(error.to_string()))?
+    let (sheet, options, truncated) = if is_xlsx(&bytes) {
+        let sheet = read_xlsx(&bytes, row_cap).map_err(|error| CsvImportError::File(error.to_string()))?;
+        let truncated = sheet.truncated;
+        let options = CsvImportOptions {
+            null_marker: choices.null_marker.clone(),
+            ..Default::default()
+        };
+        (sheet, options, truncated)
     } else {
-        bytes
+        let mut options = CsvImportOptions::from(detect_format(&bytes));
+        if let Some(delimiter) = choices.delimiter {
+            options.delimiter = delimiter;
+        }
+        options.null_marker = choices.null_marker.clone();
+        let mut sheet = read_csv(&bytes, &options, Some(row_cap.saturating_add(1)))
+            .map_err(|error| CsvImportError::File(error.to_string()))?;
+        let truncated = sheet.rows.len() > row_cap;
+        sheet.rows.truncate(row_cap);
+        (sheet, options, truncated)
     };
-    let mut options = CsvImportOptions::from(detect_format(&bytes));
-    if let Some(delimiter) = choices.delimiter {
-        options.delimiter = delimiter;
-    }
-    options.null_marker = choices.null_marker.clone();
-    let mut sheet =
-        read_csv(&bytes, &options, Some(row_cap + 1)).map_err(|error| CsvImportError::File(error.to_string()))?;
-    let truncated = sheet.rows.len() > row_cap;
-    sheet.rows.truncate(row_cap);
     let mapping = suggest_mapping(&sheet.headers, target.columns);
     if mapping.iter().all(Option::is_none) {
         return Err(CsvImportError::NoMatchingColumns);
@@ -225,6 +231,51 @@ mod tests {
         assert_eq!(result.imported_columns, ["customer", "total"]);
         let (_, values) = &result.statements[0];
         assert_eq!(values[1], bookie_core::Value::Null, "the chosen NULL text becomes NULL");
+    }
+
+    #[test]
+    fn an_excel_import_uses_worksheet_columns_even_when_a_csv_delimiter_is_selected() {
+        use bookie_core::export::{CsvDelimiter, ResultExport, ResultFormat, write_result_file};
+        use bookie_core::{QueryResult, Value};
+
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("orders.xlsx");
+        let result = QueryResult {
+            columns: orders().into_iter().skip(1).collect(),
+            rows: vec![
+                vec![Value::Text("a,b|c".into()), Value::Float(2.5)],
+                vec![Value::Text("next".into()), Value::Float(3.5)],
+            ]
+            .into(),
+            truncated: false,
+        };
+        write_result_file(
+            &path,
+            &result,
+            &ResultExport {
+                format: ResultFormat::Xlsx,
+                csv: &Default::default(),
+                sql: None,
+            },
+            || false,
+            |_| (),
+        )
+        .unwrap();
+        let target = SaveTarget {
+            driver_id: "sqlite",
+            schema: None,
+            table: "orders",
+            columns: &orders(),
+        };
+        let choices = ImportChoices {
+            delimiter: Some(CsvDelimiter::Pipe),
+            ..Default::default()
+        };
+        let plan = plan_csv_import(target, DriverCapabilities::default(), &path, 1, &choices).unwrap();
+        assert_eq!(plan.imported_columns, ["customer", "total"]);
+        assert_eq!(plan.statements[0].1, [Value::Text("a,b|c".into()), Value::Float(2.5)]);
+        assert_eq!(plan.rows, 1);
+        assert!(plan.truncated);
     }
 
     #[test]

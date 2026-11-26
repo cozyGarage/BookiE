@@ -342,7 +342,11 @@ fn collect_rows(
     }
 }
 
-fn finish_sheet(headers: Vec<String>, mut rows: Vec<Vec<String>>, truncated: bool) -> Result<CsvSheet, ImportError> {
+pub(super) fn finish_sheet(
+    headers: Vec<String>,
+    mut rows: Vec<Vec<String>>,
+    truncated: bool,
+) -> Result<CsvSheet, ImportError> {
     let width = headers.len().max(rows.iter().map(Vec::len).max().unwrap_or(0));
     if width == 0 {
         return Err(ImportError::NoColumns);
