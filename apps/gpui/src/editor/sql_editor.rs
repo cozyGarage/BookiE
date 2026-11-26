@@ -174,6 +174,7 @@ fn completion_item(rank: usize, candidate: Candidate, range: Range, types: &Hash
     let kind = match candidate.kind {
         CandidateKind::Column => CompletionItemKind::FIELD,
         CandidateKind::Local => CompletionItemKind::VARIABLE,
+        CandidateKind::Function => CompletionItemKind::FUNCTION,
         CandidateKind::Table => CompletionItemKind::CLASS,
         CandidateKind::Keyword => CompletionItemKind::KEYWORD,
     };
@@ -323,8 +324,20 @@ mod tests {
         );
         assert_eq!(column.kind, Some(CompletionItemKind::FIELD));
         assert_eq!(column.detail.as_deref(), Some("REAL · orders"));
+        let function = completion_item(
+            1,
+            Candidate {
+                label: "COUNT".into(),
+                insert: "COUNT".into(),
+                kind: CandidateKind::Function,
+                detail: None,
+            },
+            range,
+            &types,
+        );
+        assert_eq!(function.kind, Some(CompletionItemKind::FUNCTION));
         let keyword = completion_item(
-            7,
+            2,
             Candidate {
                 label: "SELECT".into(),
                 insert: "SELECT".into(),
@@ -335,7 +348,8 @@ mod tests {
             &types,
         );
         assert_eq!(keyword.kind, Some(CompletionItemKind::KEYWORD));
-        assert!(column.sort_text < keyword.sort_text);
+        assert!(column.sort_text < function.sort_text);
+        assert!(function.sort_text < keyword.sort_text);
     }
 
     #[test]

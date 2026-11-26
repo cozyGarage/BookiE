@@ -1,0 +1,1 @@
+- GPUI: SQL completion ranks referenced columns and functions ahead of unrelated tables and keywords.
