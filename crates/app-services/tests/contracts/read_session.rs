@@ -1,5 +1,4 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
-#![recursion_limit = "256"]
 
 use std::sync::Arc;
 
