@@ -1,3 +1,4 @@
+use bookie_app_services::service_runtime::block_on;
 use std::path::{Path, PathBuf};
 
 use super::*;
@@ -24,13 +25,6 @@ enum PreparedImport {
     Locked(bundles::EncryptedBundle),
 }
 
-fn runtime() -> Result<tokio::runtime::Runtime, String> {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| error.to_string())
-}
-
 fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
     let metadata = std::fs::metadata(path).map_err(|_| "Could not read the selected connection file".to_string())?;
     if !metadata.is_file() || metadata.len() > limit as u64 {
@@ -52,9 +46,11 @@ fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>, String> {
 
 fn prepare_import(path: &Path) -> Result<PreparedImport, String> {
     if is_sqlite_file(path)? {
-        let imported = runtime()?
-            .block_on(bundles::parse_dbx_connection_database(path))
-            .map_err(|error| error.to_string())?;
+        let imported = block_on(async {
+            bundles::parse_dbx_connection_database(path)
+                .await
+                .map_err(|error| error.to_string())
+        })?;
         let skipped = imported.skipped.clone();
         return plan_body(imported.into_body(), skipped);
     }
@@ -102,9 +98,7 @@ fn parse_peer(path: &Path, bytes: &[u8]) -> Result<(bundles::BundleBody, Vec<Str
 }
 
 fn plan_body(body: bundles::BundleBody, skipped: Vec<String>) -> Result<PreparedImport, String> {
-    let local = runtime()?
-        .block_on(bundles::load_connections())
-        .map_err(|error| error.to_string())?;
+    let local = block_on(async { bundles::load_connections().await.map_err(|error| error.to_string()) })?;
     let plan = bundles::plan_import(&local, &body).map_err(|error| error.to_string())?;
     Ok(PreparedImport::Review(PendingImport { plan, body, skipped }))
 }
@@ -434,7 +428,7 @@ fn plan_is_current(plan: &bundles::ImportPlan, local: &[bundles::SavedConnection
 }
 
 fn apply_import(pending: PendingImport) -> Result<usize, String> {
-    runtime()?.block_on(async move {
+    block_on(async move {
         let local = bundles::load_connections()
             .await
             .map_err(|_| "The saved connections could not be read, so nothing was imported".to_string())?;
@@ -490,7 +484,7 @@ async fn apply_import_body(body: bundles::BundleBody, reviewed: bundles::ImportP
 }
 
 fn export_connections(path: PathBuf) -> Result<usize, String> {
-    runtime()?.block_on(async move {
+    block_on(async move {
         let database = bookie_app_services::database_service::DatabaseService::new();
         let operation = uuid::Uuid::new_v4();
         let connections = bundles::load_connections().await.map_err(|error| error.to_string())?;

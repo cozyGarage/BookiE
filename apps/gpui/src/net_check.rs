@@ -1,4 +1,5 @@
 use bookie_app_services::checks::{History, Outcome};
+use bookie_app_services::service_runtime::block_on;
 
 pub const HISTORY_CHECKS: usize = 20;
 
@@ -13,13 +14,11 @@ pub fn parse_address(text: &str) -> Option<String> {
 }
 
 pub fn kafka_topics(broker: &str) -> Result<String, String> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|error| error.to_string())?;
-    let topics = runtime
-        .block_on(bookie_app_services::kafka_browser::list_topics(&[broker.to_string()]))
-        .map_err(|error| error.to_string())?;
+    let topics = block_on(async {
+        bookie_app_services::kafka_browser::list_topics(&[broker.to_string()])
+            .await
+            .map_err(|error| error.to_string())
+    })?;
     if topics.is_empty() {
         return Ok(format!("{broker} · no topics"));
     }
@@ -38,16 +37,8 @@ pub fn kafka_topics(broker: &str) -> Result<String, String> {
 }
 
 pub fn run_check(address: &str) -> Outcome {
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build();
-    match runtime {
-        Ok(runtime) => runtime.block_on(bookie_app_services::checks::check_tcp(
-            address,
-            std::time::Duration::from_secs(5),
-        )),
-        Err(error) => Outcome::Down {
-            reason: error.to_string(),
-        },
-    }
+    block_on(async { Ok(bookie_app_services::checks::check_tcp(address, std::time::Duration::from_secs(5)).await) })
+        .unwrap_or_else(|reason| Outcome::Down { reason })
 }
 
 pub fn record(histories: &mut Vec<(String, History)>, address: &str, outcome: Outcome) -> (bool, String) {
