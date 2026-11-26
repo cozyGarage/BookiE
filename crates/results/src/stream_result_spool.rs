@@ -1,6 +1,6 @@
 use std::fmt;
 use std::fs::File;
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -9,8 +9,9 @@ use aes_gcm::aead::{Aead, KeyInit, Payload, consts::U12};
 use aes_gcm::{Aes256Gcm, Nonce};
 use bookie_core::{ColumnInfo, QueryResult, QueryRows, Value};
 use secrecy::{ExposeSecret, SecretBox};
+use serde::de::{self, SeqAccess, Visitor};
 use serde::ser::{SerializeSeq, SerializeStruct, Serializer};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 const FRAME_VERSION: u8 = 1;
@@ -111,9 +112,11 @@ struct StoredPageRef<'a> {
 
 #[derive(Deserialize)]
 struct StoredPage {
-    rows: Vec<Vec<StoredValue>>,
+    rows: StoredRows,
     truncated: bool,
 }
+
+struct StoredRows(QueryRows);
 
 #[derive(Deserialize)]
 enum StoredValue {
@@ -207,17 +210,47 @@ impl Serialize for StoredValueRef<'_> {
 }
 
 impl StoredPage {
-    fn into_query_result(self, columns: Vec<ColumnInfo>) -> Result<QueryResult, StreamResultSpoolError> {
-        let rows = self
-            .rows
-            .into_iter()
-            .map(|row| row.into_iter().map(StoredValue::into_value).collect())
-            .collect::<Result<Vec<Vec<Value>>, _>>()?;
-        Ok(QueryResult {
+    fn into_query_result(self, columns: Vec<ColumnInfo>) -> QueryResult {
+        QueryResult {
             columns,
-            rows: rows.into(),
+            rows: self.rows.0,
             truncated: self.truncated,
-        })
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for StoredRows {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct RowsVisitor;
+
+        impl<'de> Visitor<'de> for RowsVisitor {
+            type Value = StoredRows;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("stored result rows")
+            }
+
+            fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut rows = QueryRows::new();
+                while let Some(row) = sequence.next_element::<Vec<StoredValue>>()? {
+                    let values = row
+                        .into_iter()
+                        .map(StoredValue::into_value)
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(de::Error::custom)?;
+                    rows.push(values);
+                }
+                Ok(StoredRows(rows))
+            }
+        }
+
+        deserializer.deserialize_seq(RowsVisitor)
     }
 }
 
@@ -615,94 +648,154 @@ fn load_page_blocking(
     index: u64,
     columns: Vec<ColumnInfo>,
 ) -> Result<Arc<QueryResult>, StreamResultSpoolError> {
-    let mut spool = inner.file.lock().map_err(|_| StreamResultSpoolError::Io)?;
-    let location = *spool
-        .pages
-        .get(usize::try_from(index).map_err(|_| StreamResultSpoolError::MissingPage)?)
-        .ok_or(StreamResultSpoolError::MissingPage)?;
-    spool
-        .file
-        .seek(SeekFrom::Start(location.offset))
-        .map_err(|_| StreamResultSpoolError::Io)?;
-    let page = read_page_payload(inner, &mut spool.file, index, location)?;
-    drop(spool);
-    Ok(Arc::new(page.into_query_result(columns)?))
+    let (location, mut payload) = {
+        let mut spool = inner.file.lock().map_err(|_| StreamResultSpoolError::Io)?;
+        let location = *spool
+            .pages
+            .get(usize::try_from(index).map_err(|_| StreamResultSpoolError::MissingPage)?)
+            .ok_or(StreamResultSpoolError::MissingPage)?;
+        spool
+            .file
+            .seek(SeekFrom::Start(location.offset))
+            .map_err(|_| StreamResultSpoolError::Io)?;
+        let buffer_size = ENCRYPTION_CHUNK_BYTES + FRAME_HEADER_BYTES as usize + AUTH_TAG_BYTES as usize;
+        let mut reader = BufReader::with_capacity(buffer_size, &mut spool.file);
+        (location, read_page_frames(&mut reader, index, location)?)
+    };
+    let page = read_page_payload(inner, &mut payload, index, location)?;
+    Ok(Arc::new(page.into_query_result(columns)))
 }
 
-fn read_page_payload(
-    inner: &SpoolInner,
-    file: &mut File,
+struct FrameHeader {
+    sequence: u64,
+    plaintext_len: usize,
+    ciphertext_len: usize,
+}
+
+fn read_page_frames(
+    reader: &mut impl Read,
     page_index: u64,
     location: PageLocation,
-) -> Result<StoredPage, StreamResultSpoolError> {
+) -> Result<Vec<u8>, StreamResultSpoolError> {
     let mut payload = Vec::new();
     let mut expected_sequence = location.first_nonce;
     for _ in 0..location.chunks {
-        let (sequence, plaintext) = read_frame(inner, file, page_index)?;
-        if sequence != expected_sequence {
+        let mut header = [0_u8; 25];
+        reader.read_exact(&mut header).map_err(|_| StreamResultSpoolError::Io)?;
+        let frame = parse_frame_header(&header, page_index)?;
+        if frame.sequence != expected_sequence {
             return Err(StreamResultSpoolError::InvalidFrame);
         }
         expected_sequence = expected_sequence
             .checked_add(1)
             .ok_or(StreamResultSpoolError::InvalidFrame)?;
-        payload.extend_from_slice(&plaintext);
+        payload.extend_from_slice(&header);
+        let start = payload.len();
+        let end = start
+            .checked_add(frame.ciphertext_len)
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        payload.resize(end, 0);
+        reader
+            .read_exact(&mut payload[start..end])
+            .map_err(|_| StreamResultSpoolError::Io)?;
     }
-    rmp_serde::from_slice(&payload).map_err(|_| StreamResultSpoolError::Decode)
+    Ok(payload)
 }
 
-fn read_frame(
-    inner: &SpoolInner,
-    file: &mut File,
-    expected_page: u64,
-) -> Result<(u64, Vec<u8>), StreamResultSpoolError> {
-    let version = read_byte(file)?;
-    let page = read_u64(file)?;
-    let sequence = read_u64(file)?;
-    let plaintext_len = read_u32(file)? as usize;
-    let ciphertext_len = read_u32(file)? as usize;
-    if version != FRAME_VERSION
+fn parse_frame_header(header: &[u8; 25], expected_page: u64) -> Result<FrameHeader, StreamResultSpoolError> {
+    let page = u64::from_be_bytes(
+        header[1..9]
+            .try_into()
+            .map_err(|_| StreamResultSpoolError::InvalidFrame)?,
+    );
+    let sequence = u64::from_be_bytes(
+        header[9..17]
+            .try_into()
+            .map_err(|_| StreamResultSpoolError::InvalidFrame)?,
+    );
+    let plaintext_len = u32::from_be_bytes(
+        header[17..21]
+            .try_into()
+            .map_err(|_| StreamResultSpoolError::InvalidFrame)?,
+    ) as usize;
+    let ciphertext_len = u32::from_be_bytes(
+        header[21..25]
+            .try_into()
+            .map_err(|_| StreamResultSpoolError::InvalidFrame)?,
+    ) as usize;
+    if header[0] != FRAME_VERSION
         || page != expected_page
         || plaintext_len > ENCRYPTION_CHUNK_BYTES
         || ciphertext_len != plaintext_len.saturating_add(AUTH_TAG_BYTES as usize)
     {
         return Err(StreamResultSpoolError::InvalidFrame);
     }
-    let mut ciphertext = vec![0_u8; ciphertext_len];
-    file.read_exact(&mut ciphertext)
-        .map_err(|_| StreamResultSpoolError::Io)?;
-    let nonce = nonce_for(sequence);
-    let aad = frame_aad(page, sequence, plaintext_len);
-    let plaintext = cipher(inner)?
-        .decrypt(
-            &nonce,
-            Payload {
-                msg: &ciphertext,
-                aad: &aad,
-            },
-        )
-        .map_err(|_| StreamResultSpoolError::Encryption)?;
-    if plaintext.len() != plaintext_len {
+    Ok(FrameHeader {
+        sequence,
+        plaintext_len,
+        ciphertext_len,
+    })
+}
+
+fn read_page_payload(
+    inner: &SpoolInner,
+    payload: &mut Vec<u8>,
+    expected_page: u64,
+    location: PageLocation,
+) -> Result<StoredPage, StreamResultSpoolError> {
+    let cipher = cipher(inner)?;
+    let mut read = 0_usize;
+    let mut written = 0_usize;
+    let mut expected_sequence = location.first_nonce;
+    for _ in 0..location.chunks {
+        let header_end = read.checked_add(25).ok_or(StreamResultSpoolError::InvalidFrame)?;
+        let header: &[u8; 25] = payload
+            .get(read..header_end)
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        let frame = parse_frame_header(header, expected_page)?;
+        if frame.sequence != expected_sequence {
+            return Err(StreamResultSpoolError::InvalidFrame);
+        }
+        expected_sequence = expected_sequence
+            .checked_add(1)
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        let ciphertext_start = header_end;
+        let ciphertext_end = ciphertext_start
+            .checked_add(frame.ciphertext_len)
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        let ciphertext = payload
+            .get(ciphertext_start..ciphertext_end)
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        let nonce = nonce_for(frame.sequence);
+        let aad = frame_aad(expected_page, frame.sequence, frame.plaintext_len);
+        let plaintext = cipher
+            .decrypt(
+                &nonce,
+                Payload {
+                    msg: ciphertext,
+                    aad: &aad,
+                },
+            )
+            .map_err(|_| StreamResultSpoolError::Encryption)?;
+        if plaintext.len() != frame.plaintext_len {
+            return Err(StreamResultSpoolError::InvalidFrame);
+        }
+        let written_end = written
+            .checked_add(plaintext.len())
+            .ok_or(StreamResultSpoolError::InvalidFrame)?;
+        payload
+            .get_mut(written..written_end)
+            .ok_or(StreamResultSpoolError::InvalidFrame)?
+            .copy_from_slice(&plaintext);
+        read = ciphertext_end;
+        written = written_end;
+    }
+    if read != payload.len() {
         return Err(StreamResultSpoolError::InvalidFrame);
     }
-    Ok((sequence, plaintext))
-}
-
-fn read_byte(file: &mut File) -> Result<u8, StreamResultSpoolError> {
-    let mut bytes = [0_u8; 1];
-    file.read_exact(&mut bytes).map_err(|_| StreamResultSpoolError::Io)?;
-    Ok(bytes[0])
-}
-
-fn read_u32(file: &mut File) -> Result<u32, StreamResultSpoolError> {
-    let mut bytes = [0_u8; 4];
-    file.read_exact(&mut bytes).map_err(|_| StreamResultSpoolError::Io)?;
-    Ok(u32::from_be_bytes(bytes))
-}
-
-fn read_u64(file: &mut File) -> Result<u64, StreamResultSpoolError> {
-    let mut bytes = [0_u8; 8];
-    file.read_exact(&mut bytes).map_err(|_| StreamResultSpoolError::Io)?;
-    Ok(u64::from_be_bytes(bytes))
+    payload.truncate(written);
+    rmp_serde::from_slice(payload).map_err(|_| StreamResultSpoolError::Decode)
 }
 
 fn nonce_for(sequence: u64) -> Nonce<U12> {

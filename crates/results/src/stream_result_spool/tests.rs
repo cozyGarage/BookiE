@@ -159,10 +159,11 @@ async fn round_trips_every_typed_value_without_changing_float_bits() {
 async fn a_multi_frame_read_initializes_its_cipher_once() {
     let spool = StreamResultSpoolManager::default().create().expect("spool");
     let page = result(vec![Value::Text("x".repeat(ENCRYPTION_CHUNK_BYTES * 2))]);
+    let columns = page.columns.clone();
     spool.append_page(0, page).await.expect("append");
     spool.inner.cipher_initializations.store(0, Ordering::Relaxed);
 
-    let loaded = spool.load_page(0, Vec::new()).await.expect("load");
+    let loaded = spool.load_page(0, columns).await.expect("load");
 
     assert_eq!(loaded.rows[0][0], Value::Text("x".repeat(ENCRYPTION_CHUNK_BYTES * 2)));
     assert_eq!(spool.inner.cipher_initializations.load(Ordering::Relaxed), 1);
