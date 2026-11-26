@@ -197,6 +197,17 @@ impl PostgresTableCursor {
     }
 }
 
+async fn is_base_table(
+    guard: &PolicyGuard,
+    table: &TableInfo,
+    control: &OperationControl,
+) -> Result<bool, DriverFailurePresentation> {
+    let tables = crate::catalog::list_tables_excluding(guard, &[], control)
+        .await
+        .map_err(|error| classify(&error))?;
+    Ok(tables.contains(table))
+}
+
 fn table_select(table: &TableInfo, key: &[String]) -> String {
     let quote = |name: &str| bookie_core::sql_dialect::quote_ident("postgres", name);
     let relation = table.schema.as_deref().map_or_else(
@@ -342,13 +353,17 @@ impl ReadSession {
         table: &TableInfo,
         control: &OperationControl,
     ) -> Result<Option<ViewEditability>, DriverFailurePresentation> {
-        if !self.views.contains(table) {
+        let known_view = self.views.contains(table);
+        if !known_view && self.tables.contains(table) {
             return Ok(None);
         }
+        let guard = self.guard()?;
         if !self.supports_updatable_views {
+            if !known_view && is_base_table(&guard, table, control).await? {
+                return Ok(None);
+            }
             return Ok(Some(ViewEditability::NotUpdatable));
         }
-        let guard = self.guard()?;
         guard
             .fetch_view_editability_controlled(table.schema.as_deref(), &table.name, control)
             .await

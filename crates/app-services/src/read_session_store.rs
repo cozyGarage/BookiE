@@ -896,6 +896,45 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_relation_created_after_the_session_opened_is_checked_by_its_kind() {
+        let (store, id, _directory, path) = sqlite_store_with_session(false).await;
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE VIEW late_ids AS SELECT id FROM items")
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE TABLE late_items (id INTEGER PRIMARY KEY)")
+            .await
+            .unwrap();
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let relation = |name: &str| TableInfo {
+            schema: None,
+            name: name.into(),
+        };
+        let read = |table: TableInfo| {
+            let store = &store;
+            let control = &control;
+            async move { store.read_view_editability(id, &table, control).await.unwrap() }
+        };
+        assert_eq!(
+            read(relation("late_ids")).await,
+            Some(bookie_core::ViewEditability::NotUpdatable)
+        );
+        assert_eq!(read(relation("late_items")).await, None);
+        assert_eq!(
+            read(relation("missing")).await,
+            Some(bookie_core::ViewEditability::NotUpdatable)
+        );
+    }
+
     fn backup_job(directory: &std::path::Path) -> crate::database_backup::BackupJob {
         crate::database_backup::BackupJob::Backup {
             output: directory.join("out.dump"),
