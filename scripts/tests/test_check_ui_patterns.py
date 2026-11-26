@@ -48,6 +48,7 @@ class UiPatternTests(unittest.TestCase):
             path.write_text(
                 ".bg(rgba(0x00000088))\n.text_color(hsla(0., 0., 0.7, 0.45))\n.text_xs()\n.text_sm()\n"
                 'ghost("toggle", "", theme)\n.text_color(rgb(theme.info))\n.shadow_lg()\n.px(px(8.0 + 14.0 * depth))\n'
+                'Button::new("menu")\n'
             )
             found = checker.count(path)
         self.assertEqual(found.get("gpui-raw-colour"), 2)
@@ -56,6 +57,7 @@ class UiPatternTests(unittest.TestCase):
         self.assertEqual(found.get("gpui-info-colour"), 1)
         self.assertEqual(found.get("gpui-shadow"), 1)
         self.assertEqual(found.get("gpui-literal-px"), 1)
+        self.assertEqual(found.get("gpui-button-new"), 1)
 
 
 if __name__ == "__main__":

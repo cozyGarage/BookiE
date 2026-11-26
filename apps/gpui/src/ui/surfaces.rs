@@ -1,5 +1,7 @@
 use bookie_gpui::theme::{Theme, size};
-use gpui::{Div, ElementId, Role, SharedString, Stateful, div, prelude::*, px, rgb};
+use gpui::{AnyElement, Div, ElementId, Role, SharedString, Stateful, div, prelude::*, px, rgb};
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::Sizable as _;
 
 use crate::assets::icon;
 
@@ -176,6 +178,43 @@ pub(crate) fn icon_label_button(
         .hover(move |style| style.bg(rgb(theme.accent)))
         .child(icon(name, theme.muted_foreground))
         .child(text)
+}
+
+pub(crate) fn menu_button(
+    id: impl Into<ElementId>,
+    label: Option<AnyElement>,
+    icon: Option<AnyElement>,
+    accessible_name: impl Into<SharedString>,
+    tooltip: impl Into<SharedString>,
+    compact: bool,
+) -> Button {
+    let icon_only = label.is_none();
+    let mut content = div().flex().items_center().min_w_0().gap_1();
+    if let Some(icon) = icon {
+        content = content.child(icon);
+    }
+    if let Some(label) = label {
+        content = content.child(label);
+    }
+
+    let button = Button::new(id)
+        .ghost()
+        .small()
+        .accessibility_label(accessible_name)
+        .tooltip(tooltip)
+        .dropdown_caret(true);
+    let button = if compact { button.compact() } else { button };
+    let button = if icon_only {
+        let control = if compact {
+            size::COMPACT_CONTROL
+        } else {
+            size::SMALL_CONTROL
+        };
+        button.p_0().size(px(control))
+    } else {
+        button
+    };
+    button.child(content)
 }
 
 pub(crate) fn button(

@@ -1,8 +1,6 @@
 use bookie_app_services::er_diagram::DiagramTable;
 use bookie_core::{ForeignKeyInfo, TableInfo};
-use gpui_component::button::{Button, ButtonVariants};
 use gpui_component::menu::{DropdownMenu, PopupMenuItem};
-use gpui_kit::component::Sizable as _;
 
 use crate::diagram_ui::DiagramView;
 use crate::surfaces::{ButtonKind, compact_button};
@@ -36,25 +34,27 @@ fn relationship_choice(
         .and_then(|index| options.get(index).cloned())
         .unwrap_or_else(|| label.into());
     let owner = cx.entity().downgrade();
-    Button::new(id)
-        .ghost()
-        .small()
-        .compact()
-        .max_w_full()
-        .label(title)
-        .accessibility_label(label)
-        .dropdown_menu(move |menu, _, _| {
-            options.iter().enumerate().fold(menu, |menu, (index, label)| {
-                let owner = owner.clone();
-                menu.item(
-                    PopupMenuItem::new(label.clone())
-                        .checked(selected == Some(index))
-                        .on_click(move |_, _, cx| {
-                            let _ = owner.update(cx, |this, cx| this.choose_relationship_option(choice, index, cx));
-                        }),
-                )
-            })
+    crate::surfaces::menu_button(
+        id,
+        Some(div().whitespace_nowrap().child(title).into_any_element()),
+        None,
+        label,
+        format!("Choose {label}"),
+        true,
+    )
+    .max_w_full()
+    .dropdown_menu(move |menu, _, _| {
+        options.iter().enumerate().fold(menu, |menu, (index, label)| {
+            let owner = owner.clone();
+            menu.item(
+                PopupMenuItem::new(label.clone())
+                    .checked(selected == Some(index))
+                    .on_click(move |_, _, cx| {
+                        let _ = owner.update(cx, |this, cx| this.choose_relationship_option(choice, index, cx));
+                    }),
+            )
         })
+    })
 }
 
 fn target_id(table: &DiagramTable) -> TableInfo {
