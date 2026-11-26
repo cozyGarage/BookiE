@@ -53,20 +53,44 @@ fn declared_enum_and_set_columns_offer_their_members() {
 }
 
 #[test]
+fn a_schema_qualified_postgres_enum_uses_the_picker_but_an_array_does_not() {
+    let mut status = column("app.mood", true);
+    let type_name = bookie_core::QualifiedTypeName {
+        schema: "app".into(),
+        name: "mood".into(),
+    };
+    status.enum_type = Some(type_name.clone());
+    let current = Cell::Text("new".into());
+    assert_eq!(
+        choice_for("app.mood", Some(&status), &current),
+        Some(Choice::PostgresEnum(type_name.clone()))
+    );
+    assert_eq!(
+        choice_for("app.mood", Some(&status), &Cell::Null),
+        Some(Choice::PostgresEnum(type_name))
+    );
+    status.data_type = "app.mood[]".into();
+    assert!(choice_for("app.mood[]", Some(&status), &current).is_none());
+}
+
+#[test]
 fn a_member_is_staged_as_its_declared_text() {
-    let status = column("enum('new','done')", false);
-    assert_eq!(member_cell("done", &status), Ok(Cell::Text("done".into())));
-    assert!(member_cell("gone", &status).is_err());
+    let labels = vec!["new".into(), "done".into()];
+    assert_eq!(member_cell("done", &labels), Some(Cell::Text("done".into())));
+    assert_eq!(member_cell("gone", &labels), None);
 }
 
 #[test]
 fn a_menu_pick_preserves_two_apostrophes_as_a_literal_member() {
-    let status = column(r"enum('','\'\'')", false);
-    assert_eq!(member_cell("", &status), Ok(Cell::Text(String::new())));
-    assert_eq!(member_cell("''", &status), Ok(Cell::Text("''".into())));
-    let rights = column(r"set('read','write','\'\'')", false);
-    assert_eq!(member_cell("''", &rights), Ok(Cell::Text("''".into())));
-    assert!(member_cell("read,write", &rights).is_err());
+    for declaration in [r"enum('','\'\'')", r"set('','\'\'','read','write')"] {
+        let status = column(declaration, false);
+        let Some(Choice::Members(labels)) = choice_for(declaration, Some(&status), &Cell::Null) else {
+            panic!("the declared members are offered");
+        };
+        assert_eq!(member_cell("", &labels), Some(Cell::Text(String::new())));
+        assert_eq!(member_cell("''", &labels), Some(Cell::Text("''".into())));
+        assert_eq!(member_cell("read,write", &labels), None);
+    }
 }
 
 fn connect_flags(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut gpui::VisualTestContext, SqliteFixture) {
@@ -159,5 +183,22 @@ fn a_choice_metadata_reply_cannot_edit_a_replacement_grid(cx: &mut TestAppContex
     view.read_with(cx, |view, _| {
         assert!(view.cell_edit.edits.is_empty());
         assert_eq!(view.cell_at(0, 1), Cell::Bool(true));
+    });
+}
+
+#[gpui::test]
+fn starting_a_second_cell_edit_discards_the_first_choice_reply(cx: &mut TestAppContext) {
+    let (view, cx, _fixture) = connect_flags(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.live.as_ref().unwrap().forget_columns();
+            view.start_edit(0, 1, window, cx);
+            view.start_edit(0, 2, window, cx);
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.cell_at(0, 1), Cell::Bool(true));
+        assert_eq!(view.cell_at(0, 2), Cell::Bool(true));
     });
 }

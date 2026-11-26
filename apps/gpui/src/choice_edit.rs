@@ -1,11 +1,12 @@
 use bookie_app_services::enum_input::declared_member_labels;
-use bookie_core::ColumnInfo;
+use bookie_core::{ColumnInfo, QualifiedTypeName};
 use bookie_gpui::model::Cell;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Choice {
     Toggle(Cell),
     Members(Vec<String>),
+    PostgresEnum(QualifiedTypeName),
 }
 
 fn is_boolean_type(data_type: &str) -> bool {
@@ -38,15 +39,18 @@ pub(crate) fn choice_for(data_type: &str, info: Option<&ColumnInfo>, cell: &Cell
         let nullable = info.is_some_and(|info| info.nullable);
         return Some(Choice::Toggle(next_boolean(cell, nullable)));
     }
+    if let Some(type_name) = info.and_then(|info| info.enum_type.as_ref()) {
+        return (matches!(cell, Cell::Text(_) | Cell::Null) && !declared.ends_with("[]"))
+            .then(|| Choice::PostgresEnum(type_name.clone()));
+    }
     declared_member_labels(declared.trim())
         .filter(|labels| !labels.is_empty())
         .map(Choice::Members)
 }
 
-pub(crate) fn member_cell(label: &str, info: &ColumnInfo) -> Result<Cell, String> {
-    if declared_member_labels(info.data_type.trim()).is_some_and(|labels| labels.iter().any(|member| member == label)) {
-        Ok(Cell::Text(label.to_owned()))
-    } else {
-        Err(format!("{label} is not a declared value of {}", info.name))
-    }
+pub(crate) fn member_cell(label: &str, labels: &[String]) -> Option<Cell> {
+    labels
+        .iter()
+        .any(|member| member == label)
+        .then(|| Cell::Text(label.to_owned()))
 }

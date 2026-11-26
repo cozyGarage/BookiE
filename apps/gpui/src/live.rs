@@ -526,6 +526,13 @@ impl LiveSession {
         self.read_columns(table, false, Duration::from_secs(10))
     }
 
+    pub fn enum_labels(&self, type_name: &bookie_core::QualifiedTypeName) -> Result<Vec<String>, String> {
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        self.runtime
+            .block_on(self.sessions.read_enum_labels(self.session_id, type_name, &control))
+            .map_err(|failure| driver_failure_message(&failure))
+    }
+
     pub fn completion_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
         if let Some(columns) = self.cached_columns(table) {
             return Ok(columns);
