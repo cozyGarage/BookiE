@@ -22,6 +22,57 @@ pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: 
     candidates_with_plan(sql, cursor, index, settings, &plan)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CandidateKind {
+    Column,
+    Local,
+    Table,
+    Keyword,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Candidate {
+    pub label: String,
+    pub insert: String,
+    pub kind: CandidateKind,
+    pub detail: Option<String>,
+}
+
+pub struct RankedCandidates {
+    pub range: Range<usize>,
+    pub items: Vec<Candidate>,
+}
+
+pub fn ranked_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> RankedCandidates {
+    let Candidates { range, values } = candidates(sql, cursor, index);
+    let owners = index.column_owners();
+    let mut items: Vec<Candidate> = values
+        .into_iter()
+        .map(|(label, insert)| {
+            let (kind, detail) = match owners.get(&insert) {
+                Some(owner) => (CandidateKind::Column, owner.clone()),
+                None if index.is_table(&insert) => (CandidateKind::Table, None),
+                None if is_keyword(&insert) => (CandidateKind::Keyword, None),
+                None => (CandidateKind::Local, None),
+            };
+            Candidate {
+                label,
+                insert,
+                kind,
+                detail,
+            }
+        })
+        .collect();
+    items.sort_by_key(|item| item.kind);
+    RankedCandidates { range, items }
+}
+
+fn is_keyword(value: &str) -> bool {
+    super::completion::SQL_KEYWORDS
+        .split_whitespace()
+        .any(|keyword| keyword == value)
+}
+
 pub fn completion_plan(sql: &str, grammar: SqlGrammar, settings: Option<LexicalSettings>) -> ScriptPlan {
     let settings = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
     plan_with(sql, Some(grammar), Some(settings))
@@ -142,6 +193,33 @@ mod tests {
             candidates.values,
             vec![("\"odd.schema\".\"Users\"".into(), "\"odd.schema\".\"Users\"".into())]
         );
+    }
+
+    #[test]
+    fn ranked_candidates_put_columns_and_tables_before_keywords_and_name_the_owning_table() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(vec!["orders".into(), "ordinals".into()]);
+        index.set_columns("orders", vec!["order_total".into()]);
+        let sql = "SELECT or FROM orders";
+        let ranked = ranked_candidates(sql, "SELECT or".len(), &index);
+        let kinds: Vec<_> = ranked
+            .items
+            .iter()
+            .map(|item| (item.insert.as_str(), item.kind))
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                ("\"order_total\"", CandidateKind::Column),
+                ("orders", CandidateKind::Table),
+                ("ordinals", CandidateKind::Table),
+                ("ORDER", CandidateKind::Keyword),
+                ("OR", CandidateKind::Keyword),
+            ]
+        );
+        assert_eq!(ranked.items[0].detail.as_deref(), Some("orders"));
+        assert_eq!(ranked.range, candidates(sql, "SELECT or".len(), &index).range);
     }
 
     #[test]

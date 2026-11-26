@@ -159,7 +159,7 @@ impl GridView {
             .children(running.map(|seconds| {
                 div()
                     .text_color(rgb(theme.muted_foreground))
-                    .child(format!("{seconds}s"))
+                    .child(format!("Running · {seconds} s"))
             }))
             .when(running.is_some(), |bar| {
                 if stopping {

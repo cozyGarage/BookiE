@@ -1,4 +1,13 @@
 #[test]
+fn a_driver_cancelled_result_is_distinct_from_an_unconfirmed_write() {
+    use bookie_app_services::driver_error_presentation::DriverFailurePresentation as Failure;
+    let cancelled = super::QueryFailure::from(Failure::Cancelled);
+    let unconfirmed = super::QueryFailure::from(Failure::OperationOutcomeUnknown(Box::new(Failure::Cancelled)));
+    assert!(cancelled.cancelled);
+    assert!(!unconfirmed.cancelled);
+}
+
+#[test]
 fn query_failure_preserves_server_position_without_inventing_one() {
     use bookie_app_services::driver_error_presentation::DriverFailurePresentation as Failure;
     let error = super::QueryFailure::from(Failure::Query {

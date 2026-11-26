@@ -360,7 +360,19 @@ impl GridView {
         } else {
             line.hover(move |style| style.bg(rgb(theme.accent)))
         };
-        line.on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
+        let menu_table = match &row {
+            TreeRow::Table(table) => Some(table.clone()),
+            _ => None,
+        };
+        line.when_some(menu_table, |line, table| {
+            line.on_mouse_down(
+                gpui::MouseButton::Right,
+                cx.listener(move |this, _: &gpui::MouseDownEvent, window, cx| {
+                    this.open_table_menu(&table, window, cx);
+                }),
+            )
+        })
+        .on_click(cx.listener(move |this, event: &gpui::ClickEvent, window, cx| {
             this.click_tree_row(&row, event.click_count(), window, cx);
             cx.notify();
         }))

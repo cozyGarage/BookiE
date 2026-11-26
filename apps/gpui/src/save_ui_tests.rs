@@ -217,6 +217,33 @@ fn a_save_with_an_unknown_outcome_shows_an_error_instead_of_success(cx: &mut Tes
 }
 
 #[gpui::test]
+fn save_in_the_pending_marker_opens_the_review_and_saves_nothing_yet(cx: &mut TestAppContext) {
+    let path = fixture_copy("marker-save");
+    let (view, cx) = saving_view(cx, &path);
+    let write = write_session(&path, false);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
+            view.save.write = Some((id, write));
+        })
+    });
+    queue_edit(&view, cx, "Marker");
+    cx.update(|window, cx| window.render_frame(cx));
+    let save = cx.debug_bounds("save-pending-edits").expect("the marker offers Save");
+    cx.simulate_click(save.center(), Default::default());
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_some(), "no review: {}", view.status);
+    });
+    assert_eq!(
+        saved_customer(&path, 1),
+        "Ada",
+        "nothing is saved before the user confirms"
+    );
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn a_plan_prepared_before_the_edits_changed_is_dropped_and_a_stale_review_cannot_be_confirmed(cx: &mut TestAppContext) {
     let path = fixture_copy("stale");
     let (view, cx) = saving_view(cx, &path);

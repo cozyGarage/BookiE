@@ -1678,6 +1678,62 @@ fn stop_targets_only_the_current_sql_run(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn escape_in_the_sql_editor_stops_a_running_query(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.panel.running = Some((view.queries.generation, std::time::Instant::now()));
+            view.sql_input.update(cx, |editor, cx| editor.focus(window, cx));
+        })
+    });
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| assert!(view.queries.cancel.is_cancelled()));
+}
+
+#[gpui::test]
+fn the_palette_stop_command_cancels_the_run_and_marks_it_cancelled_not_failed(cx: &mut TestAppContext) {
+    let (view, cx) = open_live(cx);
+    let sql =
+        "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 500000000) SELECT count(*) FROM n";
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input.update(cx, |input, cx| input.set_value(sql, window, cx));
+            view.run_query(cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        let stop = view
+            .palette_actions()
+            .into_iter()
+            .find(|action| action.id == "stop-query");
+        assert!(
+            stop.is_some_and(|action| action.enabled),
+            "Stop query is offered while running"
+        );
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.run_palette_id("stop-query", window, cx)));
+    for _ in 0..300 {
+        cx.executor().advance_clock(std::time::Duration::from_millis(100));
+        cx.run_until_parked();
+        if view.read_with(cx, |view, _| view.panel.running.is_none()) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    view.read_with(cx, |view, _| {
+        let slot = view.run_tabs.slots.last().expect("the stopped run has a tab");
+        assert!(slot.cancelled, "{}", view.status);
+        assert!(slot.failure.is_none(), "a stop is not a failure");
+        assert!(view.status.ends_with("cancelled"), "{}", view.status);
+        assert!(view.panel.error_location.is_none());
+    });
+}
+
+#[gpui::test]
 fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
