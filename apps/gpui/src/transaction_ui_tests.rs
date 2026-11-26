@@ -37,6 +37,33 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
 }
 
 #[gpui::test]
+fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppContext) {
+    let path = fixture_copy("compact-query-toolbar-transaction");
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    for (width, sidebar_open) in [(760.0, false), (900.0, true), (1500.0, true)] {
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.sidebar.open = sidebar_open;
+                view.panel.open = true;
+                cx.notify();
+            })
+        });
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+        cx.run_until_parked();
+        let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
+        for id in ["commit-transaction", "rollback-transaction"] {
+            let control = cx.debug_bounds(id).expect("transaction action remains visible");
+            assert!(
+                control.origin.x >= toolbar.origin.x
+                    && control.origin.x + control.size.width <= toolbar.origin.x + toolbar.size.width,
+                "{id} at {width}px"
+            );
+        }
+    }
+}
+
+#[gpui::test]
 fn typed_transaction_end_clears_the_toolbar(cx: &mut TestAppContext) {
     for sql in ["COMMIT", "ROLLBACK"] {
         let path = fixture_copy("typed-transaction-end");

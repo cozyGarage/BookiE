@@ -103,6 +103,14 @@ impl GridView {
     }
 
     pub(crate) fn run_at_cursor(&mut self, cx: &mut Context<Self>) {
+        self.run_from_cursor(true, cx);
+    }
+
+    pub(crate) fn run_statement_at_cursor(&mut self, cx: &mut Context<Self>) {
+        self.run_from_cursor(false, cx);
+    }
+
+    fn run_from_cursor(&mut self, use_selection: bool, cx: &mut Context<Self>) {
         if self.live.is_none() {
             self.run_query(cx);
             return;
@@ -112,7 +120,12 @@ impl GridView {
             .as_ref()
             .map_or_else(|| "postgres".to_string(), |session| session.driver_id.clone());
         let editor = self.sql_input.read(cx);
-        let (text, cursor, selection) = (editor.value().to_string(), editor.cursor(), editor.selected_range());
+        let (text, cursor) = (editor.value().to_string(), editor.cursor());
+        let selection = if use_selection {
+            editor.selected_range()
+        } else {
+            cursor..cursor
+        };
         let range = run_source_range(&text, &driver, cursor, selection.clone());
         match run_target(&text, &driver, cursor, selection) {
             Ok(sql) => {

@@ -165,6 +165,135 @@ fn the_query_toolbar_connection_chip_opens_the_connection_status(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut TestAppContext) {
+    use gpui_kit::test::{TestQueryExt, TestWindowExt};
+
+    let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t ctrl-enter");
+    cx.run_until_parked();
+    for dark in [false, true] {
+        if dark {
+            cx.simulate_keystrokes("ctrl-shift-p");
+            cx.simulate_input("dark theme");
+            cx.simulate_keystrokes("enter");
+            cx.run_until_parked();
+        }
+        for (width, compact, sidebar_open) in [(760.0, true, false), (900.0, true, true), (1500.0, false, true)] {
+            cx.update(|_, cx| {
+                view.update(cx, |view, cx| {
+                    view.sidebar.open = sidebar_open;
+                    view.panel.open = true;
+                    cx.notify();
+                })
+            });
+            cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+            cx.run_until_parked();
+            let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
+            let results = cx.debug_bounds("results-header").expect("result header is visible");
+            let toolbar_ids: &[&str] = if compact {
+                &[
+                    "run-statement",
+                    "query-run-options",
+                    "sql-editor-tools",
+                    "query-file-menu",
+                    "query-context-menu",
+                    "begin-transaction",
+                ]
+            } else {
+                &[
+                    "run-statement",
+                    "run-query",
+                    "sql-editor-tools",
+                    "query-file-menu",
+                    "query-connection-chip",
+                    "begin-transaction",
+                ]
+            };
+            for id in toolbar_ids {
+                let label = match *id {
+                    "query-run-options" => "Run options",
+                    "sql-editor-tools" if compact => "Editor tools",
+                    "sql-editor-tools" => "Tools",
+                    "query-file-menu" if compact => "File actions",
+                    "query-file-menu" => "Import / Export",
+                    "query-context-menu" => "Connection and database context",
+                    _ => id,
+                };
+                let control = cx
+                    .debug_bounds(id)
+                    .or_else(|| cx.update(|window, _| window.try_find_by_label(label).map(|node| node.bounds())))
+                    .unwrap_or_else(|| panic!("{id} at {width}px remains visible"));
+                assert!(
+                    control.origin.x >= toolbar.origin.x
+                        && control.origin.x + control.size.width <= toolbar.origin.x + toolbar.size.width,
+                    "{id} at {width}px"
+                );
+            }
+            let result_ids: &[&str] = if compact {
+                &["result-view-menu", "toggle-results"]
+            } else {
+                &["Table data", "Summary", "Messages", "toggle-results"]
+            };
+            for id in result_ids {
+                let label = if *id == "result-view-menu" { "Result view" } else { id };
+                let control = cx
+                    .debug_bounds(id)
+                    .or_else(|| cx.update(|window, _| window.try_find_by_label(label).map(|node| node.bounds())))
+                    .unwrap_or_else(|| panic!("{id} at {width}px remains visible"));
+                assert!(
+                    control.origin.x >= results.origin.x
+                        && control.origin.x + control.size.width <= results.origin.x + results.size.width,
+                    "{id} at {width}px"
+                );
+            }
+            if compact && !dark && width == 900.0 {
+                view.update(cx, |view, cx| {
+                    view.panel.running = Some((view.queries.generation, Instant::now()));
+                    cx.notify();
+                });
+                cx.run_until_parked();
+                let stop = cx.debug_bounds("stop-query").expect("Stop stays visible during a run");
+                assert!(
+                    stop.origin.x >= toolbar.origin.x
+                        && stop.origin.x + stop.size.width <= toolbar.origin.x + toolbar.size.width
+                );
+                view.update(cx, |view, cx| {
+                    view.panel.running = None;
+                    cx.notify();
+                });
+                cx.run_until_parked();
+                let options = cx
+                    .debug_bounds("query-run-options")
+                    .or_else(|| cx.update(|window, _| window.try_find_by_label("Run options").map(|node| node.bounds())))
+                    .expect("run options are visible");
+                cx.simulate_click(options.center(), Default::default());
+                cx.run_until_parked();
+                let run_items = cx.update(|window, cx| {
+                    window.render_frame(cx);
+                    ["Run selection", "Run statement", "Run all"]
+                        .map(|label| window.try_find_by_label(label).is_some())
+                });
+                assert_eq!(run_items, [true, true, true]);
+                cx.simulate_keystrokes("escape");
+                let views = cx
+                    .debug_bounds("result-view-menu")
+                    .or_else(|| cx.update(|window, _| window.try_find_by_label("Result view").map(|node| node.bounds())))
+                    .expect("view menu is visible");
+                cx.simulate_click(views.center(), Default::default());
+                cx.run_until_parked();
+                let view_items = cx.update(|window, cx| {
+                    window.render_frame(cx);
+                    ["Table data", "Summary", "Messages"]
+                        .map(|label| window.try_find_by_label(label).is_some())
+                });
+                assert_eq!(view_items, [true, true, true]);
+                cx.simulate_keystrokes("escape");
+            }
+        }
+    }
+}
+
+#[gpui::test]
 fn undo_and_redo_step_through_the_staged_edits_of_a_cell(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let edit = |cx: &mut gpui::VisualTestContext, text: &str| {
