@@ -2,15 +2,40 @@ use std::ops::Range;
 
 use bookie_app_services::completion_proposals::completion_plan;
 use bookie_app_services::result_editability::grammar_for_driver;
-use bookie_core::sql_syntax::{SqlGrammar, script::ScriptTokenKind};
+use bookie_app_services::statement_plan::statement_range_in_plan;
+use bookie_core::sql_syntax::script::ScriptPlan;
+use bookie_core::sql_syntax::script::ScriptTokenKind;
 use bookie_gpui::theme::size::GUTTER_MARKER_WIDTH;
-use gpui::{Context, Entity, px};
+use gpui::{Context, Entity, SharedString, px};
 use gpui_component::input::{EditorState, GutterDecoration, InputEvent, RangeDecoration};
 
 use crate::GridView;
 
 const MARK_DOCUMENT_BYTES: usize = 256 * 1024;
 const MAX_OCCURRENCES: usize = 100;
+
+struct MarkSnapshot {
+    revision: u64,
+    driver: String,
+    text: SharedString,
+    plan: Option<ScriptPlan>,
+}
+
+impl MarkSnapshot {
+    fn new(revision: u64, driver: String, text: SharedString) -> Self {
+        let plan = grammar_for_driver(&driver).map(|grammar| completion_plan(&text, grammar, None));
+        Self {
+            revision,
+            driver,
+            text,
+            plan,
+        }
+    }
+
+    fn matches(&self, revision: u64, driver: &str) -> bool {
+        self.revision == revision && self.driver == driver
+    }
+}
 
 impl GridView {
     pub(crate) fn observe_sql_marks(input: &Entity<EditorState>, cx: &mut Context<Self>) {
@@ -30,6 +55,7 @@ impl GridView {
         })
         .detach();
         let mut last = None;
+        let mut snapshot = None;
         cx.observe(input, move |view, input, cx| {
             let editor = input.read(cx);
             let driver = view.live.as_ref().map_or("postgres", |session| &session.driver_id);
@@ -44,20 +70,39 @@ impl GridView {
             if last.as_ref() == Some(&key) {
                 return;
             }
-            let text = (length <= MARK_DOCUMENT_BYTES).then(|| editor.value());
-            let (marks, decorations) = if let Some(text) = text.as_ref() {
-                let marks = crate::run_cursor_ui::run_source_range(text, driver, key.2, key.3.clone())
-                    .map(GutterDecoration::new)
-                    .into_iter()
-                    .collect();
-                let decorations = grammar_for_driver(driver)
-                    .into_iter()
-                    .flat_map(|grammar| matching_ranges(text, key.2, &key.3, grammar))
-                    .map(RangeDecoration::new)
-                    .collect();
-                (marks, decorations)
-            } else {
+            let (marks, decorations) = if length > MARK_DOCUMENT_BYTES {
+                snapshot = None;
                 (Vec::new(), Vec::new())
+            } else {
+                if !snapshot
+                    .as_ref()
+                    .is_some_and(|snapshot: &MarkSnapshot| snapshot.matches(key.0, &key.4))
+                {
+                    snapshot = Some(MarkSnapshot::new(key.0, key.4.clone(), editor.value()));
+                }
+                match snapshot.as_ref() {
+                    Some(snapshot) => {
+                        let range = if key.3.is_empty() {
+                            snapshot
+                                .plan
+                                .as_ref()
+                                .and_then(|plan| statement_range_in_plan(&snapshot.text, plan, key.2))
+                        } else {
+                            crate::run_cursor_ui::run_source_range(&snapshot.text, driver, key.2, key.3.clone())
+                        };
+                        let marks = range.map(GutterDecoration::new).into_iter().collect();
+                        let decorations = snapshot
+                            .plan
+                            .as_ref()
+                            .map(|plan| matching_ranges(&snapshot.text, key.2, &key.3, plan))
+                            .unwrap_or_default()
+                            .into_iter()
+                            .map(RangeDecoration::new)
+                            .collect();
+                        (marks, decorations)
+                    }
+                    None => (Vec::new(), Vec::new()),
+                }
             };
             last = Some(key);
             gutter.set(marks, cx);
@@ -68,8 +113,7 @@ impl GridView {
     }
 }
 
-fn matching_ranges(sql: &str, cursor: usize, selected: &Range<usize>, grammar: SqlGrammar) -> Vec<Range<usize>> {
-    let plan = completion_plan(sql, grammar, None);
+fn matching_ranges(sql: &str, cursor: usize, selected: &Range<usize>, plan: &ScriptPlan) -> Vec<Range<usize>> {
     let tokens = || plan.tokens(0..sql.len());
     if !selected.is_empty() {
         let Some(word) = tokens()
@@ -110,15 +154,27 @@ fn matching_ranges(sql: &str, cursor: usize, selected: &Range<usize>, grammar: S
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bookie_core::sql_syntax::SqlGrammar;
 
     #[test]
     fn sql_marks_skip_matches_inside_literals_and_comments() {
         let sql = "select id, ID, 'id' -- id\nfrom items";
-        assert_eq!(matching_ranges(sql, 9, &(7..9), SqlGrammar::PostgreSql), vec![11..13]);
+        let plan = completion_plan(sql, SqlGrammar::PostgreSql, None);
+        assert_eq!(matching_ranges(sql, 9, &(7..9), &plan), vec![11..13]);
         let sql = "select ('(' /* ) */)";
+        let plan = completion_plan(sql, SqlGrammar::PostgreSql, None);
         assert_eq!(
-            matching_ranges(sql, sql.len(), &(sql.len()..sql.len()), SqlGrammar::PostgreSql),
+            matching_ranges(sql, sql.len(), &(sql.len()..sql.len()), &plan),
             vec![7..8, sql.len() - 1..sql.len()]
         );
+    }
+
+    #[test]
+    fn mark_snapshots_are_reused_only_for_the_same_edit_and_driver() {
+        let snapshot = MarkSnapshot::new(4, "postgres".into(), SharedString::from("SELECT 1"));
+
+        assert!(snapshot.matches(4, "postgres"));
+        assert!(!snapshot.matches(5, "postgres"));
+        assert!(!snapshot.matches(4, "mysql"));
     }
 }

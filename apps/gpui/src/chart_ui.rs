@@ -61,7 +61,7 @@ impl GridView {
                 if cancel.is_cancelled() {
                     return None;
                 }
-                let mut data = result_chart::compute(&rows, &profiles, &settings);
+                let mut data = result_chart::compute(rows.as_ref(), &profiles, &settings);
                 data.rows_cut = rows_cut;
                 (!cancel.is_cancelled()).then_some(data)
             },

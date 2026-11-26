@@ -4,7 +4,7 @@ A release is a tag named `linux-vX.Y.Z` on the protected `main` branch. The GitH
 
 ## Before tagging
 
-Finish the selected [release scope](backlog.md#finishing-028) before cutting a candidate. A merged change and a passing unit test do not replace installed runtime acceptance.
+Finish the selected [release scope](backlog.md#current-release-work) before cutting a candidate. A merged change and a passing unit test do not replace installed runtime acceptance.
 
 1. Merge the reviewed release change to `main`. It sets the workspace version, Meson version and newest AppStream entry to the same `X.Y.Z` value, regenerates `Cargo.lock` with `cargo update --workspace` and `apps/linux/packaging/THIRD_PARTY_NOTICES.md` with `python3 scripts/update-third-party-notices.py` (preflight fails on stale notices once the version changes), and adds a `## [X.Y.Z]` section to `CHANGELOG.md`. Run `python3 scripts/check-release-version.py` and `python3 scripts/release-notes.py notes X.Y.Z`.
 2. Write that section from `changelog.d` fragments with `python3 scripts/release-notes.py release X.Y.Z YYYY-MM-DD`; it moves them into `CHANGELOG.md` and deletes them ([ADR 0053](decisions/0053-changelog-fragments.md)). Only the release pull request edits `CHANGELOG.md`. The release workflow reads the committed section with `release-notes.py notes <version>` and fails when it is missing or empty. A wrong or missing fragment is fixed with a normal commit before the release is cut.
