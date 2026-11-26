@@ -62,7 +62,8 @@ async fn value_contract_temporal_infinities_remain_distinct_from_null() {
                 input.to_owned()
             };
             assert_eq!(
-                sheet.rows[0][0], expected_csv_cell,
+                sheet.rows.get(0).unwrap().get(0).unwrap(),
+                expected_csv_cell,
                 "default CSV formula safety marker for PostgreSQL {kind} {input}"
             );
 

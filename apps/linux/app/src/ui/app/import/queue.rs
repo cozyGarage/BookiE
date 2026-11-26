@@ -148,7 +148,7 @@ fn file_shape(bytes: &[u8], options: &CsvImportOptions) -> Result<Vec<String>, S
     if options.has_header {
         return Ok(sheet.headers);
     }
-    let fields = sheet.rows.first().map_or(0, Vec::len);
+    let fields = sheet.rows.get(0).map_or(0, bookie_core::import::TextRow::len);
     Ok(vec![String::new(); fields])
 }
 

@@ -51,7 +51,6 @@ fn infer_kind(sheet: &CsvSheet, field: usize, options: &CsvImportOptions) -> Col
         .iter()
         .take(INFER_SAMPLE_ROWS)
         .filter_map(|row| row.get(field))
-        .map(String::as_str)
         .filter(|text| !text.trim().is_empty() && *text != options.null_marker)
         .collect();
     if sample.is_empty() {

@@ -10,6 +10,7 @@ pub(crate) struct RunSlot {
     pub edits: grid_edit::Edits,
     pub source: Option<Source>,
     pub failure: Option<String>,
+    pub cancelled: bool,
     pub estimated_bytes: usize,
     pub cancel_process: bool,
 }
@@ -22,6 +23,7 @@ impl RunSlot {
             edits: grid_edit::Edits::new(),
             source,
             failure: None,
+            cancelled: false,
             cancel_process: false,
         }
     }
@@ -205,9 +207,14 @@ impl GridView {
                     let error_status = outcomes
                         .last()
                         .and_then(|outcome| outcome.result.as_ref().err())
+                        .filter(|error| !error.cancelled)
                         .map(|error| error.message.clone());
                     let first_new_number = this.run_tabs.next_number;
                     for outcome in outcomes {
+                        if outcome.result.as_ref().is_err_and(|error| error.cancelled) {
+                            this.apply_cancelled_outcome(&outcome);
+                            continue;
+                        }
                         this.apply_query_outcome(outcome, &original, cancel_process, activate, cx);
                     }
                     if activate && this.run_tabs.next_number != first_new_number {
@@ -281,6 +288,32 @@ impl GridView {
         }
     }
 
+    fn apply_cancelled_outcome(&mut self, outcome: &crate::query_execution::Outcome) {
+        self.panel.messages.statement_cancelled(&outcome.sql, outcome.elapsed);
+        let mut run = next_run(self.run_tabs.next_number);
+        run.rows = 0;
+        run.elapsed_ms = Some(u64::try_from(outcome.elapsed.as_millis()).unwrap_or(u64::MAX));
+        let source: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Cancelled query".into()));
+        let mut slot = RunSlot::new(run, Some(source));
+        slot.cancelled = true;
+        self.retain_result(slot);
+        self.status = "Query cancelled".into();
+    }
+
+    fn query_running(&self) -> bool {
+        self.panel
+            .running
+            .is_some_and(|(generation, _)| generation == self.queries.generation)
+            && !self.queries.cancel.is_cancelled()
+    }
+
+    pub(crate) fn can_stop_query(&self) -> bool {
+        self.query_running()
+            || self
+                .transaction_statement()
+                .is_some_and(|statement| !statement.cancel.is_cancelled())
+    }
+
     fn track_running_query(&mut self, cx: &mut Context<Self>) {
         let running = (self.queries.generation, Instant::now());
         self.panel.running = Some(running);
@@ -305,12 +338,10 @@ impl GridView {
     }
 
     pub(crate) fn stop_query(&mut self) {
-        if self
-            .panel
-            .running
-            .is_some_and(|(generation, _)| generation == self.queries.generation)
-            && !self.queries.cancel.is_cancelled()
-        {
+        if self.stop_transaction_statement() {
+            return;
+        }
+        if self.query_running() {
             self.queries.cancel.cancel();
             self.status = "Cancellation requested…".into();
         }
@@ -328,6 +359,9 @@ impl GridView {
         let capabilities = driver.capabilities();
         self.tabs.open_query();
         self.sync_grid_owner();
+        if !self.grid_is_query {
+            return;
+        }
         self.status = "Reading the data dictionary…".into();
         self.begin_background(
             Work::Load,
@@ -339,7 +373,8 @@ impl GridView {
             },
             |this, (elapsed, result)| match result {
                 Ok(table) => {
-                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, true) {
+                    let activate = this.grid_is_query;
+                    if let Some(slot) = this.append_run(Some(std::sync::Arc::new(table)), false, activate) {
                         slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                     }
                 }
@@ -349,7 +384,7 @@ impl GridView {
     }
 
     pub(crate) fn add_run(&mut self, source: Option<Source>) {
-        self.append_run(source, false, true);
+        self.append_run(source, false, self.grid_is_query);
     }
 
     fn can_activate_query_result(&self, selected: Option<usize>) -> bool {
@@ -566,6 +601,9 @@ impl GridView {
         if self.run_tabs.slots[index].failure.is_some() {
             self.panel.view = ResultView::Messages;
             self.status = format!("{} · failed", run.label());
+        } else if self.run_tabs.slots[index].cancelled {
+            self.panel.view = ResultView::Messages;
+            self.status = format!("{} · cancelled", run.label());
         } else {
             if self.panel.view == ResultView::Messages {
                 self.panel.view = ResultView::Table;

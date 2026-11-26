@@ -186,7 +186,7 @@ async fn value_contract_mssql_max_values_survive_connection_session_and_consumer
         .enumerate()
         .map(|(index, row)| {
             bookie_core::import::row_to_values(
-                row,
+                &row,
                 &[Some(0), Some(1), Some(2), Some(3)],
                 &import_columns,
                 &bookie_core::import::CsvImportOptions {

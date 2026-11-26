@@ -19,10 +19,7 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
 fn sheet(rows: &[&[&str]], headers: &[&str]) -> CsvSheet {
     CsvSheet {
         headers: headers.iter().map(|header| (*header).to_owned()).collect(),
-        rows: rows
-            .iter()
-            .map(|row| row.iter().map(|cell| (*cell).to_owned()).collect())
-            .collect(),
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().copied())),
         truncated: false,
     }
 }
@@ -585,7 +582,7 @@ fn only_the_first_failures_are_listed_and_the_rest_are_counted() {
         .collect();
     let sheet = CsvSheet {
         headers: vec!["id".to_owned()],
-        rows,
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().map(String::as_str))),
         truncated: false,
     };
 
@@ -624,7 +621,7 @@ fn the_batches_a_plan_offers_are_bounded_and_cover_every_row() {
     let rows: Vec<Vec<String>> = (0..7).map(|index| vec![index.to_string()]).collect();
     let sheet = CsvSheet {
         headers: vec!["id".to_owned()],
-        rows,
+        rows: crate::import::TextRows::from_test_rows(rows.iter().map(|row| row.iter().map(String::as_str))),
         truncated: false,
     };
     let plan = build_insert_plan(&target(&columns, &mapping), &sheet, &CsvImportOptions::default()).expect("plan");
@@ -650,4 +647,56 @@ fn a_table_name_containing_values_is_not_rewritten_by_the_override_clause() {
         plan.statement,
         "INSERT INTO \"my VALUES t\" (\"id\", \"name\") OVERRIDING SYSTEM VALUE VALUES ($1, $2)"
     );
+}
+
+#[test]
+fn workbook_numbers_and_fractional_timestamps_bind_as_native_values() {
+    use rust_xlsxwriter::{ExcelDateTime, Format, Workbook};
+
+    let mut workbook = Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "amount").unwrap();
+    worksheet.write_string(0, 1, "recorded").unwrap();
+    let time = ExcelDateTime::from_ymd(2025, 4, 3)
+        .unwrap()
+        .and_hms_milli(12, 2, 5, 789)
+        .unwrap();
+    let format = Format::new().set_num_format("yyyy-mm-dd hh:mm:ss.000");
+    worksheet.write_number(1, 0, 2.5).unwrap();
+    worksheet.write_datetime_with_format(1, 1, &time, &format).unwrap();
+    let bytes = workbook.save_to_buffer().unwrap();
+    let sheet = crate::import::read_xlsx(&bytes, 1).unwrap();
+    let columns = [column("amount", "REAL"), column("recorded", "DATETIME")];
+    let mapping = [Some(0), Some(1)];
+    let target = ImportTarget {
+        driver_id: "sqlite",
+        ..target(&columns, &mapping)
+    };
+    let options = CsvImportOptions {
+        null_marker: "2.5".to_owned(),
+        ..Default::default()
+    };
+    let result = build_insert_plan(&target, &sheet, &options).unwrap();
+    let expected = chrono::NaiveDate::from_ymd_opt(2025, 4, 3)
+        .unwrap()
+        .and_hms_milli_opt(12, 2, 5, 789)
+        .unwrap();
+    assert_eq!(result.rows, [[Value::Float(2.5), Value::DateTime(expected)]]);
+}
+
+#[test]
+fn a_numeric_workbook_cell_is_not_null_when_it_needs_destination_type_conversion() {
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "amount").unwrap();
+    worksheet.write_number(1, 0, 2).unwrap();
+    let sheet = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 1).unwrap();
+    let columns = [column("amount", "INTEGER")];
+    let options = CsvImportOptions {
+        null_marker: "2".to_owned(),
+        ..Default::default()
+    };
+
+    let result = build_insert_plan(&target(&columns, &[Some(0)]), &sheet, &options).unwrap();
+    assert_eq!(result.rows, [[Value::Int(2)]]);
 }

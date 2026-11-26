@@ -274,7 +274,7 @@ fn bind_rows(
     let mut failures = Vec::new();
     let mut total_failures = 0;
     for (index, row) in sheet.rows.iter().enumerate() {
-        match row_to_values_for_driver(row, mapping, columns, options, index + header_offset + 1, driver_id) {
+        match row_to_values_for_driver(&row, mapping, columns, options, index + header_offset + 1, driver_id) {
             Ok(mut values) => {
                 if driver_id == "postgres" {
                     for (value, column) in values.iter_mut().zip(columns) {

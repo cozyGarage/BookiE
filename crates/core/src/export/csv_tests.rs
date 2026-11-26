@@ -294,7 +294,7 @@ fn value_contract_csv_round_trip_preserves_bool_uuid_and_json() {
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            crate::import::row_to_values(row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2).unwrap()
+            crate::import::row_to_values(&row, &[Some(0), Some(1), Some(2)], &columns, &options, index + 2).unwrap()
         })
         .collect();
     assert_eq!(restored, rows);
@@ -329,7 +329,7 @@ fn value_contract_csv_binary_round_trip_preserves_null_empty_and_every_byte() {
             .iter()
             .enumerate()
             .map(|(index, row)| {
-                crate::import::row_to_values(row, &[Some(0), Some(1)], &columns, &options, index + 2).unwrap()
+                crate::import::row_to_values(&row, &[Some(0), Some(1)], &columns, &options, index + 2).unwrap()
             })
             .collect();
         assert_eq!(restored, rows);
@@ -354,7 +354,7 @@ fn value_contract_csv_round_trip_preserves_signed_integer_boundaries() {
     let imported: Vec<Value> = sheet
         .rows
         .iter()
-        .map(|row| crate::import::row_to_values(row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
+        .map(|row| crate::import::row_to_values(&row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
         .collect();
     assert_eq!(imported, expected.into_iter().map(Value::Int).collect::<Vec<_>>());
 }
@@ -370,7 +370,8 @@ fn value_contract_csv_round_trip_preserves_decimal_trailing_zeroes() {
 
     let options = crate::import::CsvImportOptions::default();
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let imported = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let imported =
+        crate::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     let Value::Decimal(actual) = imported[0] else {
         panic!("CSV import did not produce a decimal: {imported:?}");
     };
@@ -388,7 +389,7 @@ fn value_contract_csv_round_trip_preserves_negative_zero_bits() {
 
     let options = crate::import::CsvImportOptions::default();
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let values = crate::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     let Value::Float(actual) = values[0] else {
         panic!("CSV import did not produce a float: {values:?}");
     };
@@ -405,7 +406,7 @@ fn value_contract_csv_round_trip_preserves_smallest_subnormal_bits() {
 
     let options = crate::import::CsvImportOptions::default();
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let values = crate::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     let Value::Float(actual) = values[0] else {
         panic!("CSV import did not produce a float: {values:?}");
     };
@@ -422,7 +423,7 @@ fn value_contract_csv_round_trip_preserves_largest_finite_float_bits() {
 
     let options = crate::import::CsvImportOptions::default();
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let values = crate::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     let Value::Float(actual) = values[0] else {
         panic!("CSV import did not produce a float: {values:?}");
     };
@@ -478,7 +479,7 @@ fn value_contract_csv_and_json_round_trip_seeded_finite_float_bits() {
     let imported = sheet
         .rows
         .iter()
-        .map(|row| crate::import::row_to_values(row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
+        .map(|row| crate::import::row_to_values(&row, &[Some(0)], &columns, &options, 2).unwrap()[0].clone())
         .collect::<Vec<_>>();
     for (expected, actual) in expected.iter().zip(imported) {
         let Value::Float(actual) = actual else {
@@ -508,7 +509,7 @@ fn value_contract_csv_round_trip_preserves_timestamptz_nanoseconds() {
 
     let options = crate::import::CsvImportOptions::default();
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-    let values = crate::import::row_to_values(&sheet.rows[0], &[Some(0)], &columns, &options, 2).unwrap();
+    let values = crate::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0)], &columns, &options, 2).unwrap();
     assert_eq!(values, vec![expected]);
 }
 
@@ -531,7 +532,7 @@ fn value_contract_csv_round_trip_keeps_nonfinite_floats_distinct_from_null() {
     let imported: Vec<Value> = sheet
         .rows
         .iter()
-        .map(|row| crate::import::row_to_values(row, &[Some(0), Some(1)], &columns, &options, 2).unwrap()[0].clone())
+        .map(|row| crate::import::row_to_values(&row, &[Some(0), Some(1)], &columns, &options, 2).unwrap()[0].clone())
         .collect();
     assert!(matches!(imported[0], Value::Float(value) if value.is_nan()));
     assert_eq!(imported[1], Value::Float(f64::INFINITY));
@@ -693,7 +694,7 @@ fn an_export_with_a_multi_character_delimiter_is_re_imported_losslessly() {
         let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
         assert_eq!(sheet.headers, ["id", "note"], "{delimiter}");
         assert_eq!(
-            sheet.rows,
+            sheet.rows.as_test_rows(),
             [["1", "a||b"], ["2", "say \"hi\""], ["3", "two\nlines||x"], ["4", "::"]],
             "{delimiter}"
         );
@@ -731,7 +732,7 @@ fn a_cell_ending_with_part_of_the_delimiter_is_quoted_and_survives() {
             ..Default::default()
         };
         let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
-        assert_eq!(sheet.rows, [[first, second]], "{delimiter:?} {first:?}");
+        assert_eq!(sheet.rows.as_test_rows(), [[first, second]], "{delimiter:?} {first:?}");
     }
 }
 
@@ -760,7 +761,7 @@ fn every_short_cell_pair_round_trips_through_each_delimiter() {
                 let csv = render_csv(&columns, &rows, &custom_options(delimiter));
                 let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
                 assert_eq!(
-                    sheet.rows,
+                    sheet.rows.as_test_rows(),
                     [[first.clone(), second.clone()]],
                     "{delimiter:?} {first:?} {second:?}"
                 );
@@ -794,7 +795,7 @@ fn column_names_ending_with_part_of_the_delimiter_survive_in_the_header() {
     };
     let sheet = crate::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     assert_eq!(sheet.headers, ["a|", "b"]);
-    assert_eq!(sheet.rows, [["1", "2"]]);
+    assert_eq!(sheet.rows.as_test_rows(), [["1", "2"]]);
 }
 
 #[test]

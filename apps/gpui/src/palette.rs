@@ -15,8 +15,9 @@ pub fn known_group(id: &str) -> Option<&'static str> {
         return Some("Connection");
     }
     let group = match id {
-        "query" | "run" | "run-at-cursor" | "explain" | "favorites" | "save-favorite" | "delete-favorite"
-        | "previous-run" | "next-run" | "close-run" | "compare" | "open-sql-file" | "save-sql-file" => "Query",
+        "query" | "run" | "stop-query" | "run-at-cursor" | "explain" | "favorites" | "save-favorite"
+        | "delete-favorite" | "previous-run" | "next-run" | "close-run" | "compare" | "open-sql-file"
+        | "save-sql-file" => "Query",
         "new-connection"
         | "import-connections"
         | "export-connections"

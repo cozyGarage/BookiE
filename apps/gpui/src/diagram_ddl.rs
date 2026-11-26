@@ -168,6 +168,7 @@ impl GridView {
             },
             review: "Review the generated SQL before applying it".into(),
             confirm: "Apply",
+            destructive: false,
             note: Some(crate::structure_ui::STRUCTURE_CHANGE_NOTE),
             reconnect: create.then(|| table.clone()),
         };

@@ -27,8 +27,7 @@ fn open_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestCont
                 last_activity: Instant::now(),
                 statements: 0,
                 finishing: false,
-                running: false,
-                running_cancel: None,
+                running: None,
             });
             view.tabs.open_query();
             view.sync_grid_owner();
@@ -56,7 +55,9 @@ fn compact_query_toolbar_keeps_transaction_controls_visible(cx: &mut TestAppCont
         });
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         cx.run_until_parked();
-        let toolbar = cx.debug_bounds("query-editor-toolbar").expect("query toolbar is visible");
+        let toolbar = cx
+            .debug_bounds("query-editor-toolbar")
+            .expect("query toolbar is visible");
         let actions: &[&str] = if width < bookie_gpui::theme::size::COMPACT_QUERY_WIDTH {
             &["transaction-badge", "transaction-actions"]
         } else {
@@ -116,7 +117,7 @@ fn an_in_flight_save_blocks_beginning_a_manual_transaction(cx: &mut TestAppConte
             view.begin_transaction(cx);
             assert!(!view.transaction_starting);
             assert!(view.transaction.is_none());
-            assert!(view.status.contains("save review"), "{}", view.status);
+            assert_eq!(view.status, "Wait for the save to finish before starting a transaction");
         })
     });
     std::fs::remove_file(path).ok();
@@ -207,20 +208,24 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.run_in_transaction("UPDATE orders SET customer = 'Temporary' WHERE id = 1".into(), cx);
-            assert!(view.transaction.as_ref().is_some_and(|transaction| transaction.running));
+            assert!(
+                view.transaction
+                    .as_ref()
+                    .is_some_and(|transaction| transaction.running.is_some())
+            );
             view.invalidate_background();
         })
     });
     wait_for(&view, cx, |view| {
         view.transaction
             .as_ref()
-            .is_some_and(|transaction| !transaction.running)
+            .is_some_and(|transaction| transaction.running.is_none())
     });
     view.read_with(cx, |view, _| {
         assert!(
             view.transaction
                 .as_ref()
-                .is_some_and(|transaction| transaction.statements == 1),
+                .is_some_and(|transaction| transaction.running.is_none() && transaction.statements == 1),
             "the statement should finish despite the unrelated invalidation"
         );
         assert!(!view.status.contains("cancelled"), "{}", view.status);
@@ -241,18 +246,15 @@ fn stop_cancels_the_running_transaction_statement(cx: &mut TestAppContext) {
         view.update(cx, |view, cx| {
             view.run_in_transaction("UPDATE orders SET customer = 'Temporary' WHERE id = 1".into(), cx);
             let cancel = view
-                .transaction
-                .as_ref()
-                .and_then(|transaction| transaction.running_cancel.as_ref())
+                .transaction_statement()
                 .expect("the running statement owns a cancellation token")
+                .cancel
                 .clone();
             view.stop_transaction_statement();
             assert!(cancel.is_cancelled());
         })
     });
-    wait_for(&view, cx, |view| {
-        view.transaction.as_ref().is_none_or(|transaction| !transaction.running)
-    });
+    wait_for(&view, cx, |view| !view.transaction_statement_running());
     if view.read_with(cx, |view, _| view.transaction.is_some()) {
         cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
         wait_for(&view, cx, |view| view.transaction.is_none());
@@ -325,8 +327,7 @@ fn a_reviewed_grid_save_cannot_write_outside_a_transaction_that_opened_later(cx:
                 last_activity: Instant::now(),
                 statements: 0,
                 finishing: false,
-                running: false,
-                running_cancel: None,
+                running: None,
             });
         })
     });
@@ -419,13 +420,12 @@ fn a_denied_commit_keeps_the_transaction_available_for_rollback(cx: &mut TestApp
                 last_activity: Instant::now(),
                 statements: 1,
                 finishing: false,
-                running: false,
-                running_cancel: None,
+                running: None,
             });
-            view.transaction.as_mut().unwrap().running = true;
+            view.transaction.as_mut().unwrap().running = Some(crate::transaction_ui::RunningStatement::start());
             view.end_transaction(true, cx);
             assert!(view.status.contains("Wait for the transaction operation"));
-            view.transaction.as_mut().unwrap().running = false;
+            view.transaction.as_mut().unwrap().running = None;
             view.end_transaction(true, cx);
         })
     });
@@ -491,8 +491,7 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
                     last_activity: Instant::now(),
                     statements: 1,
                     finishing: false,
-                    running: false,
-                    running_cancel: None,
+                    running: None,
                 });
                 view.end_transaction(true, cx);
                 assert!(view.transaction_open());
@@ -573,7 +572,7 @@ fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut Tes
                 cx,
             );
             let transaction = view.transaction.as_ref().expect("still open");
-            assert!(!transaction.running, "{}", view.status);
+            assert!(transaction.running.is_none(), "{}", view.status);
             assert_eq!(transaction.statements, 0);
             assert!(view.status.contains("schema"), "{}", view.status);
         })
@@ -581,5 +580,156 @@ fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut Tes
     cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
     wait_for(&view, cx, |view| view.status == "Transaction rolled back");
     assert_eq!(saved_customer(&path, 1), original);
+    std::fs::remove_file(path).ok();
+}
+
+fn hold_transaction(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, path: &std::path::Path) {
+    let write = write_session(path, false);
+    let shared = write.begin_transaction().expect("begin a transaction");
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.transaction = Some(crate::transaction_ui::TransactionState {
+                write,
+                shared,
+                started: Instant::now(),
+                last_activity: Instant::now(),
+                statements: 0,
+                finishing: false,
+                running: None,
+            });
+        })
+    });
+}
+
+#[gpui::test]
+fn grid_writes_are_refused_while_a_transaction_is_open_and_nothing_is_written(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-blocks-save");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Outside".into()));
+            view.edits_changed();
+            view.request_save(cx);
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(view.save.pending.is_some(), "{}", view.status));
+    hold_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.confirm_save(cx);
+            assert_eq!(view.status, crate::save_ui::TRANSACTION_BLOCKS_SAVE);
+            assert!(!view.save.busy);
+            view.cancel_save(cx);
+            view.request_save(cx);
+            assert_eq!(view.status, crate::save_ui::TRANSACTION_BLOCKS_SAVE);
+            view.discard_view_edits();
+            view.click_row(0, false);
+            view.request_delete(cx);
+            assert_eq!(view.status, crate::save_ui::TRANSACTION_BLOCKS_SAVE);
+            view.open_insert_form(cx);
+            view.open_import_bar(cx);
+            view.open_structure_bar(
+                bookie_app_services::structure_change_plan::StructureChangeKind::DropTable,
+                cx,
+            );
+            assert!(!view.form_open());
+            assert!(!view.save.busy && view.save.pending.is_none());
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| assert!(view.save.pending.is_none() && !view.save.busy));
+    assert_eq!(
+        saved_customer(&path, 1),
+        "Ada",
+        "nothing was written beside the transaction"
+    );
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.transaction.is_none());
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn a_transaction_does_not_start_while_a_save_waits_for_review(cx: &mut TestAppContext) {
+    let path = fixture_copy("review-blocks-transaction");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Pending".into()));
+            view.edits_changed();
+            view.request_save(cx);
+        })
+    });
+    settle_saving(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            assert!(view.save.pending.is_some(), "{}", view.status);
+            view.begin_transaction(cx);
+            assert!(!view.transaction_open());
+            view.save.busy = true;
+            view.save.pending = None;
+            view.begin_transaction(cx);
+            assert!(!view.transaction_open());
+            view.save.busy = false;
+        })
+    });
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn a_statement_sent_while_the_transaction_starts_is_refused_with_a_reason(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-starting-run");
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.transaction_starting = true;
+            view.status.clear();
+            view.run_in_transaction("UPDATE orders SET customer = 'Early' WHERE id = 1".into(), cx);
+            assert_eq!(view.status, "Wait for the transaction to start");
+            view.transaction_starting = false;
+        })
+    });
+    assert_eq!(saved_customer(&path, 1), "Ada");
+    std::fs::remove_file(path).ok();
+}
+
+#[gpui::test]
+fn a_transaction_statement_can_be_stopped_and_unrelated_loads_do_not_cancel_or_drop_it(cx: &mut TestAppContext) {
+    let path = fixture_copy("transaction-stop");
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.run_in_transaction("SELECT customer FROM orders WHERE id = 1".into(), cx);
+            view.invalidate_background();
+            view.loads.invalidate();
+            let statement = view.transaction_statement().expect("the statement runs");
+            assert!(!statement.cancel.is_cancelled(), "an unrelated load must not cancel it");
+        })
+    });
+    wait_for(&view, cx, |view| !view.transaction_statement_running());
+    view.read_with(cx, |view, _| {
+        let transaction = view.transaction.as_ref().expect("still open");
+        assert_eq!(transaction.statements, 1, "{}", view.status);
+        assert_eq!(view.run_tabs.slots.len(), 1, "the result is kept: {}", view.status);
+    });
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.run_in_transaction("SELECT customer FROM orders".into(), cx);
+            view.stop_query();
+            let statement = view.transaction_statement().expect("the statement runs");
+            assert!(
+                statement.cancel.is_cancelled(),
+                "Stop reaches the transaction statement"
+            );
+        })
+    });
+    wait_for(&view, cx, |view| !view.transaction_statement_running());
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    wait_for(&view, cx, |view| view.transaction.is_none());
     std::fs::remove_file(path).ok();
 }

@@ -92,7 +92,7 @@ fn clipboard_csv_is_published_and_read_back_exactly() {
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            bookie_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
+            bookie_core::import::row_to_values(&row, &[Some(0)], &columns, &options, index + 1)
                 .unwrap()
                 .remove(0)
         })
@@ -161,7 +161,7 @@ fn clipboard_tsv_is_published_and_keeps_null_and_formula_cells_distinct() {
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            bookie_core::import::row_to_values(row, &[Some(0)], &columns, &options, index + 1)
+            bookie_core::import::row_to_values(&row, &[Some(0)], &columns, &options, index + 1)
                 .unwrap()
                 .remove(0)
         })

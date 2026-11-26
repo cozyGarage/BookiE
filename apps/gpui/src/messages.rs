@@ -65,6 +65,13 @@ impl MessageLog {
         );
     }
 
+    pub fn statement_cancelled(&mut self, sql: &str, elapsed: Duration) {
+        self.push(
+            MessageKind::Info,
+            format!("{} · Cancelled · {} ms", one_line(sql), elapsed.as_millis()),
+        );
+    }
+
     pub fn statement_failed(&mut self, sql: &str, reason: &str, elapsed: Duration) {
         self.push(
             MessageKind::Error,

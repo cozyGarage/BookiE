@@ -64,9 +64,9 @@ impl GridView {
                 )
                 .child(crate::assets::icon("chevron-down", theme.muted_foreground))
         };
-        div().debug_selector(|| "query-file-menu".into()).child(
-            button.dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
-        )
+        div()
+            .debug_selector(|| "query-file-menu".into())
+            .child(button.dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)))
     }
 
     pub(crate) fn query_editor_toolbar(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
@@ -98,7 +98,16 @@ impl GridView {
 
     fn query_run_controls(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> Div {
         let selected = !self.sql_input.read(cx).selected_range().is_empty();
-        let running = self.panel.running.map(|(_, at)| at.elapsed().as_secs());
+        let running = self
+            .panel
+            .running
+            .map(|(_, at)| at)
+            .or_else(|| self.transaction_statement().map(|statement| statement.started))
+            .map(|at| at.elapsed().as_secs());
+        let stopping = match self.transaction_statement() {
+            Some(statement) => statement.cancel.is_cancelled(),
+            None => self.queries.cancel.is_cancelled(),
+        };
         div()
             .flex()
             .flex_none()
@@ -153,10 +162,15 @@ impl GridView {
             .children(running.map(|seconds| {
                 div()
                     .text_color(rgb(theme.muted_foreground))
-                    .child(format!("{seconds}s"))
+                    .whitespace_nowrap()
+                    .child(if compact {
+                        format!("{seconds} s")
+                    } else {
+                        format!("Running · {seconds} s")
+                    })
             }))
             .when(running.is_some(), |bar| {
-                if self.queries.cancel.is_cancelled() {
+                if stopping {
                     bar.child(crate::surfaces::unavailable_button(
                         ButtonKind::Ghost,
                         "stop-query",
@@ -221,41 +235,41 @@ impl GridView {
             button.label("Tools")
         };
         button.dropdown_menu(move |mut menu, _, _| {
-                let explain = owner.clone();
-                let format = owner.clone();
-                let favorite = owner.clone();
-                menu = menu
-                    .item(PopupMenuItem::new("Explain").on_click(move |_, _, cx| {
-                        let _ = explain.update(cx, |view, cx| {
-                            view.explain_query(cx);
-                            cx.notify();
-                        });
-                    }))
-                    .item(PopupMenuItem::new("Format SQL").on_click(move |_, window, cx| {
-                        let _ = format.update(cx, |view, cx| view.format_query(window, cx));
-                    }))
-                    .item(PopupMenuItem::new("Save as favorite").on_click(move |_, _, cx| {
-                        let _ = favorite.update(cx, |view, cx| view.save_favorite(cx));
-                    }))
-                    .separator();
-                for (label, replace) in [("Find in editor", false), ("Replace in editor", true)] {
-                    let owner = owner.clone();
-                    menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |view, cx| {
-                            view.sql_input.update(cx, |editor, cx| editor.open_search(replace, cx));
-                        });
-                    }));
-                }
-                let complete = owner.clone();
-                menu = menu.item(
-                    PopupMenuItem::new("Suggest SQL (Ctrl+Space)").on_click(move |_, window, cx| {
-                        let _ = complete.update(cx, |view, cx| {
-                            view.sql_input
-                                .update(cx, |editor, cx| editor.show_completions(window, cx));
-                        });
-                    }),
-                );
-                crate::sql_editor::snippet_menu(menu, &owner)
+            let explain = owner.clone();
+            let format = owner.clone();
+            let favorite = owner.clone();
+            menu = menu
+                .item(PopupMenuItem::new("Explain").on_click(move |_, _, cx| {
+                    let _ = explain.update(cx, |view, cx| {
+                        view.explain_query(cx);
+                        cx.notify();
+                    });
+                }))
+                .item(PopupMenuItem::new("Format SQL").on_click(move |_, window, cx| {
+                    let _ = format.update(cx, |view, cx| view.format_query(window, cx));
+                }))
+                .item(PopupMenuItem::new("Save as favorite").on_click(move |_, _, cx| {
+                    let _ = favorite.update(cx, |view, cx| view.save_favorite(cx));
+                }))
+                .separator();
+            for (label, replace) in [("Find in editor", false), ("Replace in editor", true)] {
+                let owner = owner.clone();
+                menu = menu.item(PopupMenuItem::new(label).on_click(move |_, _, cx| {
+                    let _ = owner.update(cx, |view, cx| {
+                        view.sql_input.update(cx, |editor, cx| editor.open_search(replace, cx));
+                    });
+                }));
+            }
+            let complete = owner.clone();
+            menu = menu.item(
+                PopupMenuItem::new("Suggest SQL (Ctrl+Space)").on_click(move |_, window, cx| {
+                    let _ = complete.update(cx, |view, cx| {
+                        view.sql_input
+                            .update(cx, |editor, cx| editor.show_completions(window, cx));
+                    });
+                }),
+            );
+            crate::sql_editor::snippet_menu(menu, &owner)
         })
     }
 

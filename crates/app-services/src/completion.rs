@@ -148,6 +148,24 @@ impl SchemaIndex {
             .collect()
     }
 
+    pub(super) fn is_table(&self, value: &str) -> bool {
+        table_key(value, self.table_grammar).is_some_and(|key| self.table_keys.contains(&key))
+    }
+
+    pub(super) fn column_owners(&self) -> HashMap<String, Option<String>> {
+        let driver = quoting_driver(self.grammar);
+        let mut owners: HashMap<String, Option<String>> = HashMap::new();
+        for (table, columns) in &self.columns {
+            for column in columns {
+                owners
+                    .entry(bookie_core::sql_dialect::quote_ident(driver, column))
+                    .and_modify(|owner| *owner = None)
+                    .or_insert_with(|| Some(bare_name(table).to_string()));
+            }
+        }
+        owners
+    }
+
     pub fn invalidate_columns(&mut self) {
         self.generation = self.generation.wrapping_add(1);
         self.columns.clear();
@@ -369,6 +387,15 @@ fn candidate_words(sql: &str, cursor_byte: usize, index: &SchemaIndex) -> Vec<St
     )
 }
 
+pub(super) fn quoting_driver(grammar: Option<SqlGrammar>) -> &'static str {
+    match grammar {
+        Some(SqlGrammar::MySql) => "mysql",
+        Some(SqlGrammar::MsSql) => "mssql",
+        Some(SqlGrammar::ClickHouse) => "clickhouse",
+        _ => "postgres",
+    }
+}
+
 pub(super) fn candidate_sql(
     sql: &str,
     cursor_byte: usize,
@@ -377,12 +404,7 @@ pub(super) fn candidate_sql(
     table_prefix: Option<&str>,
     plan: Option<&ScriptPlan>,
 ) -> Vec<String> {
-    let driver = match index.grammar {
-        Some(SqlGrammar::MySql) => "mysql",
-        Some(SqlGrammar::MsSql) => "mssql",
-        Some(SqlGrammar::ClickHouse) => "clickhouse",
-        _ => "postgres",
-    };
+    let driver = quoting_driver(index.grammar);
     let narrowing = Narrowing { table_prefix, plan };
     candidates(sql, cursor_byte, index, settings, false, narrowing, |column| {
         bookie_core::sql_dialect::quote_ident(driver, column)

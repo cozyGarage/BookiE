@@ -13,7 +13,9 @@ pub(crate) struct PasteTarget {
     pub current: Cell,
 }
 
-pub(crate) fn staged_paste(targets: &[PasteTarget]) -> Result<Vec<((u64, usize), Cell)>, String> {
+type StagedPaste = Result<Vec<((u64, usize), Cell)>, String>;
+
+pub(crate) fn staged_paste(targets: &[PasteTarget]) -> StagedPaste {
     let mut staged = Vec::new();
     for (index, target) in targets.iter().enumerate() {
         let value = match &target.text {
@@ -144,7 +146,7 @@ impl GridView {
         })
     }
 
-    fn apply_paste(&mut self, outcome: Result<Vec<((u64, usize), Cell)>, String>, cx: &mut Context<Self>) {
+    fn apply_paste(&mut self, outcome: StagedPaste, cx: &mut Context<Self>) {
         match outcome {
             Ok(staged) if staged.is_empty() => self.status = "The pasted values equal the current ones".into(),
             Ok(staged) => {
