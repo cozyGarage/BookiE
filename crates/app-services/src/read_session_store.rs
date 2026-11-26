@@ -182,6 +182,32 @@ impl ReadSessionStore {
         crate::er_diagram::read::read_schema(&guard, scope, &tables, driver.capabilities(), control, |_, _| {}).await
     }
 
+    pub async fn compare_table_data(
+        &self,
+        id: SessionId,
+        source: &bookie_core::TableInfo,
+        target: &bookie_core::TableInfo,
+        control: &OperationControl,
+    ) -> Result<crate::data_compare::DataCompare, crate::data_compare::DataCompareError> {
+        let session = self.get(id).ok_or(DriverError::Disconnected)?;
+        let (connection, generation, _) = session.backup_identity();
+        let guard = self
+            .database
+            .guard_for_generation(connection, generation, bookie_policy::Principal::human_gui())
+            .ok_or(DriverError::Disconnected)?;
+        let source = crate::data_compare::TableSide {
+            connection: &guard,
+            schema: source.schema.as_deref(),
+            table: &source.name,
+        };
+        let target = crate::data_compare::TableSide {
+            connection: &guard,
+            schema: target.schema.as_deref(),
+            table: &target.name,
+        };
+        crate::data_compare::compare_tables(&session.driver_id, source, target, None, control).await
+    }
+
     pub async fn export_tables_to_folder(
         &self,
         id: SessionId,

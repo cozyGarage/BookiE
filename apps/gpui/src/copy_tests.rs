@@ -37,7 +37,7 @@ const PROPER_NAMES: &[&str] = &[
 
 const BRITISH: &[&str] = &["colour", "behaviour", "organisation", "favourite", "cancelled"];
 
-const PALETTE_MODES: [PaletteMode; 12] = [
+const PALETTE_MODES: [PaletteMode; 13] = [
     PaletteMode::Commands,
     PaletteMode::Tables,
     PaletteMode::Columns,
@@ -50,6 +50,7 @@ const PALETTE_MODES: [PaletteMode; 12] = [
     PaletteMode::NameFilter,
     PaletteMode::SchemaContext,
     PaletteMode::Themes,
+    PaletteMode::CompareTarget,
 ];
 
 fn copy_problems(text: &str) -> Vec<String> {

@@ -930,7 +930,9 @@ async fn value_contract_smalldatetime_rounding_matches_server_text() {
     let options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv.as_bytes(), &options, None).unwrap();
     let mapping = (0..result.columns.len()).map(Some).collect::<Vec<_>>();
-    let imported = bookie_core::import::row_to_values(&sheet.rows[0], &mapping, &result.columns, &options, 2).unwrap();
+    let imported =
+        bookie_core::import::row_to_values(&sheet.rows.get(0).unwrap(), &mapping, &result.columns, &options, 2)
+            .unwrap();
     assert_eq!(imported, result.rows[0]);
 
     conn.execute(

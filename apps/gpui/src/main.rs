@@ -20,6 +20,7 @@ mod connection_bundle_ui;
 mod connection_form;
 mod connection_info_ui;
 mod copy_selection;
+mod data_compare_ui;
 mod detail_panel;
 mod diagram_ddl;
 mod diagram_relationship;

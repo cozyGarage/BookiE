@@ -736,7 +736,8 @@ async fn assert_float8_array_csv_round_trip(
     let options = bookie_core::import::CsvImportOptions::default();
     let sheet = bookie_core::import::read_csv(csv_text.as_bytes(), &options, None).unwrap();
     let imported =
-        bookie_core::import::row_to_values(&sheet.rows[0], &[Some(0), Some(1)], &columns, &options, 2).unwrap();
+        bookie_core::import::row_to_values(&sheet.rows.get(0).unwrap(), &[Some(0), Some(1)], &columns, &options, 2)
+            .unwrap();
     assert_eq!(imported, row, "CSV import must retain the array as exact text");
 
     connection
