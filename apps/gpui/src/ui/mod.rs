@@ -1,0 +1,22 @@
+pub(crate) mod assets;
+pub(crate) mod audit_page;
+pub(crate) mod chrome;
+pub(crate) mod home_page;
+#[cfg(test)]
+pub(crate) mod keyboard_settings_tests;
+pub(crate) mod keyboard_settings_ui;
+pub(crate) mod keys;
+pub(crate) mod measure;
+pub(crate) mod menus;
+pub(crate) mod new_window_ui;
+pub(crate) mod notifications;
+pub(crate) mod palette_actions;
+pub(crate) mod palette_state;
+pub(crate) mod panel_state;
+pub(crate) mod picker;
+pub(crate) mod render;
+pub(crate) mod surfaces;
+pub(crate) mod text_input;
+pub(crate) mod theme_settings_ui;
+pub(crate) mod ui_theme;
+pub(crate) mod update_ui;

@@ -1,98 +1,43 @@
 use std::io::Write;
 use std::time::{Duration, Instant};
 
-mod approval_ui;
-mod assets;
-mod audit_page;
-mod backup_ui;
-mod binary_mode;
-mod cancel_process_ui;
-mod catalog_nav;
-mod chart_plot;
-mod chart_ui;
-mod choice_edit;
-mod choice_ui;
-mod chrome;
-mod close_confirm_ui;
-mod closed_tabs_ui;
-mod column_projection;
-mod connection_bundle_ui;
-mod connection_form;
-mod connection_info_ui;
-mod copy_selection;
-mod data_compare_ui;
-mod detail_panel;
-mod diagram_ddl;
-mod diagram_relationship;
-mod diagram_scene;
-mod diagram_ui;
-mod drafts_ui;
-mod edit_history;
-mod export_file_ui;
-mod favorites_ui;
-mod filter_rule_ui;
-mod find_filter;
-mod fk_nav_ui;
-mod fk_peek_ui;
-mod follow_ui;
-mod grid_edit;
-mod grid_table;
-mod health_ui;
-mod history_view;
-mod home_page;
-mod host_key_ui;
-mod import_ui;
-mod insert_ui;
-mod keyboard_settings_ui;
-mod keys;
-mod local_sort;
-mod mcp_ui;
-mod measure;
-mod menus;
-mod new_window_ui;
-mod notifications;
-mod palette_actions;
-mod palette_state;
-mod panel_state;
-mod params_ui;
-mod paste_ui;
-mod picker;
-mod plan_view;
-mod query_execution;
-mod query_pane;
-mod refresh_ui;
-mod render;
-mod resolve_ui;
-mod reveal;
-mod row_inspector_ui;
-mod run_cursor_ui;
-mod runs;
-mod save_ui;
-mod saved_filters_ui;
-mod schema_compare_ui;
-mod schema_diagram_ui;
-mod scroll_pace;
-mod selection_stats_ui;
-mod server_filter_ui;
-mod services;
-mod set_cells_ui;
-mod sidebar_catalog;
-mod sidebar_fields;
-mod sidebar_state;
-mod sql_editor;
-mod sql_editor_marks;
-mod sql_file_ui;
-mod ssh_form;
-mod structure_ui;
-mod surfaces;
-mod table_menu;
-mod tables_export_ui;
-mod text_input;
-mod theme_settings_ui;
-mod transaction_ui;
-mod ui_theme;
-mod update_ui;
-mod value_search_ui;
+mod chart;
+mod connection;
+mod diagram;
+mod editor;
+mod filter;
+mod grid;
+mod sidebar;
+mod transfer;
+mod ui;
+mod write;
+
+use chart::chart_plot;
+use connection::{catalog_nav, connection_bundle_ui, connection_form, follow_ui, host_key_ui, mcp_ui, ssh_form};
+use diagram::{diagram_ddl, diagram_relationship, diagram_scene, diagram_ui, schema_diagram_ui};
+use editor::{
+    closed_tabs_ui, history_view, params_ui, plan_view, query_execution, run_cursor_ui, runs, sql_editor, sql_file_ui,
+};
+use filter::{filter_rule_ui, saved_filters_ui, server_filter_ui, value_search_ui};
+use grid::{
+    binary_mode, choice_edit, column_projection, edit_history, fk_peek_ui, grid_edit, grid_table, insert_ui,
+    local_sort, row_inspector_ui, selection_stats_ui, set_cells_ui,
+};
+#[cfg(test)]
+use sidebar::table_menu;
+use sidebar::{favorites_ui, sidebar_catalog, sidebar_state};
+use transfer::{backup_ui, data_compare_ui, export_file_ui, import_ui, tables_export_ui};
+#[cfg(test)]
+use ui::render;
+use ui::{
+    assets, audit_page, chrome, keyboard_settings_ui, measure, menus, notifications, palette_state, panel_state,
+    picker, surfaces, text_input, ui_theme, update_ui,
+};
+#[cfg(test)]
+use ui_tests::{live_ui_tests, test_config};
+#[cfg(test)]
+use write::save_ui_tests;
+use write::{approval_ui, resolve_ui, save_ui, structure_ui, transaction_ui};
 
 use bookie_app_services::result_copy::{self, CopyContext, CopyFormat};
 use bookie_gpui::core_bridge::column_infos_for;
@@ -1231,49 +1176,7 @@ fn main() {
 }
 
 #[cfg(test)]
-mod choice_edit_tests;
-#[cfg(test)]
-mod connection_form_ui_tests;
-#[cfg(test)]
-mod copy_tests;
-#[cfg(test)]
-mod drafts_ui_tests;
-#[cfg(test)]
-mod follow_ui_tests;
-#[cfg(test)]
-mod grid_pin_tests;
-#[cfg(test)]
-mod host_key_ui_tests;
-#[cfg(test)]
-mod icon_tooltip_tests;
-#[cfg(test)]
-mod keyboard_settings_tests;
-#[cfg(test)]
-mod live_ui_tests;
-#[cfg(test)]
-mod overlay_ui_tests;
-#[cfg(test)]
-mod query_pane_ui_tests;
-#[cfg(test)]
-mod row_inspector_tests;
-#[cfg(test)]
-mod save_ui_tests;
-#[cfg(test)]
-mod server_filter_ui_tests;
-#[cfg(test)]
-mod status_bar_tests;
-#[cfg(test)]
-mod table_menu_tests;
-#[cfg(test)]
-mod test_config;
-#[cfg(test)]
-mod transaction_ui_tests;
-#[cfg(test)]
-mod typed_value_ui_tests;
-#[cfg(test)]
 mod ui_tests;
-#[cfg(test)]
-mod window_identity_tests;
 
 fn load_keymap() -> Keymap {
     let Some(path) = bookie_app_services::config_io::xdg_config_path("gpui-keymap.json") else {
