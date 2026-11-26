@@ -83,6 +83,7 @@ impl GridView {
             .chain(self.value_search_actions())
             .chain(self.schema_diagram_actions())
             .chain(self.schema_compare_actions())
+            .chain(self.data_compare_actions())
             .chain(self.run_cursor_actions())
             .chain(self.paste_actions())
             .chain(self.filter_rule_actions())

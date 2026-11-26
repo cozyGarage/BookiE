@@ -95,6 +95,7 @@ fn table_group(id: &str) -> Option<&'static str> {
             | "saved-filters"
             | "delete-saved-filter"
             | "count-table-rows"
+            | "compare-table-data"
             | "go-to-last-edit"
             | "edit"
             | "set-cells"

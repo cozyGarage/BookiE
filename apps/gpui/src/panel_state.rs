@@ -85,6 +85,7 @@ pub(crate) struct SearchState {
     pub recent: crate::closed_tabs_ui::TabRecency,
     pub origin: Option<bookie_gpui::live::Origin>,
     pub tables_export: crate::tables_export_ui::TablesExportState,
+    pub data_compare: crate::data_compare_ui::DataCompareState,
 }
 
 impl SearchState {
@@ -110,6 +111,7 @@ impl SearchState {
             recent: Default::default(),
             origin: None,
             tables_export: Default::default(),
+            data_compare: Default::default(),
         }
     }
 }
