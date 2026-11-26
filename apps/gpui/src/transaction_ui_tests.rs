@@ -105,7 +105,7 @@ fn an_in_flight_save_blocks_beginning_a_manual_transaction(cx: &mut TestAppConte
             view.begin_transaction(cx);
             assert!(!view.transaction_starting);
             assert!(view.transaction.is_none());
-            assert!(view.status.contains("save review"), "{}", view.status);
+            assert_eq!(view.status, "Wait for the save to finish before starting a transaction");
         })
     });
     std::fs::remove_file(path).ok();

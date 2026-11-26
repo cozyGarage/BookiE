@@ -53,8 +53,12 @@ impl GridView {
         if self.transaction_open() {
             return;
         }
-        if self.save.busy || self.save.pending.is_some() || self.form_open() || self.modal_open() {
-            self.status = "Finish or cancel the save or the open form before starting a transaction".into();
+        if self.save.busy {
+            self.status = "Wait for the save to finish before starting a transaction".into();
+            return;
+        }
+        if self.save.pending.is_some() || self.form_open() || self.modal_open() {
+            self.status = "Finish or cancel the open form or save review before starting a transaction".into();
             return;
         }
         let Some((connection_id, opened_with)) = self
