@@ -291,14 +291,14 @@ impl TableDelegate for GridDelegate {
         let measured = measure_visible_columns(
             source,
             &self.map,
-            &self.columns,
+            (&self.columns, source_col..source_col + 1),
             &self.kinds,
             &self.edits,
             viewport_sample(self.visible_rows.start, self.visible_rows.len()),
             MAX_MEASURE_CELLS,
             |text| measure_text(text, window),
         );
-        measured.get(source_col).copied().map(px)
+        measured.first().copied().map(px)
     }
     fn visible_rows_changed(&mut self, visible: Range<usize>, window: &mut Window, cx: &mut Context<TableState<Self>>) {
         self.visible_rows = visible.clone();
@@ -316,7 +316,7 @@ impl TableDelegate for GridDelegate {
         let measured = measure_visible_columns(
             source,
             &self.map,
-            &self.columns,
+            (&self.columns, 0..self.columns.len()),
             &self.kinds,
             &self.edits,
             viewport_sample(visible.start, visible.len()),
@@ -702,7 +702,7 @@ impl GridView {
         let widths = measure_visible_columns(
             source,
             &delegate.map,
-            &columns,
+            (&columns, 0..columns.len()),
             &delegate.kinds,
             &delegate.edits,
             start..start.saturating_add(FIT_VISIBLE_ROWS),
@@ -1016,7 +1016,7 @@ impl GridView {
             measure_visible_columns(
                 &self.source,
                 &map,
-                &columns,
+                (&columns, 0..columns.len()),
                 &kinds,
                 &self.cell_edit.edits,
                 viewport_sample(start, self.viewport_rows),
@@ -1347,17 +1347,20 @@ fn viewport_sample(start: usize, rows: usize) -> Range<usize> {
 fn measure_visible_columns(
     source: &Source,
     map: &RowMap,
-    columns: &[(String, f32)],
+    (columns, selected): (&[(String, f32)], Range<usize>),
     kinds: &[(String, bool)],
     edits: &Edits,
     sample: Range<usize>,
     max_cells: usize,
     mut measure: impl FnMut(&str) -> f32,
 ) -> Vec<f32> {
+    let Some(columns) = columns.get(selected.clone()) else {
+        return Vec::new();
+    };
     let mut widths: Vec<f32> = columns
         .iter()
         .enumerate()
-        .map(|(index, (name, _))| measure_header_width(name, kinds.get(index), &mut measure))
+        .map(|(index, (name, _))| measure_header_width(name, kinds.get(selected.start + index), &mut measure))
         .collect();
     if columns.is_empty() || map.compare.is_some() {
         return widths;
@@ -1376,8 +1379,8 @@ fn measure_visible_columns(
             continue;
         };
         borrowed_row = true;
-        for (column, cell) in cells.iter().take(widths.len()).enumerate() {
-            let preview = cell_preview(edits.get(&(source_row, column)).unwrap_or(cell));
+        for (column, cell) in cells.iter().skip(selected.start).take(widths.len()).enumerate() {
+            let preview = cell_preview(edits.get(&(source_row, selected.start + column)).unwrap_or(cell));
             widths[column] = widths[column].max(measure(&preview).min(MAX_CONTENT_WIDTH));
         }
     }
@@ -1699,6 +1702,7 @@ mod tests {
 
     struct BorrowedRowSource {
         cells: Vec<Cell>,
+        rows: u64,
         row_copies: AtomicUsize,
     }
 
@@ -1708,7 +1712,7 @@ mod tests {
         }
 
         fn total(&self) -> u64 {
-            1
+            self.rows
         }
 
         fn row(&self, _index: u64) -> Vec<Cell> {
@@ -1717,7 +1721,7 @@ mod tests {
         }
 
         fn row_ref(&self, index: u64) -> Option<&[Cell]> {
-            (index == 0).then_some(&self.cells)
+            (index < self.rows).then_some(&self.cells)
         }
 
         fn find(
@@ -1750,6 +1754,7 @@ mod tests {
     fn live_grid_previews_borrow_large_cells_instead_of_cloning_the_row() {
         let source = Arc::new(BorrowedRowSource {
             cells: vec![Cell::Text("x".repeat(1024 * 1024))],
+            rows: 1,
             row_copies: AtomicUsize::new(0),
         });
         let source_dyn: Source = source.clone();
@@ -1776,6 +1781,7 @@ mod tests {
     fn visible_values_size_columns_without_cloning_rows_or_using_type_guesses() {
         let source = Arc::new(BorrowedRowSource {
             cells: vec![Cell::Int(7), Cell::Text("2026-11-20T16:44:22.133000+01:00".into())],
+            rows: 1,
             row_copies: AtomicUsize::new(0),
         });
         let source_dyn: Source = source.clone();
@@ -1786,7 +1792,7 @@ mod tests {
                 count: 1,
                 ..Default::default()
             },
-            &columns,
+            (&columns, 0..columns.len()),
             &[],
             &Edits::default(),
             viewport_sample(0, 20),
@@ -1800,9 +1806,50 @@ mod tests {
     }
 
     #[test]
+    fn fitting_one_column_uses_the_sample_budget_for_that_column_only() {
+        let source: Source = Arc::new(BorrowedRowSource {
+            cells: vec![Cell::Int(7); 512],
+            rows: 64,
+            row_copies: AtomicUsize::new(0),
+        });
+        let columns = vec![("name".into(), 100.0); 512];
+        let map = RowMap {
+            count: 64,
+            ..Default::default()
+        };
+        let mut edits = Edits::default();
+        edits.insert((63, 511), Cell::Text("wide pending value".into()));
+
+        let measure = |selected| {
+            let mut calls = 0;
+            let widths = measure_visible_columns(
+                &source,
+                &map,
+                (&columns, selected),
+                &[],
+                &edits,
+                0..64,
+                MAX_MEASURE_CELLS,
+                |text| {
+                    calls += 1;
+                    text.len() as f32 * 10.0
+                },
+            );
+            (widths, calls)
+        };
+        let (all, old_fit_calls) = measure(0..512);
+        let (one, fit_calls) = measure(511..512);
+        assert_eq!(old_fit_calls, 2_560);
+        assert_eq!(fit_calls, 65);
+        assert_eq!(one, vec![180.0]);
+        assert!(one[0] > all[511]);
+    }
+
+    #[test]
     fn borrowed_wide_rows_format_only_requested_cells_and_keep_pending_edits() {
         let source = Arc::new(BorrowedRowSource {
             cells: vec![Cell::Int(7); 512],
+            rows: 1,
             row_copies: AtomicUsize::new(0),
         });
         let source_dyn: Source = source.clone();
