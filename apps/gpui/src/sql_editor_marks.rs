@@ -3,8 +3,9 @@ use std::ops::Range;
 use bookie_app_services::completion_proposals::completion_plan;
 use bookie_app_services::result_editability::grammar_for_driver;
 use bookie_core::sql_syntax::{SqlGrammar, script::ScriptTokenKind};
+use bookie_gpui::theme::size::GUTTER_MARKER_WIDTH;
 use gpui::{Context, Entity, px};
-use gpui_component::input::{EditorState, GutterDecoration, RangeDecoration, RopeExt as _};
+use gpui_component::input::{EditorState, GutterDecoration, RangeDecoration};
 
 use crate::GridView;
 
@@ -14,7 +15,7 @@ const MAX_OCCURRENCES: usize = 100;
 impl GridView {
     pub(crate) fn observe_sql_marks(input: &Entity<EditorState>, cx: &mut Context<Self>) {
         let (gutter, ranges) = input.update(cx, |editor, cx| {
-            editor.set_gutter_decorations_width(px(3.0), cx);
+            editor.set_gutter_decorations_width(px(GUTTER_MARKER_WIDTH), cx);
             (
                 editor.create_gutter_decorations_collection(Vec::new(), cx),
                 editor.create_range_decorations_collection(Vec::new(), cx),
