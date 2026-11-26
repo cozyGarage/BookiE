@@ -23,16 +23,16 @@ use grid::{
     binary_mode, choice_edit, column_projection, edit_history, fk_peek_ui, grid_edit, grid_table, insert_ui,
     local_sort, row_inspector_ui, selection_stats_ui, set_cells_ui,
 };
+#[cfg(test)]
+use sidebar::table_menu;
 use sidebar::{favorites_ui, sidebar_catalog, sidebar_state};
 use transfer::{backup_ui, data_compare_ui, export_file_ui, import_ui, tables_export_ui};
+#[cfg(test)]
+use ui::render;
 use ui::{
     assets, audit_page, chrome, keyboard_settings_ui, measure, menus, notifications, palette_state, panel_state,
     picker, surfaces, text_input, ui_theme, update_ui,
 };
-#[cfg(test)]
-use sidebar::table_menu;
-#[cfg(test)]
-use ui::render;
 #[cfg(test)]
 use ui_tests::{live_ui_tests, test_config};
 #[cfg(test)]
