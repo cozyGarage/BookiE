@@ -104,6 +104,11 @@ impl GridView {
             .flex_none()
             .gap_1()
             .items_center()
+            .min_w(px(if compact {
+                size::QUERY_RUN_AREA_COMPACT_WIDTH
+            } else {
+                size::QUERY_RUN_AREA_WIDTH
+            }))
             .when(running.is_none() && compact, |bar| {
                 bar.child(
                     button(ButtonKind::Primary, "run-statement", "Run", theme)

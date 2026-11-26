@@ -171,3 +171,38 @@ fn a_query_finishing_behind_another_result_replaces_the_running_status(cx: &mut 
         });
     }
 }
+
+#[gpui::test]
+fn the_query_toolbar_keeps_its_tools_in_place_while_a_query_runs(cx: &mut TestAppContext) {
+    use gpui_kit::test::{TestQueryExt as _, TestWindowExt as _};
+    let (view, cx) = crate::ui_tests::open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
+    for (width, tools) in [(760.0, "Editor tools"), (1500.0, "Tools")] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
+        let mut positions = Vec::new();
+        for (running, selected) in [(false, false), (true, false), (false, true)] {
+            cx.update(|window, cx| {
+                view.update(cx, |view, cx| {
+                    view.panel.running = running.then(|| (view.queries.generation, std::time::Instant::now()));
+                    view.sql_input.update(cx, |input, cx| {
+                        input.set_value("SELECT 1", window, cx);
+                        if selected {
+                            input.select_all(window, cx);
+                        }
+                    });
+                    cx.notify();
+                })
+            });
+            cx.run_until_parked();
+            positions.push(cx.update(|window, cx| {
+                window.render_frame(cx);
+                window.find_by_label(tools).bounds().origin.x
+            }));
+        }
+        assert!(
+            positions.iter().all(|x| *x == positions[0]),
+            "{tools} moved at {width}px: {positions:?}"
+        );
+    }
+}
