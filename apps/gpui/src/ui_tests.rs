@@ -709,7 +709,7 @@ fn go_to_column_in_the_columns_menu_opens_the_column_picker(cx: &mut TestAppCont
     let button = cx.update(|window, _| window.find_by_label("Columns").bounds());
     cx.simulate_click(button.center(), Default::default());
     cx.run_until_parked();
-    let jump = cx.update(|window, _| window.find_by_label("Go to column").bounds());
+    let jump = cx.update(|window, _| window.find_by_label("Jump to column").bounds());
     cx.simulate_click(jump.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {

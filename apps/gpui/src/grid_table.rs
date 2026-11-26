@@ -697,10 +697,11 @@ impl GridView {
             return;
         };
         let start = delegate.visible_rows.start;
+        let (columns, _, _) = self.grid_columns();
         let widths = measure_visible_columns(
             source,
             &delegate.map,
-            &delegate.columns,
+            &columns,
             &delegate.kinds,
             &delegate.edits,
             start..start.saturating_add(FIT_VISIBLE_ROWS),
@@ -709,7 +710,7 @@ impl GridView {
         );
         let visible_widths = (0..delegate.projection.len())
             .filter_map(|index| delegate.projection.source_index(index))
-            .map(|source| px(widths[source].max(MIN_GRID_COLUMN_WIDTH)))
+            .filter_map(|source| widths.get(source).map(|width| px(width.max(MIN_GRID_COLUMN_WIDTH))))
             .collect::<Vec<_>>();
         self.remember_grid_widths(&visible_widths, cx);
     }

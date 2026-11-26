@@ -581,7 +581,7 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
 }
 
 #[gpui::test]
-fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &mut TestAppContext) {
+fn pinned_and_hidden_columns_keep_the_last_cell_inside_the_scroll_viewport(cx: &mut TestAppContext) {
     let source = Arc::new(WideSource(
         (0..41)
             .map(|index| ColumnMeta {
@@ -606,6 +606,8 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
     cx.simulate_click(pin_bounds.center(), Default::default());
     cx.run_until_parked();
 
+    cx.update(|window, cx| view.update(cx, |view, cx| view.hide_column(15, "column_15", window, cx)));
+    cx.run_until_parked();
     view.update(cx, |view, cx| {
         view.table.update(cx, |table, _| {
             let offset_past_scroll_end = gpui::point(gpui::px(-10_000.0), gpui::px(0.0));
@@ -626,7 +628,7 @@ fn pinning_a_leading_column_keeps_the_last_cell_inside_the_scroll_viewport(cx: &
         .expect("vertical scrollbar gutter is rendered");
     cx.update(|window, _| {
         let pinned = window.find(("col-header", 0usize)).bounds();
-        let last_header = window.find(("col-header", 40usize)).bounds();
+        let last_header = window.find(("col-header", 39usize)).bounds();
         let last_cell = window.find("table-cell-0:40").bounds();
         let visible_right = vertical_gutter.origin.x;
         assert!(
