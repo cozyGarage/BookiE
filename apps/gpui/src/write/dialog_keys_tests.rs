@@ -207,3 +207,30 @@ fn escape_closes_notifications_without_stopping_a_focused_query(cx: &mut TestApp
     });
     std::fs::remove_file(&path).ok();
 }
+
+#[gpui::test]
+fn escape_closes_notifications_above_the_palette_first(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.notices.open = true;
+            cx.notify();
+        })
+    });
+    cx.simulate_keystrokes("ctrl-shift-p");
+    view.read_with(cx, |view, _| assert!(view.palette.open));
+
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| {
+        assert!(
+            !view.notices.open,
+            "Escape closes the visually higher notification drawer"
+        );
+        assert!(view.palette.open, "the covered palette stays open");
+    });
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| assert!(!view.palette.open));
+    std::fs::remove_file(&path).ok();
+}

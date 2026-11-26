@@ -19,14 +19,6 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
-        if self.palette.open {
-            if palette_navigation_key(key, event.keystroke.modifiers) {
-                self.move_palette_selection(key, cx);
-                cx.stop_propagation();
-                cx.notify();
-            }
-            return;
-        }
         if let Some(surface) = top {
             if self.surface_key(key, cx) {
                 cx.stop_propagation();
@@ -34,6 +26,14 @@ impl GridView {
             if surface != Surface::Notifications || key == "escape" {
                 return;
             }
+        }
+        if self.palette.open {
+            if palette_navigation_key(key, event.keystroke.modifiers) {
+                self.move_palette_selection(key, cx);
+                cx.stop_propagation();
+                cx.notify();
+            }
+            return;
         }
         if key == "escape" && self.can_stop_query() && self.sql_input.read(cx).focus_handle(cx).is_focused(window) {
             self.stop_query();
