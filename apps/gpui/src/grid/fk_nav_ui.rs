@@ -25,10 +25,7 @@ impl GridView {
         let Some((row, column)) = self.active_row_with_names() else {
             return;
         };
-        self.clear_fk_peek();
-        let generation = self.fk_peek_work.generation;
-        let cancel = CancellationToken::new();
-        self.fk_peek_work.cancel = cancel.clone();
+        let (generation, cancel) = self.begin_fk_lookup();
         let table = self.catalog.grid_table.clone();
         let query_table = table.clone();
         let current_session = live.clone();
@@ -67,7 +64,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                if !this.fk_peek_response_is_current(generation, &current_session, &table) {
+                if !this.fk_lookup_is_current(generation, &current_session, &table) {
                     return;
                 }
                 match found {
@@ -94,7 +91,14 @@ impl GridView {
         self.fk_peek = None;
     }
 
-    pub(crate) fn fk_peek_response_is_current(
+    fn begin_fk_lookup(&mut self) -> (u64, CancellationToken) {
+        self.clear_fk_peek();
+        let cancel = CancellationToken::new();
+        self.fk_peek_work.cancel = cancel.clone();
+        (self.fk_peek_work.generation, cancel)
+    }
+
+    pub(crate) fn fk_lookup_is_current(
         &self,
         generation: u64,
         session: &std::sync::Arc<bookie_gpui::live::LiveSession>,
@@ -103,6 +107,7 @@ impl GridView {
         self.fk_peek_work.generation == generation
             && self.is_current_session(session)
             && self.catalog.grid_table == *table
+            && matches!(self.tabs.current(), Tab::Table(active) if active == table)
             && !self.grid_is_query
     }
 
@@ -126,26 +131,38 @@ impl GridView {
         let Some((row, column)) = self.active_row_with_names() else {
             return;
         };
+        let (generation, cancel) = self.begin_fk_lookup();
         let table = self.catalog.grid_table.clone();
+        let query_table = table.clone();
+        let query_session = live.clone();
         self.status = "Following the foreign key…".into();
         cx.spawn(async move |this, cx| {
             let found = cx
                 .background_executor()
                 .spawn(async move {
-                    let structure = live.table_structure(&table)?;
+                    if cancel.is_cancelled() {
+                        return Err("Canceled the foreign key lookup".into());
+                    }
+                    let structure = query_session.table_structure(&query_table)?;
+                    if cancel.is_cancelled() {
+                        return Err("Canceled the foreign key lookup".into());
+                    }
                     let mut targets = match direction {
                         Direction::ToReferenced => {
-                            reference_targets(&structure.foreign_keys, table.schema.as_deref(), &column, &row)
+                            reference_targets(&structure.foreign_keys, query_table.schema.as_deref(), &column, &row)
                         }
                         Direction::ToReferencing => referencing_targets(&structure.referenced_by, &row),
                     }?;
                     let count = targets.len();
                     let target = targets.remove(0);
-                    let statement = target_statement(&live, &target)?;
+                    let statement = target_statement(&query_session, &target)?;
                     Ok::<_, String>((statement, count, target.table))
                 })
                 .await;
             this.update(cx, |this, cx| {
+                if !this.fk_lookup_is_current(generation, &live, &table) {
+                    return;
+                }
                 match found {
                     Ok(((sql, params), count, table)) => {
                         this.run_sql_with(sql, params, cx);

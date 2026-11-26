@@ -70,8 +70,41 @@ Limits of the GPUI frontend after the DataTable change. GPUI is the primary fron
 
 - **Cell selection:** a cell is always selected while rows are shown (the top-left cell at first), so the cursor is always visible.
 - **Sidebar:** the narrow header label clips when the pane is narrow. Connection-bundle import and export are in the toolbar's **Import / Export** menu, not the sidebar. These connection settings bundles are separate from importing table data from a file.
-- **CSV delimiter:** table import accepts CSV and XLSX files through the review flow for eligible saved writable connections. The import preview is capped at 1,000 rows per run, and confirming applies the import in one transaction. Clipboard export writes to the clipboard. The palette command `csv delimiter <text>` (1 to 8 characters, no quote or line break) sets a multi-character delimiter for CSV copies and CSV file export until the app closes, and "CSV delimiter: back to the comma" resets it ([#3096](https://github.com/cozyGarage/BookiE/issues/3096)). File export opens a dialog with formats CSV (comma, semicolon, tab or pipe separator), JSON, JSON Lines, Markdown, HTML, XML, SQL INSERT statements and Excel workbook. SQL is offered only for table results on engines that support SQL literals, and Excel only when the rows fit in one worksheet. Row scopes are Selected rows, Current page, Filtered / loaded rows and Full result; Full result is offered only when the result is complete and, for a table, the load used one snapshot ([#3788](https://github.com/cozyGarage/BookiE/pull/3788)).
-- **GPUI export row limit:** the palette command `export limit <n>` (a whole number of at least 1) caps clipboard Export as CSV and file export to the first n rows of the chosen rows until the app closes, and a notification says when more rows were not exported; "Export limit: remove" clears it. It never fetches rows that are not loaded ([#3089](https://github.com/cozyGarage/BookiE/issues/3089)).
+- **CSV delimiter:** table import accepts CSV and XLSX files through the review flow for eligible saved writable connections. The import preview is capped at 1,000 rows per run, and confirming applies the import in one transaction. Clipboard export writes to the clipboard. The palette command `csv delimiter <text>` (1 to 8 characters, no quote or line break) sets a multi-character delimiter for CSV copies and CSV file export until the app closes, and "Reset the CSV delimiter … to a comma" resets it ([#3096](https://github.com/cozyGarage/BookiE/issues/3096)). File export opens a dialog with formats CSV (comma, semicolon, tab or pipe separator), JSON, JSON Lines, Markdown, HTML, XML, SQL INSERT statements and Excel workbook. SQL is offered only for table results on engines that support SQL literals, and Excel only when the rows fit in one worksheet. Row scopes are Selected rows, Current page, Filtered / loaded rows and Full result; Full result is offered only when the result is complete and, for a table, the load used one snapshot ([#3788](https://github.com/cozyGarage/BookiE/pull/3788)).
+- **GPUI export row limit:** the palette command `export limit <n>` (a whole number of at least 1) caps clipboard Export as CSV and file export to the first n rows of the chosen rows until the app closes, and a notification says when more rows were not exported; "Remove the export limit of n rows" clears it. It never fetches rows that are not loaded ([#3089](https://github.com/cozyGarage/BookiE/issues/3089)).
 - **Settings:** pages for Appearance (color theme and Dark theme switch), Fonts (UI and editor font family and size), Keyboard (shortcuts) and MCP (local server and tokens); the palette opens them. Fonts and theme are saved in `$XDG_CONFIG_HOME/bookie-gpui/settings.json`, and window geometry in `window.json` beside it. These files ignore `BOOKIE_PROFILE`, so development and normal builds share them.
 - **Row cap:** table loads and query results are held in memory and capped at 100,000 rows, within the shared decoded-byte and cell budgets. GPUI does not stream or spool result pages; the status marks a result that may be incomplete.
 - **Writes:** table edits, row inserts and deletes, structure changes and imports go through the guarded review and Save flow on saved connections not marked read-only. Query tabs are read-only outside the explicit transaction flow (Begin transaction, run, then Commit).
+- **Run all:** a buffer is split into at most 64 statements. They run one at a time in one session and the run stops at the first failure. Several statements with parameters are refused; run them one at a time.
+- **Data compare:** **Compare table data…** compares two tables on the same connection by their shared primary key. Tables without one are refused, and key columns cannot be chosen. The sync script is copied to the clipboard; nothing runs ([#3818](https://github.com/cozyGarage/BookiE/issues/3818)).
+
+### Available in the GTK app or the shared services but not yet in GPUI
+
+What GPUI has is described in the [GPUI README](../apps/gpui/README.md). Module names are in `crates/app-services` unless a crate is named.
+
+| Feature | Backend entry point (module/function) | GTK | Tracking issue |
+|---|---|---|---|
+| Several query tabs per window (GPUI has one Query tab) | GTK only (`ui/app/workspace_tabs.rs`) | Yes | [#4068](https://github.com/cozyGarage/BookiE/issues/4068) |
+| Several connections in one window's sidebar | `window_sessions::WindowSessions` | Yes | [#3715](https://github.com/cozyGarage/BookiE/issues/3715) |
+| Restore open tabs after a restart (GPUI keeps only the query draft) | `workspace_state::WorkspaceStore` | Yes | |
+| Rename, colour and tag tabs | `tab_mark::TabMark` | Yes | |
+| Query results beyond 100,000 rows, streamed and spooled | `interactive_session::open_query_cursor_on_target`, spool in `bookie-results` | Yes | [#4071](https://github.com/cozyGarage/BookiE/issues/4071) |
+| Export rows that are not loaded, in any format (GPUI only via Export Tables as CSV) | `export_pages::page_fetcher`, `snapshot_export::SnapshotPages` | Yes | |
+| Find and replace in result cells | `grid_replace` | Yes | |
+| Conditional cell highlighting | `highlight_settings::HighlightSettingsStore` | Yes | |
+| Table filters remembered across restarts | `filter_settings::FilterSettingsStore` | Yes | |
+| Auto-refresh a table every 15 seconds | GTK only (`ui/browse_tab/auto_refresh.rs`) | Yes | |
+| Edit updatable views with the view checks | `view_edit::resolve_view_columns` | Yes | |
+| Searchable foreign-key value picker | `browse_query::foreign_key_candidates_query` | Yes | [#4070](https://github.com/cozyGarage/BookiE/issues/4070) |
+| Other value views: Unix time, UUID styles, JSON in text (GPUI has binary hex, UTF-8 and Base64) | `display_as::display_forms` | Yes | |
+| Image preview in the value viewer | `image_preview::previewable_image` | Yes | |
+| Collation choices in the structure editor | `structure_metadata::load_collations` | Yes | |
+| Set a sequence's next value | `sequence_value::set_sequence_value` | Yes | |
+| Session temporary tables in the sidebar | `interactive_session` (`list_temporary_tables_controlled`) | Yes | [#3783](https://github.com/cozyGarage/BookiE/issues/3783) |
+| Function and procedure definitions | `bookie-core` `Connection::routine_definition` (used by MCP) | No | [#4072](https://github.com/cozyGarage/BookiE/issues/4072) |
+| Save, rename and delete SQL snippets (GPUI inserts saved ones) | `snippets::SnippetStore::save`, `delete` | Yes | [#3915](https://github.com/cozyGarage/BookiE/issues/3915) |
+| Saved-query folders and rename (GPUI favorites save, load and delete) | `bookie-storage` `SavedQueryLibrary` | Yes | |
+| Editor bookmarks | `editor_bookmarks::BookmarkSet` | Yes | |
+| Remembered CSV import column mappings | `csv_import_mappings::CsvMappingStore` | Yes | |
+| List and revoke remembered approvals | `bookie-policy` `ApprovalGrants` | Yes | |
+| What's new after an upgrade | `release_updates::should_show_whats_new` | Yes | |
