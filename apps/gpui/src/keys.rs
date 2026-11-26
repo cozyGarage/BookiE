@@ -61,6 +61,15 @@ impl GridView {
             cx.stop_propagation();
             return;
         }
+        if event.keystroke.key == "escape"
+            && self.can_stop_query()
+            && self.sql_input.read(cx).focus_handle(cx).is_focused(window)
+        {
+            self.stop_query();
+            cx.stop_propagation();
+            cx.notify();
+            return;
+        }
         let modifiers = event.keystroke.modifiers;
         let control = control_modifier(modifiers);
         if !self.grid_key_ready(window, control || modifiers.alt) {
