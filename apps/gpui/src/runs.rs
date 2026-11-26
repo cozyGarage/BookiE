@@ -351,8 +351,7 @@ impl GridView {
                 .run_tabs
                 .slots
                 .get(self.run_tabs.active)
-                .map(|slot| slot.run.number)
-                == selected
+                .is_none_or(|slot| Some(slot.run.number) == selected)
     }
 
     fn append_run(&mut self, source: Option<Source>, cancel_process: bool, activate: bool) -> Option<&mut RunSlot> {

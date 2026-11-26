@@ -123,3 +123,25 @@ fn selecting_an_older_result_leaves_the_query_running(cx: &mut TestAppContext) {
         assert_eq!(latest.row(0), [Cell::Int(7)]);
     });
 }
+
+#[gpui::test]
+fn a_query_can_show_its_result_after_the_last_older_result_is_closed(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.add_run(None);
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 7", window, cx));
+            view.run_query(cx);
+            while !view.run_tabs.slots.is_empty() {
+                view.close_run(0);
+            }
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.source.row(0), [bookie_gpui::model::Cell::Int(7)])
+    });
+}
