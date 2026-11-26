@@ -16,16 +16,26 @@ pub fn candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Candidates {
 }
 
 pub fn candidates_with(sql: &str, cursor: usize, index: &SchemaIndex, settings: Option<LexicalSettings>) -> Candidates {
+    candidates_with_scope(sql, cursor, index, settings).0
+}
+
+fn candidates_with_scope(
+    sql: &str,
+    cursor: usize,
+    index: &SchemaIndex,
+    settings: Option<LexicalSettings>,
+) -> (Candidates, Option<Scope>) {
     let grammar = index.grammar.unwrap_or(SqlGrammar::PostgreSql);
     let settings_for_grammar = settings.unwrap_or_else(|| LexicalSettings::default_for(grammar));
     let plan = plan_with(sql, Some(grammar), Some(settings_for_grammar));
-    candidates_with_plan(sql, cursor, index, settings, &plan)
+    candidates_with_plan_and_scope(sql, cursor, index, settings, &plan)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CandidateKind {
     Column,
     Local,
+    Function,
     Table,
     Keyword,
 }
@@ -44,7 +54,7 @@ pub struct RankedCandidates {
 }
 
 pub fn ranked_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> RankedCandidates {
-    let Candidates { range, values } = candidates(sql, cursor, index);
+    let (Candidates { range, values }, scope) = candidates_with_scope(sql, cursor, index, None);
     let owners = index.column_owners();
     let mut items: Vec<Candidate> = values
         .into_iter()
@@ -52,6 +62,7 @@ pub fn ranked_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Ranke
             let (kind, detail) = match owners.get(&insert) {
                 Some(owner) => (CandidateKind::Column, owner.clone()),
                 None if index.is_table(&insert) => (CandidateKind::Table, None),
+                None if is_function(&insert) => (CandidateKind::Function, None),
                 None if is_keyword(&insert) => (CandidateKind::Keyword, None),
                 None => (CandidateKind::Local, None),
             };
@@ -63,8 +74,27 @@ pub fn ranked_candidates(sql: &str, cursor: usize, index: &SchemaIndex) -> Ranke
             }
         })
         .collect();
-    items.sort_by_key(|item| item.kind);
+    items.sort_by_key(|item| candidate_rank(item.kind, scope.as_ref()));
     RankedCandidates { range, items }
+}
+
+fn candidate_rank(kind: CandidateKind, scope: Option<&Scope>) -> u8 {
+    match (scope, kind) {
+        (Some(Scope::Tables), CandidateKind::Local) => 0,
+        (Some(Scope::Tables), CandidateKind::Table) => 1,
+        (Some(Scope::Tables), CandidateKind::Function) => 2,
+        (Some(Scope::Tables), CandidateKind::Column) => 3,
+        (Some(Scope::Tables), CandidateKind::Keyword) => 4,
+        (_, CandidateKind::Column) => 0,
+        (_, CandidateKind::Local) => 1,
+        (_, CandidateKind::Function) => 2,
+        (_, CandidateKind::Table) => 3,
+        (_, CandidateKind::Keyword) => 4,
+    }
+}
+
+fn is_function(value: &str) -> bool {
+    matches!(value, "AVG" | "COUNT" | "MAX" | "MIN" | "SUM")
 }
 
 fn is_keyword(value: &str) -> bool {
@@ -85,12 +115,25 @@ pub fn candidates_with_plan(
     settings: Option<LexicalSettings>,
     plan: &ScriptPlan,
 ) -> Candidates {
+    candidates_with_plan_and_scope(sql, cursor, index, settings, plan).0
+}
+
+fn candidates_with_plan_and_scope(
+    sql: &str,
+    cursor: usize,
+    index: &SchemaIndex,
+    settings: Option<LexicalSettings>,
+    plan: &ScriptPlan,
+) -> (Candidates, Option<Scope>) {
     let cursor = floor_char_boundary(sql, cursor.min(sql.len()));
     let Some(mut range) = replacement_range(cursor, plan) else {
-        return Candidates {
-            range: cursor..cursor,
-            values: Vec::new(),
-        };
+        return (
+            Candidates {
+                range: cursor..cursor,
+                values: Vec::new(),
+            },
+            None,
+        );
     };
     let quoted = sql[range.start..].starts_with(['"', '`', '[']);
     let shared_plan = index.grammar.map(|_| plan);
@@ -100,7 +143,7 @@ pub fn candidates_with_plan(
     }
     let prefix = normalized(&sql[range.start..cursor]);
     let mut values = candidate_sql(sql, range.start, index, settings, Some(&prefix), shared_plan);
-    if !quoted && !matches!(scope, Scope::ColumnsOf(_)) {
+    if !quoted && !matches!(&scope, Scope::ColumnsOf(_)) {
         values.extend(super::completion::SQL_KEYWORDS.split_whitespace().map(str::to_string));
     }
     let values = values
@@ -118,7 +161,7 @@ pub fn candidates_with_plan(
             (label, value)
         })
         .collect();
-    Candidates { range, values }
+    (Candidates { range, values }, Some(scope))
 }
 
 fn replacement_range(cursor: usize, plan: &ScriptPlan) -> Option<Range<usize>> {
@@ -220,6 +263,42 @@ mod tests {
         );
         assert_eq!(ranked.items[0].detail.as_deref(), Some("orders"));
         assert_eq!(ranked.range, candidates(sql, "SELECT or".len(), &index).range);
+    }
+
+    #[test]
+    fn expression_completion_ranks_columns_then_functions_then_tables_then_keywords() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(vec!["orders".into(), "customers".into()]);
+        index.set_columns("orders", vec!["company_id".into()]);
+        let sql = "SELECT * FROM orders WHERE c";
+        let ranked = ranked_candidates(sql, sql.len(), &index);
+        let position = |insert: &str| {
+            ranked
+                .items
+                .iter()
+                .position(|candidate| candidate.insert == insert)
+                .unwrap_or_else(|| panic!("missing completion {insert}"))
+        };
+
+        assert!(position("\"company_id\"") < position("COUNT"));
+        assert!(position("COUNT") < position("customers"));
+        assert!(position("customers") < position("CHECK"));
+        assert_eq!(ranked.items[position("COUNT")].kind, CandidateKind::Function);
+        assert_eq!(ranked.items[position("CHECK")].kind, CandidateKind::Keyword);
+    }
+
+    #[test]
+    fn table_completion_keeps_tables_ahead_of_functions() {
+        let mut index = SchemaIndex::default();
+        index.grammar = Some(SqlGrammar::PostgreSql);
+        index.set_tables(vec!["customers".into()]);
+        let sql = "SELECT * FROM c";
+        let ranked = ranked_candidates(sql, sql.len(), &index);
+        let table = ranked.items.iter().position(|item| item.insert == "customers").unwrap();
+        let function = ranked.items.iter().position(|item| item.insert == "COUNT").unwrap();
+
+        assert!(table < function);
     }
 
     #[test]

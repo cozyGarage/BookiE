@@ -548,7 +548,7 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
         assert_eq!(idle.len(), 1, "one unread notice, not one per refresh");
         assert!(!idle[0].read);
     });
-    cx.update(|_, cx| view.update(cx, |view, cx| view.status = "Clicked a cell".into()));
+    cx.update(|_, cx| view.update(cx, |view, _cx| view.status = "Clicked a cell".into()));
     view.read_with(cx, |view, _| {
         assert_eq!(view.notices.unread(), 1, "a status change keeps it")
     });
