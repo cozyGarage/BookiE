@@ -146,7 +146,7 @@ fn oversized_full_value_replacement_is_rejected_without_closing_editor(cx: &mut 
             view.cell_edit.edits.insert((2, 1), previous.clone());
             view.start_edit(2, 1, window, cx);
             view.cell_edit.value_editor.update(cx, |editor, cx| {
-                editor.set_value(&"x".repeat(1024 * 1024 + 1), window, cx);
+                editor.set_value("x".repeat(1024 * 1024 + 1), window, cx);
             });
             view.apply_active_cell_edit(window, cx);
         });

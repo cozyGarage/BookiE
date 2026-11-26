@@ -91,10 +91,6 @@ impl GridView {
         self.search.filter.read(cx).content().trim().to_string()
     }
 
-    pub(crate) fn can_save_current_filter(&self, cx: &App) -> bool {
-        self.saved_filter_enabled() && parse_predicate(&self.current_filter_text(cx), self.source.columns()).is_ok()
-    }
-
     pub(crate) fn save_current_filter_as(&mut self, name: &str, cx: &mut Context<Self>) {
         let Some((id, schema, table)) = self.saved_filter_target() else {
             self.status = "Open a table of a saved connection to save a filter".into();
