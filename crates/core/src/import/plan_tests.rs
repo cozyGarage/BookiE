@@ -683,3 +683,20 @@ fn workbook_numbers_and_fractional_timestamps_bind_as_native_values() {
         .unwrap();
     assert_eq!(result.rows, [[Value::Float(2.5), Value::DateTime(expected)]]);
 }
+
+#[test]
+fn a_numeric_workbook_cell_is_not_null_when_it_needs_destination_type_conversion() {
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "amount").unwrap();
+    worksheet.write_number(1, 0, 2).unwrap();
+    let sheet = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 1).unwrap();
+    let columns = [column("amount", "INTEGER")];
+    let options = CsvImportOptions {
+        null_marker: "2".to_owned(),
+        ..Default::default()
+    };
+
+    let result = build_insert_plan(&target(&columns, &[Some(0)]), &sheet, &options).unwrap();
+    assert_eq!(result.rows, [[Value::Int(2)]]);
+}
