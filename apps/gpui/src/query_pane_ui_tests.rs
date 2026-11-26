@@ -95,3 +95,29 @@ fn replacement_load_does_not_inherit_explain_cancellation(cx: &mut TestAppContex
         });
     });
 }
+
+#[gpui::test]
+fn selecting_an_older_result_leaves_the_query_running(cx: &mut TestAppContext) {
+    let (view, cx) = crate::live_ui_tests::open_live(cx);
+    let selected = cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.add_run(None);
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 7", window, cx));
+            view.run_query(cx);
+            view.select_run(0);
+            assert!(!view.queries.cancel.is_cancelled());
+            view.run_tabs.slots[0].run.number
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        use bookie_gpui::model::Cell;
+        let tab = &view.run_tabs.slots[view.run_tabs.active];
+        assert_eq!(tab.run.number, selected);
+        let latest = view.run_tabs.slots.last().unwrap().source.as_ref().unwrap();
+        assert_eq!(latest.row(0), [Cell::Int(7)]);
+    });
+}

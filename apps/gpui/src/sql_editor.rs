@@ -73,12 +73,7 @@ impl CompletionProvider for SqlCompletion {
             let current_schema = schema.clone();
             let items = cx
                 .background_executor()
-                .spawn(async move {
-                    let Ok(mut cache) = cache.try_lock() else {
-                        return Vec::new();
-                    };
-                    completion_items(&text, offset, &session, schema.as_deref(), &mut cache)
-                })
+                .spawn(async move { completion_items(&text, offset, &session, schema.as_deref(), &cache) })
                 .await;
             let still_current = view
                 .read_with(cx, |view, _| {
@@ -122,36 +117,42 @@ fn completion_items(
     offset: usize,
     session: &Arc<LiveSession>,
     schema: Option<&str>,
-    cache: &mut CompletionIndex,
+    cache: &Mutex<CompletionIndex>,
 ) -> Vec<CompletionItem> {
     let Some(grammar) = grammar_for_driver(&session.driver_id) else {
         return Vec::new();
     };
     let sql = text.to_string();
-    cache.prepare(session, grammar);
-    for reference in referenced_tables(&sql, offset, Some(grammar))
+    let columns = referenced_tables(&sql, offset, Some(grammar))
         .into_iter()
         .take(MAX_METADATA_TABLES)
-    {
-        let Some((explicit_schema, name)) =
-            bookie_app_services::completion_identifiers::split_table_reference(&reference, Some(grammar))
-        else {
-            continue;
-        };
-        let requested = explicit_schema.as_deref().or(schema);
-        let mut matches = session.tables.iter().filter(|table| {
-            table.name == name && requested.is_none_or(|schema| table.schema.as_deref() == Some(schema))
-        });
-        if let Some(table) = matches.next()
-            && matches.next().is_none()
-            && let Ok(columns) = session.completion_columns(table)
-        {
-            cache
-                .index
-                .set_columns(&reference, columns.into_iter().map(|column| column.name).collect());
-        }
+        .filter_map(|reference| {
+            let (explicit_schema, name) =
+                bookie_app_services::completion_identifiers::split_table_reference(&reference, Some(grammar))?;
+            let requested = explicit_schema.as_deref().or(schema);
+            let mut matches = session.tables.iter().filter(|table| {
+                table.name == name && requested.is_none_or(|schema| table.schema.as_deref() == Some(schema))
+            });
+            let table = matches.next()?;
+            if matches.next().is_some() {
+                return None;
+            }
+            let columns = session
+                .completion_columns(table)
+                .ok()?
+                .into_iter()
+                .map(|column| column.name)
+                .collect();
+            Some((reference, columns))
+        })
+        .collect::<Vec<_>>();
+    let Ok(mut cache) = cache.lock() else { return Vec::new() };
+    cache.prepare(session, grammar);
+    for (reference, columns) in columns {
+        cache.index.set_columns(&reference, columns);
     }
     let result = candidates(&sql, offset, &cache.index);
+    drop(cache);
     let range = Range::new(
         text.offset_to_position(result.range.start),
         text.offset_to_position(result.range.end),

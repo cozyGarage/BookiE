@@ -3,6 +3,7 @@ use std::time::{Duration, Instant, SystemTime};
 
 use bookie_app_services::operation_control::bounded_with;
 use bookie_app_services::statement_plan::script_statements;
+use bookie_core::sql_syntax::SqlGrammar;
 use bookie_core::{QueryResultBudget, Value};
 use bookie_gpui::live::{LiveSession, LiveTable, QueryFailure};
 use bookie_gpui::source::ResultSource;
@@ -26,13 +27,13 @@ impl Execution {
     pub fn plan(sql: &str, params: Vec<Value>, driver: &str, schema: &str) -> Result<Self, String> {
         let schema = bookie_app_services::schema_context::schema_context_for_run(driver, schema, true)
             .map_err(|_| "The selected schema is invalid or unsupported on this connection".to_owned())?;
-        if bookie_app_services::result_editability::grammar_for_driver(driver).is_none() {
+        let Some(grammar) = bookie_app_services::result_editability::grammar_for_driver(driver) else {
             return Ok(Self {
                 statements: vec![sql.to_owned()],
                 params,
                 schema,
             });
-        }
+        };
         let plan = script_statements(sql, driver)?;
         if plan.statements.is_empty() {
             return Err("Type a statement first".into());
@@ -46,7 +47,19 @@ impl Execution {
         if plan.statements.len() > 1 && !params.is_empty() {
             return Err("Run parameterized statements one at a time".into());
         }
-        let statements = if plan.statements.len() == 1 {
+        let keep_original = plan.source_ranges.first().is_some_and(|range| {
+            let directive = match grammar {
+                SqlGrammar::MsSql => "GO",
+                SqlGrammar::MySql => "DELIMITER",
+                _ => return true,
+            };
+            ![&sql[..range.start], &sql[range.end..]]
+                .iter()
+                .flat_map(|outside| outside.lines())
+                .filter_map(|line| line.split_whitespace().next())
+                .any(|word| word.eq_ignore_ascii_case(directive))
+        });
+        let statements = if plan.statements.len() == 1 && keep_original {
             vec![sql.to_owned()]
         } else {
             plan.statements
@@ -110,5 +123,24 @@ fn failure(sql: &str, error: QueryFailure) -> Outcome {
         sql: sql.to_owned(),
         elapsed: Duration::ZERO,
         result: Err(error),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mssql_runs_one_batch_without_sending_the_go_directive() {
+        let sql = "DECLARE @x INT = 7; SELECT @x;\nGO";
+        let plan = Execution::plan(sql, vec![], "mssql", "").unwrap();
+        assert_eq!(plan.statements, ["DECLARE @x INT = 7; SELECT @x;"]);
+    }
+
+    #[test]
+    fn a_selected_schema_uses_the_quoted_session_statement() {
+        let plan = Execution::plan("SELECT * FROM invoices", vec![], "postgres", "accounts 2026").unwrap();
+        assert_eq!(plan.schema.as_deref(), Some("SET search_path TO \"accounts 2026\""));
+        assert_eq!(plan.statements, ["SELECT * FROM invoices"]);
     }
 }
