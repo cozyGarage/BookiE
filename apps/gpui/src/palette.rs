@@ -76,6 +76,8 @@ fn table_group(id: &str) -> Option<&'static str> {
         "table"
             | "quick-switcher"
             | "jump-column"
+            | "fit-visible-columns"
+            | "reset-grid-widths"
             | "reveal-sidebar"
             | "refresh-table"
             | "first"

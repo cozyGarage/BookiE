@@ -2594,9 +2594,12 @@ fn compact_menu_can_be_opened_from_find_with_keyboard(cx: &mut TestAppContext) {
         let focus = view.read(cx).search.find.read(cx).focus_handle_for_tests();
         window.focus(&focus, cx);
     });
-    cx.simulate_keystrokes("tab enter down down enter");
+    cx.simulate_keystrokes("tab enter down enter");
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_eq!(view.pager.page + 1, view.pager.pages()));
+    view.read_with(cx, |view, _| {
+        assert!(view.palette.open);
+        assert_eq!(view.palette.mode, crate::palette_state::PaletteMode::Columns);
+    });
 }
 #[gpui::test]
 fn real_table_grid_keyboard_and_jump_column_follow_active_tab(cx: &mut TestAppContext) {

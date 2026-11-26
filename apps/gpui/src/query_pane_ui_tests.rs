@@ -104,6 +104,8 @@ fn selecting_an_older_result_leaves_the_query_running(cx: &mut TestAppContext) {
             view.tabs.open_query();
             view.sync_grid_owner();
             view.add_run(None);
+            view.add_run(None);
+            assert_ne!(view.run_tabs.active, 0);
             view.sql_input
                 .update(cx, |input, cx| input.set_value("SELECT 7", window, cx));
             view.run_query(cx);
