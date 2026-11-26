@@ -23,6 +23,7 @@ struct Trips {
 struct CountingProxy {
     port: u16,
     trips: Arc<Mutex<Trips>>,
+    trace: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl CountingProxy {
@@ -30,7 +31,9 @@ impl CountingProxy {
         let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
         let port = listener.local_addr().unwrap().port();
         let trips = Arc::new(Mutex::new(Trips::default()));
+        let trace = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let shared = trips.clone();
+        let tracing = trace.clone();
         tokio::spawn(async move {
             loop {
                 let Ok((client, _)) = listener.accept().await else {
@@ -40,6 +43,7 @@ impl CountingProxy {
                 let (mut client_read, mut client_write) = client.into_split();
                 let (mut server_read, mut server_write) = server.into_split();
                 let up = shared.clone();
+                let tracing = tracing.clone();
                 tokio::spawn(async move {
                     let mut buffer = vec![0_u8; 65_536];
                     while let Ok(read) = client_read.read(&mut buffer).await {
@@ -50,6 +54,20 @@ impl CountingProxy {
                             let mut trips = up.lock().unwrap();
                             if !trips.last_was_client {
                                 trips.bursts += 1;
+                                if tracing.load(std::sync::atomic::Ordering::Relaxed) {
+                                    let text: String = buffer[..read]
+                                        .iter()
+                                        .map(|byte| {
+                                            if byte.is_ascii_graphic() || *byte == b' ' {
+                                                *byte as char
+                                            } else {
+                                                '.'
+                                            }
+                                        })
+                                        .take(90)
+                                        .collect();
+                                    println!("  burst {}: {text}", trips.bursts);
+                                }
                             }
                             trips.last_was_client = true;
                         }
@@ -73,7 +91,11 @@ impl CountingProxy {
                 });
             }
         });
-        Self { port, trips }
+        Self { port, trips, trace }
+    }
+
+    fn trace(&self, on: bool) {
+        self.trace.store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     fn reset(&self) {
@@ -114,6 +136,16 @@ async fn the_round_trips_each_statement_costs_are_counted() {
 
     let per_statement =
         |label: &str, bursts: u64| println!("round trips per {label}: {:.2}", bursts as f64 / RUNS as f64);
+
+    if std::env::var_os("ROUND_TRIP_TRACE").is_some() {
+        proxy.reset();
+        proxy.trace(true);
+        println!("one SELECT 1:");
+        connection.query("SELECT 1").await.unwrap();
+        println!("one table SELECT:");
+        connection.query("SELECT id, name FROM trips").await.unwrap();
+        proxy.trace(false);
+    }
 
     proxy.reset();
     for _ in 0..RUNS {
