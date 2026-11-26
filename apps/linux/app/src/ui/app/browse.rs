@@ -252,6 +252,7 @@ impl App {
         } else {
             target.page(offset, page.limit, page.sort, page.keyset_cursor.as_deref())
         }
+        .map_err(|error| error.to_string())
     }
 
     fn spawn_browse_page_load(
@@ -477,7 +478,7 @@ impl App {
             Ok(query) => query,
             Err(error) => {
                 sender.input(AppMsg::RowCountFailed(tab_id, request));
-                sender.input(AppMsg::ShowToast(error));
+                sender.input(AppMsg::ShowToast(error.to_string()));
                 return;
             }
         };
@@ -1149,6 +1150,7 @@ fn browse_cell_value_query(
         supports_reverse_keyset: false,
     }
     .value_query(col_index, row_key)
+    .map_err(|error| error.to_string())
 }
 
 fn single_cell_value(result: QueryResult) -> Result<bookie_core::Value, String> {

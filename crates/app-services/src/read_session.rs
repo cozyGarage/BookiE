@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use bookie_core::{
     Connection, DriverRegistry, OperationControl, QueryCursorId, QueryCursorPage, QueryResult, Session, TableInfo,
+    ViewEditability,
 };
 use bookie_policy::{AuditedSession, PolicyGuard, Principal};
 use bookie_storage::SavedConnection;
@@ -83,9 +84,11 @@ pub struct ReadSession {
     id: Uuid,
     generation: Uuid,
     supports_snapshot_cursor: bool,
+    supports_updatable_views: bool,
     writable: bool,
     pub driver_id: String,
     pub tables: Vec<TableInfo>,
+    views: Vec<TableInfo>,
 }
 
 pub(crate) async fn saved_connection(id: Uuid) -> Result<Option<SavedConnection>, bookie_storage::StorageError> {
@@ -194,6 +197,17 @@ impl PostgresTableCursor {
     }
 }
 
+async fn is_base_table(
+    guard: &PolicyGuard,
+    table: &TableInfo,
+    control: &OperationControl,
+) -> Result<bool, DriverFailurePresentation> {
+    let tables = crate::catalog::list_tables_excluding(guard, &[], control)
+        .await
+        .map_err(|error| classify(&error))?;
+    Ok(tables.contains(table))
+}
+
 fn table_select(table: &TableInfo, key: &[String]) -> String {
     let quote = |name: &str| bookie_core::sql_dialect::quote_ident("postgres", name);
     let relation = table.schema.as_deref().map_or_else(
@@ -236,6 +250,7 @@ fn table_select_sorted(
     target
         .full_select(Some((index, sort.ascending)), false)
         .map(|query| query.sql)
+        .map_err(|error| error.to_string())
 }
 
 async fn open_table_cursor(
@@ -267,9 +282,9 @@ impl ReadSession {
         if !writable {
             saved.read_only = true;
         }
-        let supports_snapshot_cursor = registry
-            .get(&saved.driver_id)
-            .is_some_and(|driver| driver.capabilities().supports_snapshot_export);
+        let capabilities = registry.get(&saved.driver_id).map(|driver| driver.capabilities());
+        let supports_snapshot_cursor = capabilities.is_some_and(|capabilities| capabilities.supports_snapshot_export);
+        let supports_updatable_views = capabilities.is_some_and(|capabilities| capabilities.supports_updatable_views);
         let prepared = open_saved(
             registry,
             saved,
@@ -282,8 +297,9 @@ impl ReadSession {
         .await?;
         check_open_cancellation(&cancellation)?;
         let id = prepared.id();
+        let views = prepared.views.clone();
         let mut tables = prepared.tables.clone();
-        tables.extend(prepared.views.iter().cloned());
+        tables.extend(views.iter().cloned());
         let (activated, generation) = prepared
             .activate_with_generation(&database)
             .ok_or_else(|| OpenFailure::Other("the connection is already open in another window".into()))?;
@@ -292,9 +308,11 @@ impl ReadSession {
             id,
             generation,
             supports_snapshot_cursor,
+            supports_updatable_views,
             writable,
             driver_id: activated.driver_id,
             tables,
+            views,
         })
     }
 
@@ -327,6 +345,29 @@ impl ReadSession {
         guard
             .fetch_columns_controlled(table.schema.as_deref(), &table.name, control)
             .await
+            .map_err(|error| classify(&error))
+    }
+
+    pub async fn read_view_editability(
+        &self,
+        table: &TableInfo,
+        control: &OperationControl,
+    ) -> Result<Option<ViewEditability>, DriverFailurePresentation> {
+        let known_view = self.views.contains(table);
+        if !known_view && self.tables.contains(table) {
+            return Ok(None);
+        }
+        let guard = self.guard()?;
+        if !self.supports_updatable_views {
+            if !known_view && is_base_table(&guard, table, control).await? {
+                return Ok(None);
+            }
+            return Ok(Some(ViewEditability::NotUpdatable));
+        }
+        guard
+            .fetch_view_editability_controlled(table.schema.as_deref(), &table.name, control)
+            .await
+            .map(Some)
             .map_err(|error| classify(&error))
     }
 

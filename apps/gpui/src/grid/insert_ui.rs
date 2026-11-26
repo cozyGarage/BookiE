@@ -1,4 +1,5 @@
 use bookie_core::ColumnInfo;
+use bookie_gpui::source::ViewAccess;
 
 use crate::save_ui::{ReviewLabels, SaveRequest};
 use crate::surfaces::{ButtonKind, button, task_bar};
@@ -32,6 +33,10 @@ impl GridView {
         let Some(live) = self.save_session() else {
             return;
         };
+        if let Some(refusal) = self.source.view_access().and_then(ViewAccess::insert_refusal) {
+            self.status = refusal;
+            return;
+        }
         self.insert.loading = true;
         let table = self.catalog.grid_table.clone();
         let asked = (self.save.generation, table.clone(), live.writable);

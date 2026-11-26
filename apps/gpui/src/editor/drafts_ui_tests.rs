@@ -5,7 +5,7 @@ use crate::live_ui_tests::open_live;
 
 #[gpui::test]
 fn a_closed_query_comes_back_from_the_draft_store_when_no_closed_tab_is_left(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -27,7 +27,7 @@ fn a_closed_query_comes_back_from_the_draft_store_when_no_closed_tab_is_left(cx:
 
 #[gpui::test]
 fn go_to_last_edit_returns_the_caret_to_where_the_query_was_last_changed(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             view.tabs.open_query();
@@ -57,11 +57,11 @@ fn go_to_last_edit_returns_the_caret_to_where_the_query_was_last_changed(cx: &mu
 
 #[gpui::test]
 fn closing_the_window_keeps_the_query_text_for_reopen_but_not_an_empty_editor(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let store = view.read_with(cx, |view, _| view.closed_drafts.clone().expect("a draft store"));
     assert!(cx.simulate_close());
     assert_eq!(store.len(), 0, "an empty editor leaves no draft");
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let store = view.read_with(cx, |view, _| view.closed_drafts.clone().expect("a draft store"));
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {

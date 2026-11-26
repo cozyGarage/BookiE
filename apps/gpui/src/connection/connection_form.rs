@@ -45,6 +45,7 @@ pub(crate) struct ConnectionForm {
     pub ssh_open: bool,
     pub open: bool,
     pub focus_on_open: bool,
+    pub focus_validation: Option<gpui::FocusHandle>,
     pub restore_focus: bool,
 }
 
@@ -101,6 +102,7 @@ impl ConnectionForm {
             ssh_open: false,
             open: false,
             focus_on_open: false,
+            focus_validation: None,
             restore_focus: false,
             tls_root: input("CA certificate file (optional)", cx),
             tls_cert: input("Client certificate file (optional)", cx),
@@ -122,7 +124,12 @@ impl ConnectionForm {
         cx: &gpui::App,
     ) -> Div {
         let error = self.validation_error.as_ref().filter(|(id, message)| {
-            *id == input.entity_id() && connection_save::validate(&self.draft(cx)).as_ref().err() == Some(message)
+            *id == input.entity_id()
+                && connection_save::validate(&self.draft(cx))
+                    .map_err(|error| error.to_string())
+                    .as_ref()
+                    .err()
+                    == Some(message)
         });
         div()
             .flex()
@@ -766,8 +773,8 @@ impl GridView {
         } else {
             ButtonKind::Primary
         };
-        button(kind, "save-connection", "Save", theme).on_click(cx.listener(|this, _, window, cx| {
-            this.save_connection(window, cx);
+        button(kind, "save-connection", "Save", theme).on_click(cx.listener(|this, _, _, cx| {
+            this.save_connection(cx);
         }))
     }
 
@@ -782,7 +789,7 @@ impl GridView {
             );
         }
         button(ButtonKind::Primary, "connect-connection", "Connect", theme)
-            .on_click(cx.listener(|this, _, window, cx| this.save_connection_with_open(true, window, cx)))
+            .on_click(cx.listener(|this, _, _, cx| this.save_connection_with_open(true, cx)))
     }
 
     fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -805,7 +812,7 @@ impl GridView {
             );
         }
         button(ButtonKind::Ghost, "test-connection", "Test", theme)
-            .on_click(cx.listener(|this, _, window, cx| this.test_connection(window, cx)))
+            .on_click(cx.listener(|this, _, _, cx| this.test_connection(cx)))
     }
 
     fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -881,7 +888,7 @@ impl GridView {
                 match draft {
                     Ok(Some(draft)) => this.fill_connection_form(draft, cx),
                     Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
-                    Err(message) => this.connection_form.status = message,
+                    Err(error) => this.connection_form.status = error.to_string(),
                 }
                 this.open_connection_dialog(cx);
             });
@@ -934,6 +941,7 @@ impl GridView {
     pub(crate) fn clear_resolved_connection_error(&mut self, cx: &mut Context<Self>) {
         if let Some((_, message)) = &self.connection_form.validation_error {
             if connection_save::validate(&self.connection_form.draft(cx))
+                .map_err(|error| error.to_string())
                 .as_ref()
                 .err()
                 != Some(message)
@@ -944,60 +952,73 @@ impl GridView {
         }
     }
 
-    fn validate_connection(&mut self, draft: &ConnectionDraft, window: &mut Window, cx: &mut Context<Self>) -> bool {
+    fn validate_connection(&mut self, draft: &ConnectionDraft, cx: &mut Context<Self>) -> bool {
         self.connection_form.validation_error = None;
-        if let Err(message) = connection_save::validate(draft) {
-            if draft.capabilities.is_file_based && draft.database.trim().is_empty() {
-                let input = &self.connection_form.database;
-                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
-                window.focus(&input.read(cx).focus_handle(cx), cx);
-            } else if draft.socket_endpoint.trim().is_empty() && draft.host.trim().is_empty() {
-                let input = &self.connection_form.host;
-                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
-                window.focus(&input.read(cx).focus_handle(cx), cx);
-            } else if !draft.socket_endpoint.trim().is_empty()
-                && !bookie_app_services::connection_form::socket_path_is_absolute(draft.socket_endpoint.trim())
-            {
+        self.connection_form.focus_validation = None;
+        if let Err(error) = connection_save::validate(draft) {
+            let message = error.to_string();
+            if matches!(
+                &error,
+                connection_save::ConnectionValidationError::SocketMustBeAbsolute
+                    | connection_save::ConnectionValidationError::ClientCertificatePair
+            ) {
                 self.connection_form.security_open = true;
-                let input = &self.connection_form.socket;
-                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
-                window.focus(&input.read(cx).focus_handle(cx), cx);
-            } else if draft.port == 0 && draft.socket_endpoint.trim().is_empty() {
-                let input = &self.connection_form.port;
-                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
-                window.focus(&input.read(cx).focus_handle(cx), cx);
-            } else if draft.tls_client_cert.trim().is_empty() != draft.tls_client_key.trim().is_empty() {
-                self.connection_form.security_open = true;
-                let input = if draft.tls_client_cert.trim().is_empty() {
-                    &self.connection_form.tls_cert
-                } else {
-                    &self.connection_form.tls_key
-                };
-                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
-                window.focus(&input.read(cx).focus_handle(cx), cx);
-            } else if let Some(ssh) = &draft.ssh {
-                let form = &self.connection_form.ssh;
-                for (hop, input) in
-                    std::iter::once((&ssh.head, &form.head)).chain(ssh.jumps.iter().zip(form.jumps.iter()))
-                {
-                    let invalid = if hop.host.trim().is_empty() {
-                        Some(&input.host)
-                    } else if hop.username.trim().is_empty() {
-                        Some(&input.user)
-                    } else if hop.port == 0 {
-                        Some(&input.port)
-                    } else if hop.auth == connection_save::SshAuthKind::KeyFile && hop.key_path.trim().is_empty() {
-                        Some(&input.key)
+            }
+            if matches!(
+                &error,
+                connection_save::ConnectionValidationError::SshHeadFieldRequired { .. }
+                    | connection_save::ConnectionValidationError::SshJumpFieldRequired { .. }
+                    | connection_save::ConnectionValidationError::SshPortRequired { .. }
+                    | connection_save::ConnectionValidationError::SshPrivateKeyRequired { .. }
+            ) {
+                self.connection_form.ssh_open = true;
+            }
+            let input = match &error {
+                connection_save::ConnectionValidationError::DatabaseFileRequired => {
+                    Some(&self.connection_form.database)
+                }
+                connection_save::ConnectionValidationError::HostRequired => Some(&self.connection_form.host),
+                connection_save::ConnectionValidationError::SocketMustBeAbsolute => Some(&self.connection_form.socket),
+                connection_save::ConnectionValidationError::PortRequired => Some(&self.connection_form.port),
+                connection_save::ConnectionValidationError::ClientCertificatePair => {
+                    Some(if draft.tls_client_cert.trim().is_empty() {
+                        &self.connection_form.tls_cert
                     } else {
-                        None
-                    };
-                    if let Some(invalid) = invalid {
-                        self.connection_form.ssh_open = true;
-                        self.connection_form.validation_error = Some((invalid.entity_id(), message.clone()));
-                        window.focus(&invalid.read(cx).focus_handle(cx), cx);
-                        break;
+                        &self.connection_form.tls_key
+                    })
+                }
+                connection_save::ConnectionValidationError::SshHeadFieldRequired { field } => Some(match field {
+                    connection_save::SshField::Host => &self.connection_form.ssh.head.host,
+                    connection_save::SshField::User => &self.connection_form.ssh.head.user,
+                }),
+                connection_save::ConnectionValidationError::SshJumpFieldRequired { index, field } => self
+                    .connection_form
+                    .ssh
+                    .jumps
+                    .get(index.saturating_sub(1))
+                    .map(|hop| match field {
+                        connection_save::SshField::Host => &hop.host,
+                        connection_save::SshField::User => &hop.user,
+                    }),
+                connection_save::ConnectionValidationError::SshPortRequired { index } => {
+                    if *index == 0 {
+                        Some(&self.connection_form.ssh.head.port)
+                    } else {
+                        self.connection_form.ssh.jumps.get(index - 1).map(|hop| &hop.port)
                     }
                 }
+                connection_save::ConnectionValidationError::SshPrivateKeyRequired { index } => {
+                    if *index == 0 {
+                        Some(&self.connection_form.ssh.head.key)
+                    } else {
+                        self.connection_form.ssh.jumps.get(index - 1).map(|hop| &hop.key)
+                    }
+                }
+                connection_save::ConnectionValidationError::DriverRequired => None,
+            };
+            if let Some(input) = input {
+                self.connection_form.validation_error = Some((input.entity_id(), message.clone()));
+                self.connection_form.focus_validation = Some(input.read(cx).focus_handle(cx));
             }
             self.connection_form.status = message;
             cx.notify();
@@ -1006,12 +1027,12 @@ impl GridView {
         true
     }
 
-    pub(crate) fn test_connection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn test_connection(&mut self, cx: &mut Context<Self>) {
         if self.connection_form.testing {
             return;
         }
         let draft = self.connection_form.draft(cx);
-        if !self.validate_connection(&draft, window, cx) {
+        if !self.validate_connection(&draft, cx) {
             return;
         }
         self.connection_form.testing = true;
@@ -1034,7 +1055,7 @@ impl GridView {
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.connection_form.testing = false;
-                this.connection_form.status = outcome.unwrap_or_else(|message| message);
+                this.connection_form.status = outcome.unwrap_or_else(|error| error.to_string());
                 cx.notify();
             });
         })
@@ -1095,16 +1116,16 @@ impl GridView {
         }
     }
 
-    pub(crate) fn save_connection(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.save_connection_with_open(false, window, cx);
+    pub(crate) fn save_connection(&mut self, cx: &mut Context<Self>) {
+        self.save_connection_with_open(false, cx);
     }
 
-    fn save_connection_with_open(&mut self, open: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn save_connection_with_open(&mut self, open: bool, cx: &mut Context<Self>) {
         if self.connection_form.saving || (open && self.connection_form.testing) {
             return;
         }
         let draft = self.connection_form.draft(cx);
-        if !self.validate_connection(&draft, window, cx) {
+        if !self.validate_connection(&draft, cx) {
             return;
         }
         let color = self.connection_form.color.clone();
@@ -1116,7 +1137,7 @@ impl GridView {
                 .background_executor()
                 .spawn(async move {
                     let result = block_on(async move {
-                        let saved = connection_save::save(draft).await?;
+                        let saved = connection_save::save(draft).await.map_err(|error| error.to_string())?;
                         let color_saved =
                             bookie_app_services::read_session::set_connection_color(saved.id, color.as_deref())
                                 .await
@@ -1127,7 +1148,7 @@ impl GridView {
                         let hops = saved.ssh.as_ref().map_or_else(Vec::new, |ssh| {
                             ssh.flatten_hops().iter().map(|hop| hop.hop_id).collect()
                         });
-                        Ok((saved.id, saved.name, hops, color_saved))
+                        Ok::<_, String>((saved.id, saved.name, hops, color_saved))
                     });
                     let connections = result.is_ok().then(bookie_gpui::live::saved_connections);
                     (result, connections)

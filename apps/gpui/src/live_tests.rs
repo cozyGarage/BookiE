@@ -94,11 +94,10 @@ fn a_stale_open_event_closes_its_session() {
     };
     let file = FixtureFile(std::env::temp_dir().join(format!("bookie-gpui-stale-{}.sqlite", uuid::Uuid::new_v4())));
     std::fs::copy(source, &file.0).unwrap();
-    let runtime = tokio::runtime::Runtime::new().unwrap();
     let database = Arc::new(bookie_app_services::database_service::DatabaseService::new_isolated());
     let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database.clone());
     let control = OperationControl::with_timeout(Duration::from_secs(5));
-    let opened = runtime.block_on(sessions.open_file(&file.0, &control)).unwrap();
+    let opened = bookie_app_services::service_runtime::block_on(sessions.open_file(&file.0, &control)).unwrap();
 
     let result = keep_current_event(
         DispatchContext::Sessions(&sessions),
@@ -143,8 +142,7 @@ fn oversized_fixture() -> FixtureFile {
     let path = std::env::temp_dir().join(format!("bookie-gpui-budget-{}.sqlite", uuid::Uuid::new_v4()));
     std::fs::File::create(&path).unwrap();
     let file = FixtureFile(path);
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    runtime.block_on(async {
+    bookie_app_services::service_runtime::block_on(async {
         let registry = drivers_registry::default_registry();
         let driver = registry.get("sqlite").unwrap();
         let connection = driver
@@ -159,8 +157,9 @@ fn oversized_fixture() -> FixtureFile {
             .execute("INSERT INTO wide VALUES (zeroblob(67108865))")
             .await
             .unwrap();
-        connection.close().await.unwrap();
-    });
+        connection.close().await.map_err(|error| error.to_string())
+    })
+    .unwrap();
     file
 }
 
@@ -676,4 +675,46 @@ fn columns_read_before_a_forget_are_not_cached() {
     );
     cache.remember(cache.generation, key.clone(), &[]);
     assert!(cache.get(&key).is_some());
+}
+
+#[test]
+fn a_view_plan_keys_an_updatable_view_and_names_why_others_are_read_only() {
+    use bookie_core::ViewEditability;
+    let column = |name: &str| ColumnInfo {
+        name: name.into(),
+        data_type: "integer".into(),
+        nullable: true,
+        primary_key: false,
+        is_auto_increment: false,
+        default_value: None,
+        is_generated: false,
+        comment: None,
+        collation: None,
+        enum_type: None,
+        domain_type: None,
+    };
+    let editable = |insertable| {
+        Ok(Some(ViewEditability::Editable {
+            key_columns: vec!["id".into()],
+            read_only_columns: Vec::new(),
+            insertable,
+        }))
+    };
+    let (columns, access) = view_plan(vec![column("id"), column("name")], editable(true));
+    assert_eq!(access, ViewAccess::Editable);
+    assert!(columns[0].primary_key && !columns[1].primary_key);
+    let (_, access) = view_plan(vec![column("id")], editable(false));
+    assert!(access.edit_refusal().is_none() && access.insert_refusal().is_some());
+    assert_eq!(view_plan(vec![column("id")], Ok(None)).1, ViewAccess::Editable);
+    for refused in [
+        Ok(Some(ViewEditability::NotUpdatable)),
+        Ok(Some(ViewEditability::KeyNotExposed)),
+        Err("lost".into()),
+    ] {
+        let (columns, access) = view_plan(vec![column("id")], refused);
+        assert!(!columns[0].primary_key);
+        let refusal = access.edit_refusal().expect("a read-only view says why");
+        assert!(refusal.starts_with("This view cannot be edited: "), "{refusal}");
+        assert_eq!(access.insert_refusal(), Some(refusal));
+    }
 }

@@ -112,7 +112,7 @@ impl GridView {
                         let left = list_unknown_outcomes(Some(connection_id))
                             .await
                             .map_err(|error| error.to_string())?;
-                        Ok((decided, left))
+                        Ok::<_, String>((decided, left))
                     })
                 })
                 .await;

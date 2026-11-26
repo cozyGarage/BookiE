@@ -319,14 +319,15 @@ mod tests {
 
     #[gpui::test]
     fn diagram_creation_waits_for_review_and_refreshes_the_diagram(cx: &mut gpui::TestAppContext) {
-        use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving, write_session};
+        use crate::save_ui_tests::{saving_view, settle_saving, write_session};
+        use crate::ui_tests::test_kit::{orders, until};
         use bookie_gpui::live::{LiveSession, Origin};
-        let path = fixture_copy("diagram-create-review");
+        let path = orders();
         let (view, cx) = saving_view(cx, &path);
         let write = write_session(&path, false);
         cx.update(|window, cx| {
             view.update(cx, |view, cx| {
-                view.search.origin = Some(Origin::File(path.clone()));
+                view.search.origin = Some(Origin::File(path.to_path_buf()));
                 view.tabs.open_diagram();
                 let id = view.live.as_ref().and_then(|live| live.writable).expect("writable");
                 view.save.write = Some((id, write));
@@ -348,7 +349,7 @@ mod tests {
             assert!(review.plan.preview.contains("CREATE TABLE"));
             assert!(review.note.is_some(), "the review explains the structure change");
         });
-        let current = || LiveSession::open(&Origin::File(path.clone())).expect("open current database");
+        let current = || LiveSession::open(&Origin::File(path.to_path_buf())).expect("open current database");
         assert!(!current().tables.iter().any(|table| table.name == "draft table"));
 
         cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
@@ -359,15 +360,9 @@ mod tests {
                     .as_ref()
                     .is_some_and(|live| live.tables.iter().any(|table| table.name == "draft table"))
         };
-        for _ in 0..200 {
-            settle_saving(cx);
-            if view.read_with(cx, |view, _| {
-                !view.save.busy && !view.search.diagram.loading && listed(view)
-            }) {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(20));
-        }
+        until(&view, cx, "the new table is listed", |view| {
+            !view.save.busy && !view.search.diagram.loading && listed(view)
+        });
         view.read_with(cx, |view, _| {
             assert!(listed(view), "the sidebar lists the new table: {}", view.status);
             assert!(matches!(view.tabs.current(), Tab::Diagram));
@@ -379,13 +374,13 @@ mod tests {
             );
         });
         assert!(current().tables.iter().any(|table| table.name == "draft table"));
-        std::fs::remove_file(path).ok();
     }
 
     #[gpui::test]
     fn the_draft_form_puts_review_first_and_keeps_the_nullable_choice_in_place(cx: &mut gpui::TestAppContext) {
-        use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
-        let path = fixture_copy("diagram-draft-form");
+        use crate::save_ui_tests::{saving_view, settle_saving};
+        use crate::ui_tests::test_kit::orders;
+        let path = orders();
         let (view, cx) = saving_view(cx, &path);
         cx.update(|window, cx| {
             view.update(cx, |view, cx| {
@@ -411,7 +406,6 @@ mod tests {
             assert!(column.primary_key && !column.nullable);
         });
         assert_eq!(bounds(cx, "Nullable"), nullable, "the nullable choice keeps its place");
-        std::fs::remove_file(path).ok();
     }
 
     #[test]

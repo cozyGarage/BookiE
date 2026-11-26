@@ -20,7 +20,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::model::{Cell, ColumnMeta, Diff, FindResult, PAGE_ROWS, Predicate};
 use crate::shell::table_label;
-use crate::source::{ResultSource, filter_buffered_rows, find_buffered_rows};
+use crate::source::{ResultSource, ViewAccess, filter_buffered_rows, find_buffered_rows};
 
 pub fn saved_connections() -> Result<Vec<ConnectionSummary>, String> {
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -330,6 +330,7 @@ impl LiveSession {
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -423,6 +424,7 @@ impl LiveSession {
                     executed_sql: Some(sql.to_owned()),
                     load_elapsed: started.elapsed(),
                     table: None,
+                    view_access: ViewAccess::Editable,
                 }
             })
             .collect();
@@ -447,6 +449,7 @@ impl LiveSession {
             executed_sql: Some(sql.to_owned()),
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -475,6 +478,7 @@ impl LiveSession {
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: None,
+            view_access: ViewAccess::Editable,
         })
     }
 
@@ -511,7 +515,9 @@ impl LiveSession {
         } else {
             let columns = self.table_columns(table)?;
             let filter = where_filter(where_sql);
-            let query = browse_target(&self.driver_id, table, &columns, &filter).count()?;
+            let query = browse_target(&self.driver_id, table, &columns, &filter)
+                .count()
+                .map_err(|error| error.to_string())?;
             (query.sql, query.params)
         };
         let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
@@ -547,6 +553,21 @@ impl LiveSession {
 
     pub fn table_columns(&self, table: &TableInfo) -> Result<Vec<ColumnInfo>, String> {
         self.read_columns(table, false, Duration::from_secs(10))
+    }
+
+    pub fn edit_columns(&self, table: &TableInfo) -> Result<(Vec<ColumnInfo>, ViewAccess), String> {
+        let editability = self.view_editability(table);
+        Ok(view_plan(self.table_columns(table)?, editability))
+    }
+
+    fn view_editability(&self, table: &TableInfo) -> Result<Option<bookie_core::ViewEditability>, String> {
+        if self.writable.is_none() {
+            return Ok(None);
+        }
+        let control = OperationControl::with_timeout(Duration::from_secs(10));
+        self.runtime
+            .block_on(self.sessions.read_view_editability(self.session_id, table, &control))
+            .map_err(|failure| driver_failure_message(&failure))
     }
 
     pub fn enum_labels(&self, type_name: &bookie_core::QualifiedTypeName) -> Result<Vec<String>, String> {
@@ -743,16 +764,19 @@ impl LiveSession {
             return Err(format!("Row limit must be between 1 and {ROW_CAP}"));
         }
         let table = find_table(&self.tables, table)?.clone();
-        let key: Vec<String> = self
-            .table_columns(&table)
-            .map(|columns| {
-                columns
+        let editability = self.view_editability(&table);
+        let (key, view_access) = match self.table_columns(&table) {
+            Ok(columns) => {
+                let (columns, access) = view_plan(columns, editability);
+                let key: Vec<String> = columns
                     .into_iter()
                     .filter(|column| column.primary_key)
                     .map(|column| column.name)
-                    .collect()
-            })
-            .unwrap_or_default();
+                    .collect();
+                (key, access)
+            }
+            Err(_) => (Vec::new(), view_plan(Vec::new(), editability).1),
+        };
         if sort.is_some() && !self.supports_snapshot_cursor {
             return Err("Server-side table sorting is not available for this connection".into());
         }
@@ -781,6 +805,7 @@ impl LiveSession {
             executed_sql: None,
             load_elapsed: started.elapsed(),
             table: Some(table.clone()),
+            view_access,
         })
     }
 
@@ -799,7 +824,7 @@ impl LiveSession {
             return Err("WHERE filters need a SQL database".into());
         }
         let table = find_table(&self.tables, table)?;
-        let columns = self.table_columns(&table)?;
+        let (columns, view_access) = self.edit_columns(&table)?;
         let sort = match sort {
             Some(sort) => Some((
                 columns
@@ -811,12 +836,9 @@ impl LiveSession {
             None => None,
         };
         let filter = where_filter(where_sql);
-        let page = browse_target(&self.driver_id, &table, &columns, &filter).page(
-            0,
-            max_rows.saturating_add(1),
-            sort,
-            None,
-        )?;
+        let page = browse_target(&self.driver_id, &table, &columns, &filter)
+            .page(0, max_rows.saturating_add(1), sort, None)
+            .map_err(|error| error.to_string())?;
         let bookie_app_services::browse_query::PageQuery::Sql(query) = page else {
             return Err("The WHERE filter could not be sent to the database".into());
         };
@@ -826,6 +848,7 @@ impl LiveSession {
         }
         loaded.executed_sql = None;
         loaded.table = Some(table);
+        loaded.view_access = view_access;
         Ok(loaded)
     }
 
@@ -840,12 +863,12 @@ impl LiveSession {
             max_rows_per_table,
             timeout_secs: 600,
         };
-        self.runtime.block_on(self.sessions.export_tables_to_folder(
-            self.session_id,
-            self.tables.clone(),
-            job,
-            cancellation,
-        ))
+        self.runtime
+            .block_on(
+                self.sessions
+                    .export_tables_to_folder(self.session_id, self.tables.clone(), job, cancellation),
+            )
+            .map_err(|error| error.to_string())
     }
 
     pub fn run_backup(
@@ -975,6 +998,33 @@ pub struct ServerInfo {
     pub details: Option<bookie_app_services::connection_details::ConnectionDetails>,
 }
 
+fn view_plan(
+    columns: Vec<ColumnInfo>,
+    editability: Result<Option<bookie_core::ViewEditability>, String>,
+) -> (Vec<ColumnInfo>, ViewAccess) {
+    use bookie_app_services::view_edit::{ViewEditRestriction, apply_view_editability};
+    let editability = match editability {
+        Ok(Some(editability)) => editability,
+        Ok(None) => return (columns, ViewAccess::Editable),
+        Err(_) => {
+            return (
+                columns,
+                ViewAccess::ReadOnly("its editability could not be read".into()),
+            );
+        }
+    };
+    let plan = apply_view_editability(columns, &editability);
+    let access = match plan.restriction {
+        None => ViewAccess::Editable,
+        Some(restriction @ ViewEditRestriction::InsertUnavailable) => ViewAccess::NoInsert(restriction.insert_reason()),
+        Some(ViewEditRestriction::NotUpdatable) => ViewAccess::ReadOnly("it is not automatically updatable".into()),
+        Some(ViewEditRestriction::KeyNotExposed) => {
+            ViewAccess::ReadOnly("it does not expose every primary-key column of its table".into())
+        }
+    };
+    (plan.columns, access)
+}
+
 pub struct LiveTable {
     session: Arc<LiveSession>,
     columns: Vec<ColumnMeta>,
@@ -985,6 +1035,7 @@ pub struct LiveTable {
     executed_sql: Option<String>,
     load_elapsed: Duration,
     table: Option<TableInfo>,
+    view_access: ViewAccess,
 }
 
 impl LiveTable {
@@ -1103,9 +1154,13 @@ impl WriteSession {
         database.set_approval_sink(bookie_app_services::approval_prompt::reviewable_prompt_sink(approvals));
         let sessions = ReadSessionStore::new(Arc::new(drivers_registry::default_registry()), database);
         let control = OperationControl::with_timeout(Duration::from_secs(30));
-        let stamp = runtime.block_on(ReadSessionStore::saved_connection_stamp(connection_id))?;
+        let stamp = runtime
+            .block_on(ReadSessionStore::saved_connection_stamp(connection_id))
+            .map_err(|error| error.to_string())?;
         refuse_edited_connection(opened_with, &stamp)?;
-        let opened = runtime.block_on(sessions.open_saved_writable(connection_id, &control))?;
+        let opened = runtime
+            .block_on(sessions.open_saved_writable(connection_id, &control))
+            .map_err(|error| error.to_string())?;
         Ok(WriteSession {
             runtime,
             sessions,
@@ -1198,7 +1253,8 @@ impl WriteSession {
         };
         let now = self
             .runtime
-            .block_on(ReadSessionStore::saved_connection_stamp(*connection_id))?;
+            .block_on(ReadSessionStore::saved_connection_stamp(*connection_id))
+            .map_err(|error| error.to_string())?;
         Ok(now == *stamp)
     }
 
@@ -1863,7 +1919,11 @@ impl ResultSource for LiveTable {
     }
 
     fn editable(&self) -> bool {
-        self.table.is_some() && self.session.writable.is_some()
+        self.table.is_some() && self.session.writable.is_some() && self.view_access.edit_refusal().is_none()
+    }
+
+    fn view_access(&self) -> Option<&ViewAccess> {
+        Some(&self.view_access)
     }
 
     fn is_partial(&self) -> bool {

@@ -1,6 +1,7 @@
 use gpui::{TestAppContext, VisualTestContext};
 
 use crate::ui_tests::open;
+use crate::ui_tests::test_kit::NARROW;
 
 fn assert_tooltips(cx: &mut VisualTestContext, controls: &[(&'static str, &'static str)]) {
     for (id, marker) in controls {
@@ -18,7 +19,7 @@ fn assert_tooltips(cx: &mut VisualTestContext, controls: &[(&'static str, &'stat
 #[gpui::test]
 fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.simulate_resize(gpui::size(gpui::px(760.0), gpui::px(800.0)));
+    cx.simulate_resize(gpui::size(gpui::px(NARROW), gpui::px(800.0)));
     cx.run_until_parked();
     view.update(cx, |view, cx| {
         view.sidebar.open = true;

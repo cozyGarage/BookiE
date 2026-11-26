@@ -69,6 +69,45 @@ fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn connection_validation_focuses_the_missing_jump_host_user(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            set(&view.connection_form.host, "db.example.com", cx);
+            set(&view.connection_form.port, "5432", cx);
+            set(&view.connection_form.database, "app", cx);
+            view.connection_form.ssh.on = true;
+            set(&view.connection_form.ssh.head.host, "bastion.example.com", cx);
+            set(&view.connection_form.ssh.head.user, "alice", cx);
+            let jump = crate::ssh_form::HopForm::new(cx);
+            set(&jump.host, "jump.example.com", cx);
+            set(&jump.user, "", cx);
+            view.connection_form.ssh.jumps.push(jump);
+
+            view.save_connection(cx);
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.connection_form.status, "Enter the host and user of jump host 1.");
+        assert!(view.connection_form.ssh_open);
+    });
+    assert!(cx.debug_bounds("connection-ssh-fields").is_some());
+    cx.update(|window, cx| {
+        let user = view.read(cx).connection_form.ssh.jumps[0]
+            .user
+            .read(cx)
+            .focus_handle_for_tests();
+        assert!(user.is_focused(window));
+    });
+}
+
+#[gpui::test]
 fn connection_sections_use_space_on_wide_windows_and_wrap_when_narrow(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
@@ -268,7 +307,7 @@ fn security_and_ssh_start_collapsed_and_open_from_their_headers(cx: &mut TestApp
 #[gpui::test]
 fn a_tls_error_inside_a_collapsed_section_opens_it(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
-    cx.update(|window, cx| {
+    cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.open_connection_dialog(cx);
             let form = &view.connection_form;
@@ -281,7 +320,7 @@ fn a_tls_error_inside_a_collapsed_section_opens_it(cx: &mut TestAppContext) {
                 set(input, text, cx);
             }
             assert!(!view.connection_form.security_open);
-            view.save_connection(window, cx);
+            view.save_connection(cx);
             assert!(view.connection_form.security_open, "{}", view.connection_form.status);
         });
     });

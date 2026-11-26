@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use bookie_core::{ColumnInfo, FilterSet, KEYSET_OFFSET_THRESHOLD, Value, build_filter_where, keyset_where_clause};
+use thiserror::Error;
 
 use order::resolved_order_by;
 
@@ -31,6 +32,22 @@ pub struct BoundQuery {
     pub preview_columns: Vec<usize>,
 }
 
+#[derive(Debug, Error)]
+pub enum BrowseQueryError {
+    #[error(transparent)]
+    Filter(#[from] bookie_core::BuildFilterError),
+    #[error(transparent)]
+    ValueSelect(#[from] bookie_core::sql_dialect::BuildSqlError),
+    #[error(transparent)]
+    Keyset(#[from] bookie_core::KeysetError),
+    #[error("value column no longer exists")]
+    StaleValueColumn { index: usize },
+    #[error("Redis value fetch requires a Value cell and one key from a database table")]
+    InvalidRedisValueTarget,
+    #[error("MongoDB value fetch requires its single _id key")]
+    InvalidMongoValueTarget,
+}
+
 #[derive(Debug)]
 pub enum PageQuery {
     Native,
@@ -45,8 +62,8 @@ enum PageDirection {
 }
 
 impl BrowseTarget<'_> {
-    fn filtered_query(&self, projection: &str) -> Result<BoundQuery, String> {
-        let filter = build_filter_where(self.driver_id, self.columns, self.filter).map_err(|e| e.to_string())?;
+    fn filtered_query(&self, projection: &str) -> Result<BoundQuery, BrowseQueryError> {
+        let filter = build_filter_where(self.driver_id, self.columns, self.filter)?;
         let quote = |s| bookie_core::sql_dialect::quote_ident(self.driver_id, s);
         let target = match self.schema {
             Some(schema) => format!("{}.{}", quote(schema), quote(self.table)),
@@ -67,7 +84,7 @@ impl BrowseTarget<'_> {
         Ok(query)
     }
 
-    pub fn full_select(&self, sort: Option<(usize, bool)>, row_id_order: bool) -> Result<BoundQuery, String> {
+    pub fn full_select(&self, sort: Option<(usize, bool)>, row_id_order: bool) -> Result<BoundQuery, BrowseQueryError> {
         let mut query = self.filtered_query("*")?;
         if let Some(order) = resolved_order_by(self.driver_id, self.columns, sort, row_id_order) {
             query.sql.push_str(" ORDER BY ");
@@ -76,7 +93,7 @@ impl BrowseTarget<'_> {
         Ok(query)
     }
 
-    pub fn count(&self) -> Result<BoundQuery, String> {
+    pub fn count(&self) -> Result<BoundQuery, BrowseQueryError> {
         self.filtered_query("COUNT(*)")
     }
 
@@ -128,7 +145,7 @@ impl BrowseTarget<'_> {
         }
     }
 
-    pub fn value_query(&self, column_index: usize, pk_values: &[Value]) -> Result<BoundQuery, String> {
+    pub fn value_query(&self, column_index: usize, pk_values: &[Value]) -> Result<BoundQuery, BrowseQueryError> {
         if self.driver_id == "mongodb" {
             return mongodb::value_query(self, column_index, pk_values);
         }
@@ -142,8 +159,7 @@ impl BrowseTarget<'_> {
             self.columns,
             column_index,
             pk_values,
-        )
-        .map_err(|error| error.to_string())?;
+        )?;
         Ok(BoundQuery {
             sql,
             params,
@@ -159,7 +175,7 @@ impl BrowseTarget<'_> {
         limit: u64,
         sort: Option<(usize, bool)>,
         cursor: Option<&[Value]>,
-    ) -> Result<PageQuery, String> {
+    ) -> Result<PageQuery, BrowseQueryError> {
         self.page_with(offset, limit, sort, cursor, false, PageDirection::Forward)
     }
 
@@ -169,11 +185,16 @@ impl BrowseTarget<'_> {
         limit: u64,
         sort: Option<(usize, bool)>,
         cursor: Option<&[Value]>,
-    ) -> Result<PageQuery, String> {
+    ) -> Result<PageQuery, BrowseQueryError> {
         self.page_with(offset, limit, sort, cursor, false, PageDirection::Before)
     }
 
-    pub fn page_last(&self, offset: u64, limit: u64, sort: Option<(usize, bool)>) -> Result<PageQuery, String> {
+    pub fn page_last(
+        &self,
+        offset: u64,
+        limit: u64,
+        sort: Option<(usize, bool)>,
+    ) -> Result<PageQuery, BrowseQueryError> {
         self.page_with(offset, limit, sort, None, false, PageDirection::Last)
     }
 
@@ -183,7 +204,7 @@ impl BrowseTarget<'_> {
         limit: u64,
         sort: Option<(usize, bool)>,
         cursor: Option<&[Value]>,
-    ) -> Result<PageQuery, String> {
+    ) -> Result<PageQuery, BrowseQueryError> {
         self.page_with(offset, limit, sort, cursor, true, PageDirection::Forward)
     }
 
@@ -195,7 +216,7 @@ impl BrowseTarget<'_> {
         cursor: Option<&[Value]>,
         row_id_order: bool,
         direction: PageDirection,
-    ) -> Result<PageQuery, String> {
+    ) -> Result<PageQuery, BrowseQueryError> {
         let (mut projection, projected) = self.projection();
         let previewing = match long_text::projection(self).filter(|_| projected.is_none()) {
             Some(preview) => {
@@ -321,7 +342,7 @@ fn append_keyset_clause(
     cursor: Option<&[Value]>,
     before: bool,
     filter_is_empty: bool,
-) -> Result<bool, String> {
+) -> Result<bool, BrowseQueryError> {
     let Some(cursor) = cursor else {
         return Ok(false);
     };
@@ -329,8 +350,7 @@ fn append_keyset_clause(
         bookie_core::keyset_before_where_clause(driver_id, keys, cursor, query.params.len())
     } else {
         keyset_where_clause(driver_id, keys, cursor, query.params.len())
-    }
-    .map_err(|error| error.to_string())?;
+    }?;
     query.sql.push_str(if filter_is_empty { " WHERE " } else { " AND " });
     query.sql.push_str(&clause);
     query.params.extend(params);

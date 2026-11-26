@@ -2,26 +2,12 @@ use bookie_app_services::result_chart::{Aggregate, Kind};
 use bookie_gpui::shell::ResultView;
 use gpui::TestAppContext;
 
-use crate::GridView;
 use crate::live_ui_tests::open_live;
-
-fn wait_for(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, ready: impl Fn(&GridView) -> bool) {
-    for _ in 0..200 {
-        cx.executor().advance_clock(std::time::Duration::from_secs(1));
-        cx.run_until_parked();
-        if view.read_with(cx, |view, _| ready(view)) {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(50));
-    }
-    view.read_with(cx, |view, _| {
-        assert!(ready(view), "chart did not settle: {}", view.status)
-    });
-}
+use crate::ui_tests::test_kit::until;
 
 #[gpui::test]
 fn a_result_charts_its_totals_and_keeps_the_latest_picks_when_reopened(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let sql = "SELECT customer, total FROM orders ORDER BY customer";
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -31,9 +17,11 @@ fn a_result_charts_its_totals_and_keeps_the_latest_picks_when_reopened(cx: &mut 
             view.run_query(cx);
         })
     });
-    wait_for(&view, cx, |view| view.source.executed_sql() == Some(sql));
+    until(&view, cx, "the chart settles", |view| {
+        view.source.executed_sql() == Some(sql)
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_chart(cx)));
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the chart settles", |view| {
         view.panel.chart.is_some() && !view.panel.chart_loading
     });
     view.read_with(cx, |view, _| {
@@ -58,7 +46,7 @@ fn a_result_charts_its_totals_and_keeps_the_latest_picks_when_reopened(cx: &mut 
             view.invalidate_scans();
         })
     });
-    wait_for(&view, cx, |view| !view.panel.chart_loading);
+    until(&view, cx, "the chart settles", |view| !view.panel.chart_loading);
     let rows = view.read_with(cx, |view, _| {
         std::sync::Arc::downgrade(&view.panel.chart.as_ref().expect("chart").rows)
     });
@@ -85,7 +73,7 @@ fn a_result_charts_its_totals_and_keeps_the_latest_picks_when_reopened(cx: &mut 
 
 #[gpui::test]
 fn replacing_and_closing_results_release_their_chart_rows_and_data(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, _| {
             let table = view.source.clone();
@@ -96,7 +84,7 @@ fn replacing_and_closing_results_release_their_chart_rows_and_data(cx: &mut Test
     });
     for closing in [false, true] {
         cx.update(|_, cx| view.update(cx, |view, cx| view.show_chart(cx)));
-        wait_for(&view, cx, |view| {
+        until(&view, cx, "the chart settles", |view| {
             view.panel.chart.is_some() && !view.panel.chart_loading
         });
         let (rows, data) = view.read_with(cx, |view, _| {
@@ -125,7 +113,7 @@ fn replacing_and_closing_results_release_their_chart_rows_and_data(cx: &mut Test
 
 #[gpui::test]
 fn a_late_chart_preparation_or_recalculation_cannot_restore_a_replaced_result(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.add_run(Some(view.source.clone()));
@@ -139,7 +127,7 @@ fn a_late_chart_preparation_or_recalculation_cannot_restore_a_replaced_result(cx
         assert!(!view.panel.chart_loading);
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_chart(cx)));
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the chart settles", |view| {
         view.panel.chart.is_some() && !view.panel.chart_loading
     });
     cx.update(|_, cx| {
@@ -166,7 +154,7 @@ fn dropping_a_work_ticket_cancels_its_pending_chart_work() {
 
 #[gpui::test]
 fn a_wide_result_keeps_the_number_controls_bounded(cx: &mut TestAppContext) {
-    let (view, cx) = open_live(cx);
+    let (view, cx, _orders) = open_live(cx);
     let sql = format!(
         "SELECT {}",
         (0..512)
@@ -182,9 +170,11 @@ fn a_wide_result_keeps_the_number_controls_bounded(cx: &mut TestAppContext) {
             view.run_query(cx);
         })
     });
-    wait_for(&view, cx, |view| view.source.executed_sql() == Some(sql.as_str()));
+    until(&view, cx, "the chart settles", |view| {
+        view.source.executed_sql() == Some(sql.as_str())
+    });
     cx.update(|_, cx| view.update(cx, |view, cx| view.show_chart(cx)));
-    wait_for(&view, cx, |view| {
+    until(&view, cx, "the chart settles", |view| {
         view.panel.chart.is_some() && !view.panel.chart_loading
     });
     let built = [
@@ -216,7 +206,7 @@ fn a_wide_result_keeps_the_number_controls_bounded(cx: &mut TestAppContext) {
         assert!(matches!(items[0].pick, crate::picker::Pick::ChartValue(300)));
     });
     cx.simulate_keystrokes("enter");
-    wait_for(&view, cx, |view| !view.panel.chart_loading);
+    until(&view, cx, "the chart settles", |view| !view.panel.chart_loading);
     view.read_with(cx, |view, _| {
         assert!(
             view.panel

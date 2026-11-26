@@ -295,11 +295,12 @@ impl GridView {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::save_ui_tests::{fixture_copy, saving_view, settle_saving};
+    use crate::save_ui_tests::{saving_view, settle_saving};
+    use crate::ui_tests::test_kit::orders;
 
     #[gpui::test]
     fn relationship_review_keeps_the_diagram_and_does_not_replace_the_active_load(cx: &mut gpui::TestAppContext) {
-        let path = fixture_copy("diagram-relationship-review");
+        let path = orders();
         let (view, cx) = saving_view(cx, &path);
         let generation = cx.update(|_, cx| {
             view.update(cx, |view, cx| {
@@ -333,6 +334,5 @@ mod tests {
             assert!(view.save.pending.is_none());
             assert!(view.status.contains("cannot add foreign keys"), "{}", view.status);
         });
-        std::fs::remove_file(path).ok();
     }
 }
