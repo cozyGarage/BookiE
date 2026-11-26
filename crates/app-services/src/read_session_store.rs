@@ -281,6 +281,16 @@ impl ReadSessionStore {
         session.read_enum_labels(type_name, control).await
     }
 
+    pub async fn read_view_editability(
+        &self,
+        id: SessionId,
+        table: &TableInfo,
+        control: &OperationControl,
+    ) -> Result<Option<bookie_core::ViewEditability>, DriverFailurePresentation> {
+        let session = self.get(id).ok_or(DriverFailurePresentation::Disconnected)?;
+        session.read_view_editability(table, control).await
+    }
+
     pub async fn server_version(
         &self,
         id: SessionId,
@@ -782,6 +792,47 @@ mod tests {
             .await
             .unwrap();
         (store, opened.session_id, directory, path)
+    }
+
+    #[tokio::test]
+    async fn only_a_view_is_checked_and_a_sqlite_view_is_not_updatable() {
+        let (store, id, _directory, path) = sqlite_store_with_session(false).await;
+        let writer = drivers_sqlite::SqliteDriver
+            .connect(ConnectOptions {
+                database: path.to_string_lossy().into_owned(),
+                ..ConnectOptions::default()
+            })
+            .await
+            .unwrap();
+        writer
+            .execute("CREATE VIEW item_ids AS SELECT id FROM items")
+            .await
+            .unwrap();
+        assert!(store.close(id));
+        let control = OperationControl::with_timeout(Duration::from_secs(5));
+        let reopened = store
+            .open_file_writable_for_tests(&path, false, &control)
+            .await
+            .unwrap();
+        let relation = |name: &str| {
+            reopened
+                .tables
+                .iter()
+                .find(|table| table.name == name)
+                .cloned()
+                .unwrap()
+        };
+        let read = |table: TableInfo| {
+            let store = &store;
+            let control = &control;
+            let id = reopened.session_id;
+            async move { store.read_view_editability(id, &table, control).await.unwrap() }
+        };
+        assert_eq!(read(relation("items")).await, None);
+        assert_eq!(
+            read(relation("item_ids")).await,
+            Some(bookie_core::ViewEditability::NotUpdatable)
+        );
     }
 
     fn backup_job(directory: &std::path::Path) -> crate::database_backup::BackupJob {

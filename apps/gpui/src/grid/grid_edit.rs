@@ -113,6 +113,8 @@ impl GridView {
         let count = self.cell_edit.edits.len();
         if self.can_save_edits() {
             format!("{count} change(s) pending; press Ctrl+S to save")
+        } else if let Some(refusal) = self.view_edit_refusal() {
+            format!("{refusal}; {count} edited here only, nothing is saved")
         } else {
             format!("{count} edited in this view only; nothing is saved")
         }

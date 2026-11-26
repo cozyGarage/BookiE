@@ -6,6 +6,7 @@ use bookie_app_services::cell_save_plan::{
 use bookie_app_services::csv_import_plan::plan_csv_import;
 use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
+use bookie_gpui::source::ViewAccess;
 
 use crate::chrome::tip;
 use crate::surfaces::{ButtonKind, button, compact_button, task_bar_frame, task_title};
@@ -82,6 +83,14 @@ pub(crate) struct ReviewLabels {
 
 const MAX_DELETE_ROWS: u64 = 500;
 
+fn view_refusal(request: &SaveRequest, access: &ViewAccess) -> Option<String> {
+    match request {
+        SaveRequest::Edits(_) | SaveRequest::Deletes(_) => access.edit_refusal(),
+        SaveRequest::Insert(_) | SaveRequest::Import(..) => access.insert_refusal(),
+        SaveRequest::Structure(..) => None,
+    }
+}
+
 pub(crate) const TRANSACTION_BLOCKS_SAVE: &str = "Commit or roll back the open transaction first";
 
 impl GridView {
@@ -92,6 +101,10 @@ impl GridView {
 
     pub(crate) fn can_save_edits(&self) -> bool {
         self.live.as_ref().is_some_and(|live| live.writable.is_some()) && self.source.editable()
+    }
+
+    pub(crate) fn view_edit_refusal(&self) -> Option<String> {
+        self.source.view_access().and_then(ViewAccess::edit_refusal)
     }
 
     fn pending_changes(&self) -> Vec<CellChange> {
@@ -112,7 +125,9 @@ impl GridView {
             return None;
         }
         let Some(live) = self.live.clone().filter(|_| self.can_save_edits()) else {
-            self.status = "Saving needs a table from a saved connection that is not read-only".into();
+            self.status = self
+                .view_edit_refusal()
+                .unwrap_or_else(|| "Saving needs a table from a saved connection that is not read-only".into());
             return None;
         };
         if self.save.busy || self.save.pending.is_some() {
@@ -227,7 +242,10 @@ impl GridView {
             let planned = cx
                 .background_executor()
                 .spawn(async move {
-                    let columns = live.table_columns(&table)?;
+                    let (columns, access) = live.edit_columns(&table)?;
+                    if let Some(refusal) = view_refusal(&request, &access) {
+                        return Err(refusal);
+                    }
                     let target = SaveTarget {
                         driver_id: &live.driver_id,
                         schema: table.schema.as_deref(),
@@ -658,11 +676,15 @@ impl GridView {
         }
         let can_save = self.can_save_edits();
         let (label, explanation) = if can_save {
-            (format!("{count} pending"), "Changes not saved to the database yet")
+            (
+                format!("{count} pending"),
+                "Changes not saved to the database yet".to_owned(),
+            )
         } else {
             (
                 format!("{count} view only"),
-                "Edits in this view only; nothing is saved",
+                self.view_edit_refusal()
+                    .unwrap_or_else(|| "Edits in this view only; nothing is saved".into()),
             )
         };
         Some(

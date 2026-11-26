@@ -9,3 +9,5 @@ pub(crate) mod structure_ui;
 pub(crate) mod transaction_ui;
 #[cfg(test)]
 pub(crate) mod transaction_ui_tests;
+#[cfg(test)]
+mod view_edit_ui_tests;
