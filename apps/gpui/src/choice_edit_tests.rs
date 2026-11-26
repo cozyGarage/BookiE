@@ -123,3 +123,31 @@ fn space_on_a_boolean_cell_toggles_it(cx: &mut TestAppContext) {
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert_eq!(view.cell_at(0, 1), Cell::Bool(false)));
 }
+
+#[gpui::test]
+fn a_choice_metadata_reply_cannot_edit_a_replacement_grid(cx: &mut TestAppContext) {
+    let (view, cx, _fixture) = connect_flags(cx);
+    let replacement = view.read_with(cx, |view, _| {
+        view.live
+            .as_ref()
+            .unwrap()
+            .load_table_controlled(
+                &view.catalog.grid_table,
+                100,
+                &tokio_util::sync::CancellationToken::new(),
+            )
+            .unwrap()
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.live.as_ref().unwrap().forget_columns();
+            view.start_edit(0, 1, window, cx);
+            view.source = std::sync::Arc::new(replacement);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.cell_edit.edits.is_empty());
+        assert_eq!(view.cell_at(0, 1), Cell::Bool(true));
+    });
+}

@@ -1,5 +1,9 @@
+use std::sync::{Arc, Weak};
+
 use bookie_core::ColumnInfo;
 use bookie_gpui::model::Cell;
+use bookie_gpui::shell::Tab;
+use bookie_gpui::source::ResultSource;
 use gpui::{Context, DismissEvent, Window};
 use gpui_component::menu::{PopupMenu, PopupMenuItem};
 
@@ -7,6 +11,32 @@ use crate::GridView;
 use crate::choice_edit::{Choice, choice_for, is_choice_candidate, member_cell};
 use crate::grid_edit::EditMode;
 use crate::menus::RowMenu;
+
+#[derive(Clone)]
+struct ChoiceTarget {
+    source: Weak<dyn ResultSource>,
+    tab: Tab,
+    generation: u64,
+    row: u64,
+    column: usize,
+}
+
+impl ChoiceTarget {
+    fn is_current(&self, view: &GridView) -> bool {
+        self.tab == *view.tabs.current()
+            && self.generation == view.save.generation
+            && self
+                .source
+                .upgrade()
+                .is_some_and(|source| Arc::ptr_eq(&source, &view.source))
+            && view.source.editable()
+            && view.compare.is_none()
+            && !view.form_open()
+            && view.cell_edit.active.is_none()
+            && self.row < view.source.total()
+            && self.column < view.source.columns().len()
+    }
+}
 
 impl GridView {
     pub(crate) fn begin_choice_edit(
@@ -27,22 +57,24 @@ impl GridView {
             return false;
         };
         let table = self.catalog.grid_table.clone();
+        let target = ChoiceTarget {
+            source: Arc::downgrade(&self.source),
+            tab: self.tabs.current().clone(),
+            generation: self.save.generation,
+            row,
+            column,
+        };
         if let Some(columns) = live.cached_columns(&table) {
-            self.apply_choice(row, column, &columns, window, cx);
+            self.apply_choice(target, &columns, window, cx);
             return true;
         }
-        let asked = (self.save.generation, table.clone());
         cx.spawn_in(window, async move |this, cx| {
             let columns = cx
                 .background_executor()
                 .spawn(async move { live.table_columns(&table) })
                 .await;
             this.update_in(cx, |this, window, cx| {
-                let now = (this.save.generation, this.catalog.grid_table.clone());
-                if now != asked || this.cell_edit.active.is_some() || this.form_open() {
-                    return;
-                }
-                this.apply_choice(row, column, &columns.unwrap_or_default(), window, cx);
+                this.apply_choice(target, &columns.unwrap_or_default(), window, cx);
             })
             .ok();
         })
@@ -67,28 +99,29 @@ impl GridView {
 
     fn apply_choice(
         &mut self,
-        row: u64,
-        column: usize,
+        target: ChoiceTarget,
         columns: &[ColumnInfo],
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(meta) = self.source.columns().get(column) else {
+        if !target.is_current(self) {
             return;
-        };
+        }
+        let (row, column) = (target.row, target.column);
+        let meta = &self.source.columns()[column];
         let info = columns.iter().find(|info| info.name == meta.name);
         let cell = self.cell_at(row, column);
         match choice_for(&meta.data_type, info, &cell) {
             Some(Choice::Toggle(next)) => self.stage_choice(row, column, next, cx),
             Some(Choice::Members(labels)) => match info {
-                Some(info) => self.open_choice_menu((row, column), info.clone(), labels, window, cx),
+                Some(info) => self.open_choice_menu(target, info.clone(), labels, window, cx),
                 None => self.start_edit_mode(row, column, EditMode::Inline, window, cx),
             },
             None => self.start_edit_mode(row, column, EditMode::Inline, window, cx),
         }
     }
 
-    pub(crate) fn stage_choice(&mut self, row: u64, column: usize, cell: Cell, cx: &mut Context<Self>) {
+    fn stage_choice(&mut self, row: u64, column: usize, cell: Cell, cx: &mut Context<Self>) {
         if self.save.pending.is_some() || self.save.busy {
             self.status = "Save or cancel the review before editing more cells".into();
             cx.notify();
@@ -103,9 +136,12 @@ impl GridView {
         cx.notify();
     }
 
-    fn pick_member(&mut self, row: u64, column: usize, label: &str, info: &ColumnInfo, cx: &mut Context<Self>) {
+    fn pick_member(&mut self, target: &ChoiceTarget, label: &str, info: &ColumnInfo, cx: &mut Context<Self>) {
+        if !target.is_current(self) {
+            return;
+        }
         match member_cell(label, info) {
-            Ok(cell) => self.stage_choice(row, column, cell, cx),
+            Ok(cell) => self.stage_choice(target.row, target.column, cell, cx),
             Err(reason) => {
                 self.status = format!("Not applied: {reason}");
                 cx.notify();
@@ -115,25 +151,25 @@ impl GridView {
 
     fn open_choice_menu(
         &mut self,
-        (row, column): (u64, usize),
+        target: ChoiceTarget,
         info: ColumnInfo,
         labels: Vec<String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let owner = cx.entity().downgrade();
-        let current = match self.cell_at(row, column) {
+        let current = match self.cell_at(target.row, target.column) {
             Cell::Text(text) => Some(text),
             _ => None,
         };
         let menu = PopupMenu::build(window, cx, move |mut menu, _, _| {
             menu = menu.scrollable(true);
             for label in &labels {
-                let (owner, info, picked) = (owner.clone(), info.clone(), label.clone());
+                let (owner, target, info, picked) = (owner.clone(), target.clone(), info.clone(), label.clone());
                 let item = PopupMenuItem::new(label.clone())
                     .checked(current.as_deref() == Some(label.as_str()))
                     .on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| this.pick_member(row, column, &picked, &info, cx));
+                        let _ = owner.update(cx, |this, cx| this.pick_member(&target, &picked, &info, cx));
                     });
                 menu = menu.item(item);
             }
