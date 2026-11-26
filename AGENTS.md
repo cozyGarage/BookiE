@@ -9,7 +9,7 @@ These rules apply to every coding agent and every contributor. `CLAUDE.md` point
 The Forgejo mirror may retain a separate `linux` branch until that service is migrated. Specify the remote and branch explicitly for mirror operations; GitHub PRs and canonical development use `main`.
 
 - The rename is complete ([ADR 0027](docs/decisions/0027-complete-bookie-rename.md)): Cargo packages, binaries, crates, environment variables, application ID, paths and keyring schema are `bookie-*` / `BOOKIE_*` / `com.bookie.linux`. Legacy `tablepro` names appear only for upstream attribution and for reading old state. Do not reintroduce `tablepro` identifiers.
-- The UI uses GTK4, libadwaita, GtkSourceView and Relm4. Database drivers are static workspace crates registered at compile time. The GPUI app in `apps/gpui` is the chosen cross-platform frontend and GTK is maintained in parallel ([ADR 0052](docs/decisions/0052-gpui-is-the-cross-platform-frontend.md)).
+- The primary frontend for new product work is GPUI in `apps/gpui`; GTK4, libadwaita, GtkSourceView and Relm4 form the historical Linux frontend. GTK receives security, data-integrity and release-blocking fixes, not new features or parity work. The GPUI supported-release gate and GTK package cutover are defined by [ADR 0058](docs/decisions/0058-gpui-primary-gtk-historical.md). Database drivers are static workspace crates registered at compile time.
 - Every shipped feature works without an account, license key, subscription, paid tier or remote entitlement check.
 - The root [LICENSE](LICENSE) applies. User-facing changes add a `changelog.d` fragment ([changelog and commits](#changelog-and-commits)).
 

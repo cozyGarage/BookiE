@@ -569,3 +569,100 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
         domain_type: None,
     }
 }
+
+const BASELINE_ROWS: usize = 100_000;
+
+#[tokio::test]
+#[ignore = "prints the import baseline measured for #3741; run with --ignored --nocapture"]
+async fn a_hundred_thousand_row_import_lands_complete_and_reports_its_time() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled(
+            "CREATE TABLE import_bulk (id INTEGER PRIMARY KEY, name TEXT NOT NULL, amount REAL)",
+            &control(),
+        )
+        .await
+        .expect("create");
+    let columns = vec![
+        column("id", "INTEGER"),
+        column("name", "TEXT"),
+        column("amount", "REAL"),
+    ];
+    let mut csv = String::from("id,name,amount\n");
+    for id in 1..=BASELINE_ROWS {
+        csv.push_str(&format!("{id},name {id},{}.25\n", id % 1000));
+    }
+    let plan = plan_for("import_bulk", &columns, csv.as_bytes());
+    let mut scope = begin(&fixture.guard, "import_bulk", &plan).await;
+    let started = std::time::Instant::now();
+    let mut batches = 0_u32;
+    for rows in plan.batches(bookie_core::import::DEFAULT_IMPORT_BATCH_ROWS) {
+        let batch = BulkBatch {
+            schema: None,
+            table: "import_bulk",
+            statement: &plan.statement,
+            rows,
+        };
+        fixture
+            .guard
+            .execute_bulk_batch(&mut scope, batch, &control())
+            .await
+            .expect("batch");
+        batches += 1;
+    }
+    let elapsed = started.elapsed();
+    fixture
+        .guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .unwrap();
+    println!(
+        "sqlite import baseline: {BASELINE_ROWS} rows in {batches} batches took {:.2?} ({:.0} rows/s)",
+        elapsed,
+        BASELINE_ROWS as f64 / elapsed.as_secs_f64()
+    );
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT count(*) FROM import_bulk").await,
+        vec![vec![Value::Int(BASELINE_ROWS as i64)]]
+    );
+}
+
+#[tokio::test]
+async fn a_slow_write_outlives_the_read_deadline_and_a_slow_read_does_not() {
+    let fixture = fixture().await;
+    fixture
+        .guard
+        .execute_controlled("CREATE TABLE slow (n INTEGER)", &control())
+        .await
+        .expect("create");
+    let short = || OperationControl::with_timeout(Duration::from_millis(100));
+
+    let read = fixture
+        .guard
+        .query_controlled(
+            "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 50000000) SELECT count(*) FROM c",
+            &short(),
+        )
+        .await;
+    assert!(
+        matches!(read, Err(DriverError::TimedOut)),
+        "a read keeps its deadline: {read:?}"
+    );
+
+    let write = fixture
+        .guard
+        .execute_controlled(
+            "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 3000000) INSERT INTO slow SELECT x FROM c",
+            &short(),
+        )
+        .await;
+    assert!(
+        write.is_ok(),
+        "a write is not cancelled by the read deadline: {write:?}"
+    );
+    assert_eq!(
+        rows_in(&fixture.guard, "SELECT count(*) FROM slow").await,
+        vec![vec![Value::Int(3_000_000)]]
+    );
+}

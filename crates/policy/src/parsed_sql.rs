@@ -3,6 +3,7 @@ use std::sync::OnceLock;
 use sqlparser::ast::Statement;
 use sqlparser::dialect::Dialect;
 use sqlparser::parser::{Parser, ParserError};
+use sqlparser::tokenizer::{Token, TokenWithSpan, Tokenizer};
 
 use bookie_core::sql_syntax::SqlGrammar;
 use bookie_core::sql_syntax::script::{LexicalSettings, ScriptPlan};
@@ -54,11 +55,27 @@ impl<'a> ParsedSql<'a> {
         dialect_for(&self.driver_id)
     }
 
+    fn parse(&self) -> Result<Vec<Statement>, ParserError> {
+        let dialect = self.dialect();
+        if self.driver_id != "postgres" {
+            return Parser::parse_sql(dialect.as_ref(), self.trimmed());
+        }
+        let tokens = Tokenizer::new(dialect.as_ref(), self.trimmed()).tokenize_with_location()?;
+        match without_insert_overriding(&tokens) {
+            Some(stripped) => Parser::new(dialect.as_ref())
+                .with_tokens_with_locations(stripped)
+                .parse_statements(),
+            None => Parser::new(dialect.as_ref())
+                .with_tokens_with_locations(tokens)
+                .parse_statements(),
+        }
+    }
+
     pub(crate) fn statements(&self) -> Result<&[Statement], &ParserError> {
         self.statements
             .get_or_init(|| {
                 counter::record();
-                Parser::parse_sql(self.dialect().as_ref(), self.trimmed())
+                self.parse()
             })
             .as_deref()
     }
@@ -253,4 +270,45 @@ mod tests {
         assert!(!lexical_mode_ambiguous("SELECT 'ordinary'", "postgres", None));
         assert!(!lexical_mode_ambiguous("SELECT 1", "clickhouse", None));
     }
+}
+
+fn word_is(token: &Token, expected: &str) -> bool {
+    matches!(token, Token::Word(word) if word.quote_style.is_none() && word.value.eq_ignore_ascii_case(expected))
+}
+
+fn next_significant(tokens: &[TokenWithSpan], from: usize) -> Option<usize> {
+    (from..tokens.len()).find(|at| !matches!(tokens[*at].token, Token::Whitespace(_)))
+}
+
+fn without_insert_overriding(tokens: &[TokenWithSpan]) -> Option<Vec<TokenWithSpan>> {
+    let first = next_significant(tokens, 0)?;
+    if !word_is(&tokens[first].token, "INSERT") {
+        return None;
+    }
+    let mut at = first;
+    while let Some(start) = next_significant(tokens, at) {
+        at = start + 1;
+        if !word_is(&tokens[start].token, "OVERRIDING") {
+            continue;
+        }
+        let previous = (0..start)
+            .rev()
+            .find(|index| !matches!(tokens[*index].token, Token::Whitespace(_)));
+        let kind = next_significant(tokens, start + 1)?;
+        let value = next_significant(tokens, kind + 1)?;
+        let after = next_significant(tokens, value + 1)?;
+        let clause = (word_is(&tokens[kind].token, "SYSTEM") || word_is(&tokens[kind].token, "USER"))
+            && word_is(&tokens[value].token, "VALUE");
+        let follows_column_list = previous.is_some_and(|index| tokens[index].token == Token::RParen);
+        let body = ["VALUES", "SELECT", "DEFAULT", "WITH"]
+            .iter()
+            .any(|keyword| word_is(&tokens[after].token, keyword));
+        if clause && follows_column_list && body {
+            let mut stripped = tokens[..start].to_vec();
+            stripped.extend_from_slice(&tokens[value + 1..]);
+            return Some(stripped);
+        }
+        return None;
+    }
+    None
 }

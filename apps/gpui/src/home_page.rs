@@ -1,10 +1,10 @@
 use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
+use crate::GridView;
 use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, one_line, tip};
 use crate::surfaces::{ButtonKind, button, compact_button, icon_button, section_header};
-use crate::{GridView, thousands};
 use bookie_gpui::shell::table_label;
 use bookie_gpui::theme::{Theme, size};
 
@@ -254,11 +254,10 @@ impl GridView {
     }
 
     pub(crate) fn status_count_text(&self, compact: bool) -> String {
-        match (self.status_shows_grid(), compact) {
-            (true, false) => footer_counts(self.dataset_count(), self.source.columns().len()),
-            (true, true) => format!("{} rows", thousands(self.dataset_count())),
-            (false, _) => String::new(),
+        if compact || !self.status_shows_grid() {
+            return String::new();
         }
+        footer_columns(self.source.columns().len())
     }
 
     pub fn status_bar(&self, theme: Theme, window_width: f32, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -398,23 +397,18 @@ mod footer_status_tests {
     }
 }
 
-fn footer_counts(rows: u64, columns: usize) -> String {
-    format!(
-        "{} rows · {} {}",
-        thousands(rows),
-        columns,
-        if columns == 1 { "column" } else { "columns" }
-    )
+fn footer_columns(columns: usize) -> String {
+    format!("{columns} {}", if columns == 1 { "column" } else { "columns" })
 }
 
 #[cfg(test)]
 mod footer_tests {
-    use super::{footer_counts, home_stat_counts};
+    use super::{footer_columns, home_stat_counts};
 
     #[test]
-    fn the_footer_counts_rows_and_columns_without_the_theme_name() {
-        assert_eq!(footer_counts(1234, 8), "1,234 rows · 8 columns");
-        assert_eq!(footer_counts(0, 1), "0 rows · 1 column");
+    fn the_footer_counts_columns_without_repeating_the_row_count() {
+        assert_eq!(footer_columns(8), "8 columns");
+        assert_eq!(footer_columns(1), "1 column");
     }
 
     #[test]

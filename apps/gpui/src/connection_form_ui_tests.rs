@@ -3,6 +3,25 @@ use gpui::TestAppContext;
 use crate::ui_tests::open;
 
 #[gpui::test]
+fn the_connection_form_sets_and_clears_color_with_swatches(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| view.open_connection_dialog(cx));
+    cx.run_until_parked();
+    let swatch = cx.debug_bounds("swatch-teal").expect("the teal swatch is visible");
+    assert!(cx.debug_bounds("teal").is_none(), "the color is presented as a swatch");
+    cx.simulate_click(swatch.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.connection_form.color.as_deref(), Some("teal"))
+    });
+
+    let clear = cx.debug_bounds("swatch-No color").expect("the clear swatch is visible");
+    cx.simulate_click(clear.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_eq!(view.connection_form.color, None));
+}
+
+#[gpui::test]
 fn tab_moves_between_connection_fields_in_order(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|window, cx| {
@@ -110,6 +129,28 @@ fn connection_form_keeps_actions_visible_at_two_widths(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn long_connection_test_status_has_its_own_line_above_the_actions(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.open_connection_dialog(cx);
+        view.connection_form.status = "Could not verify the PostgreSQL server certificate. ".repeat(15);
+        cx.notify();
+    });
+    for width in [720.0, 900.0, 1500.0] {
+        cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(760.0)));
+        cx.run_until_parked();
+        let status = cx
+            .debug_bounds("connection-form-status")
+            .expect("the result is visible");
+        let test = cx.debug_bounds("test-connection").expect("Test is visible");
+        let connect = cx.debug_bounds("connect-connection").expect("Connect is visible");
+        assert!(status.size.width > gpui::px(300.0));
+        assert!(status.bottom() <= test.top() && status.bottom() <= connect.top());
+        assert!(test.bottom() <= gpui::px(760.0) && connect.bottom() <= gpui::px(760.0));
+    }
+}
+
+#[gpui::test]
 fn editing_a_production_connection_keeps_it_production(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
@@ -175,16 +216,25 @@ fn connection_save_reports_partial_success_and_reuses_the_saved_identity(cx: &mu
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
             view.connection_form.ssh.jumps.push(crate::ssh_form::HopForm::new(cx));
-            view.finish_connection_save(Ok((id, "orders".into(), vec![head, jump], false)), cx);
+            assert_eq!(
+                view.finish_connection_save(Ok((id, "orders".into(), vec![head, jump], false)), cx),
+                None
+            );
             assert_eq!(view.connection_form.editing, Some(id));
             assert_eq!(view.connection_form.ssh.head.hop_id, Some(head));
             assert_eq!(view.connection_form.ssh.jumps[0].hop_id, Some(jump));
             assert_eq!(view.connection_form.draft(cx).id, Some(id));
             assert!(view.connection_form.draft(cx).keep_stored_password);
             assert!(view.connection_form.status.contains("color"));
-            view.finish_connection_save(Ok((id, "orders".into(), vec![], true)), cx);
+            assert_eq!(
+                view.finish_connection_save(Ok((id, "orders".into(), vec![], true)), cx),
+                Some(id)
+            );
             assert!(!view.connection_form.status.contains("color"));
-            view.finish_connection_save(Err("Connection save failed".into()), cx);
+            assert_eq!(
+                view.finish_connection_save(Err("Connection save failed".into()), cx),
+                None
+            );
             assert!(view.connection_form.status.contains("failed"));
             assert_eq!(view.connection_form.editing, Some(id));
         })
@@ -363,6 +413,21 @@ fn new_connection_opens_a_centred_dialog_over_the_current_tab(cx: &mut TestAppCo
 }
 
 #[gpui::test]
+fn connect_in_the_new_connection_form_validates_before_saving(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| view.open_connection_dialog(cx));
+    cx.run_until_parked();
+    let connect = cx.debug_bounds("connect-connection").expect("the dialog has Connect");
+    cx.simulate_click(connect.center(), Default::default());
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.connection_form.open);
+        assert!(!view.connection_form.status.is_empty());
+        assert!(view.live.is_none());
+    });
+}
+
+#[gpui::test]
 fn cancel_closes_the_connection_dialog(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
@@ -380,7 +445,11 @@ fn a_successful_save_closes_the_dialog_and_reports_in_the_status_line(cx: &mut T
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {
         view.open_connection_dialog(cx);
-        view.finish_connection_save(Ok((uuid::Uuid::new_v4(), "minipc".into(), Vec::new(), true)), cx);
+        let id = uuid::Uuid::new_v4();
+        assert_eq!(
+            view.finish_connection_save(Ok((id, "minipc".into(), Vec::new(), true)), cx),
+            Some(id)
+        );
     });
     view.read_with(cx, |view, _| {
         assert!(!view.connection_form.open, "a full save closes the dialog");
@@ -388,7 +457,10 @@ fn a_successful_save_closes_the_dialog_and_reports_in_the_status_line(cx: &mut T
     });
     view.update(cx, |view, cx| {
         view.open_connection_dialog(cx);
-        view.finish_connection_save(Ok((uuid::Uuid::new_v4(), "minipc".into(), Vec::new(), false)), cx);
+        assert_eq!(
+            view.finish_connection_save(Ok((uuid::Uuid::new_v4(), "minipc".into(), Vec::new(), false)), cx),
+            None
+        );
     });
     view.read_with(cx, |view, _| {
         assert!(

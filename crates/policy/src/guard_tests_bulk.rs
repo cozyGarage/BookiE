@@ -8,6 +8,7 @@ struct BulkConn {
     fails_from_batch: usize,
     failure: fn() -> DriverError,
     rejected_ids: Vec<i64>,
+    rejects_multi_row: bool,
 }
 
 impl BulkConn {
@@ -19,6 +20,7 @@ impl BulkConn {
                 fails_from_batch: usize::MAX,
                 failure: query_error,
                 rejected_ids,
+                rejects_multi_row: false,
             }),
             batches,
         )
@@ -39,6 +41,21 @@ impl BulkConn {
                 fails_from_batch,
                 failure,
                 rejected_ids: Vec::new(),
+                rejects_multi_row: false,
+            }),
+            batches,
+        )
+    }
+
+    fn open_rejecting_multi_row() -> (Arc<dyn Connection>, Arc<Mutex<Vec<usize>>>) {
+        let batches = Arc::new(Mutex::new(Vec::new()));
+        (
+            Arc::new(Self {
+                batches: batches.clone(),
+                fails_from_batch: usize::MAX,
+                failure: query_error,
+                rejected_ids: Vec::new(),
+                rejects_multi_row: true,
             }),
             batches,
         )
@@ -73,6 +90,12 @@ impl Connection for BulkConn {
 
     async fn execute_in_transaction(&self, statements: &[(String, Vec<Value>)]) -> Result<Vec<u64>, DriverError> {
         let mut batches = self.batches.lock().expect("batch lock");
+        if self.rejects_multi_row && statements.len() == 1 && statements[0].0.contains("), (") {
+            return Err(DriverError::Transaction {
+                statement_index: 0,
+                source: Box::new(query_error()),
+            });
+        }
         let rejected = statements
             .iter()
             .position(|(_, params)| matches!(params.first(), Some(Value::Int(id)) if self.rejected_ids.contains(id)));
@@ -201,7 +224,7 @@ async fn an_approved_scope_spends_exactly_its_row_budget() {
 
     assert_eq!((first, second), (3, 3));
     assert_eq!(scope.remaining_rows(), 0);
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3, 3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1, 1]);
     assert_eq!(
         guard
             .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
@@ -212,7 +235,7 @@ async fn an_approved_scope_spends_exactly_its_row_budget() {
 }
 
 #[tokio::test]
-async fn sequence_sync_failure_reports_rows_already_committed() {
+async fn sequence_sync_failure_surfaces_when_the_import_finishes_and_reports_rows_already_committed() {
     let (connection, _batches) = BulkConn::open(usize::MAX);
     let (guard, audit, _state) = approved_guard(connection, Uuid::new_v4());
     let mut request = request(2);
@@ -220,18 +243,15 @@ async fn sequence_sync_failure_reports_rows_already_committed() {
     let mut scope = guard.begin_bulk_insert(request).await.expect("scope");
     let rows = rows(2);
 
-    let error = guard
+    guard
         .execute_bulk_batch(&mut scope, batch(INSERT, "people", &rows), &control())
         .await
-        .expect_err("sequence failure follows the committed insert");
+        .expect("the insert commits; the sequence is synced when the import finishes");
     assert_eq!(scope.committed_rows(), 2);
-    assert_eq!(
-        guard
-            .finish_bulk_insert(&mut scope, BulkInsertEnd::Failed(&error))
-            .await
-            .expect("audit finish"),
-        2
-    );
+    guard
+        .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
+        .await
+        .expect_err("the sequence sync failure surfaces at the end");
     assert!(
         events(&audit)
             .iter()
@@ -278,7 +298,7 @@ async fn a_batch_past_the_row_budget_is_denied_and_never_reaches_the_driver() {
     assert!(
         matches!(error, DriverError::PolicyDenied(ref message) if message.contains("more rows than were approved"))
     );
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
     end_quietly(&guard, &mut scope).await;
 }
 
@@ -381,7 +401,7 @@ async fn a_scope_is_denied_once_the_import_has_ended() {
         .expect_err("a finished import cannot be resumed");
 
     assert!(matches!(error, DriverError::PolicyDenied(ref message) if message.contains("already been spent")));
-    assert_eq!(*batches.lock().expect("batch lock"), vec![2]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
 }
 
 #[tokio::test]
@@ -510,7 +530,7 @@ async fn a_failure_mid_import_stops_it_and_writes_one_terminal_record_with_the_c
         .expect("finish");
 
     assert_eq!(committed, 3);
-    assert_eq!(*batches.lock().expect("batch lock"), vec![3]);
+    assert_eq!(*batches.lock().expect("batch lock"), vec![1]);
     let events = events(&audit);
     assert_eq!(events.len(), 2);
     assert_eq!(events[1].terminal_status, AuditTerminalStatus::Failed);
@@ -969,7 +989,8 @@ async fn an_upsert_is_accepted_as_one_insert_shape_in_every_supported_dialect() 
             .finish_bulk_insert(&mut scope, BulkInsertEnd::Completed)
             .await
             .expect("finish");
-        assert_eq!(*batches.lock().expect("batch lock"), vec![2], "{driver}");
+        let statements = if driver == "duckdb" { 2 } else { 1 };
+        assert_eq!(*batches.lock().expect("batch lock"), vec![statements], "{driver}");
     }
 }
 
@@ -1062,4 +1083,25 @@ async fn statements_other_than_one_insert_are_still_refused_for_an_import() {
         assert!(matches!(result, Err(DriverError::PolicyDenied(_))), "{statement}");
         assert!(batches.lock().expect("batch lock").is_empty());
     }
+}
+
+#[tokio::test]
+async fn a_rejected_multi_row_batch_is_retried_row_by_row_so_the_error_names_the_row() {
+    let (connection, batches) = BulkConn::open_rejecting_multi_row();
+    let (guard, _audit, _state) = approved_guard(connection, Uuid::new_v4());
+    let mut scope = guard.begin_bulk_insert(request(3)).await.expect("scope");
+    let rows = rows(3);
+
+    let written = guard
+        .execute_bulk_batch(&mut scope, batch(INSERT, "people", &rows), &control())
+        .await
+        .expect("the per-row retry is accepted");
+
+    assert_eq!(written, 3);
+    assert_eq!(
+        *batches.lock().expect("batch lock"),
+        vec![3],
+        "three statements after the retry"
+    );
+    end_quietly(&guard, &mut scope).await;
 }
