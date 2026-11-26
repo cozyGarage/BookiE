@@ -1343,7 +1343,7 @@ fn the_sessions_command_is_hidden_and_does_nothing_off_postgres(cx: &mut TestApp
 }
 
 #[gpui::test]
-fn explaining_a_query_shows_the_plan_as_a_tree_and_a_normal_run_clears_it(cx: &mut TestAppContext) {
+fn the_selected_run_owns_the_plan_and_closing_it_clears_the_pane(cx: &mut TestAppContext) {
     use bookie_gpui::shell::ResultView;
     let (view, cx) = open_live(cx);
     let run = |view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestContext, explain: bool| {
@@ -1373,6 +1373,28 @@ fn explaining_a_query_shows_the_plan_as_a_tree_and_a_normal_run_clears_it(cx: &m
     run(&view, cx, false);
     view.read_with(cx, |view, _| {
         assert!(view.panel.plan.is_empty(), "a normal run drops the old plan");
+        assert_ne!(view.panel.view, ResultView::Plan);
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.select_run(0)));
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.panel.view, ResultView::Plan);
+        assert!(!view.panel.plan.is_empty(), "reselecting Explain restores its plan");
+    });
+    cx.update(|_, cx| view.update(cx, |view, _| view.close_run(0)));
+    view.read_with(cx, |view, _| {
+        assert!(view.panel.plan.is_empty(), "closing Explain selects the normal run");
+        assert_ne!(view.panel.view, ResultView::Plan);
+    });
+    run(&view, cx, true);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.close_run(0);
+            view.close_run(0);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.run_tabs.slots.is_empty());
+        assert!(view.panel.plan.is_empty());
         assert_ne!(view.panel.view, ResultView::Plan);
     });
 }

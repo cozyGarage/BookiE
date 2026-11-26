@@ -189,6 +189,7 @@ impl GridView {
                 },
                 move |this, (sql, source, mapping, elapsed, result), cx| {
                     this.panel.running = None;
+                    this.panel.explaining = false;
                     match result {
                         Ok(table) => {
                             this.panel.error_location = None;
@@ -198,14 +199,12 @@ impl GridView {
                             );
                             this.panel.messages.statement_ok(&sql, rows, truncated, elapsed);
                             this.panel.messages.server_messages(&table.messages);
-                            this.show_plan_of(&table);
                             this.add_run_with_cancel_process(Some(std::sync::Arc::new(table)), cancel_process);
                             if let Some(slot) = this.run_tabs.slots.last_mut() {
                                 slot.run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
                             }
                         }
                         Err(error) => {
-                            this.panel.explaining = false;
                             let detail = match error.hint.as_deref() {
                                 Some(hint) if !hint.is_empty() => format!("{} · Hint: {hint}", error.message),
                                 _ => error.message.clone(),
@@ -360,6 +359,7 @@ impl GridView {
             self.search.cursor = MatchCursor::default();
             self.set_mode(Mode::All);
         }
+        self.clear_result_plan();
         self.run_tabs.slots.clear();
         self.run_tabs.active = 0;
         self.run_tabs.next_number = 1;
@@ -466,6 +466,7 @@ impl GridView {
         self.compare = None;
         self.search.cursor = MatchCursor::default();
         self.set_mode(Mode::All);
+        self.show_plan_of(self.source.clone().as_ref());
         if self.run_tabs.slots[index].failure.is_some() {
             self.panel.view = ResultView::Messages;
             self.status = format!("{} · failed", run.label());
@@ -498,6 +499,7 @@ impl GridView {
         self.cell_edit.edits.clear();
         self.reset_edit_history();
         if self.run_tabs.slots.is_empty() {
+            self.clear_result_plan();
             self.source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Query".into()));
             self.cell_edit.active = None;
             self.compare = None;
