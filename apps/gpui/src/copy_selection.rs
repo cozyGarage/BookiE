@@ -1,6 +1,47 @@
+use std::borrow::Cow;
+use std::collections::HashSet;
+
+use bookie_core::QueryRowSet;
+
 use super::*;
 
+pub(crate) struct SelectedRows<'a> {
+    rows: Vec<Cow<'a, [Cell]>>,
+}
+
+impl QueryRowSet for SelectedRows<'_> {
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn row(&self, index: usize) -> Option<&[Cell]> {
+        self.rows.get(index).map(Cow::as_ref)
+    }
+}
+
 impl GridView {
+    pub(crate) fn selected_row_set(&self, selection: Selection) -> SelectedRows<'_> {
+        let edited_rows: HashSet<_> = self.cell_edit.edits.keys().map(|(row, _)| *row).collect();
+        let rows = (selection.first()..=selection.last())
+            .map(|index| {
+                let source_row = self.source_row(index);
+                let mut row = self
+                    .source
+                    .row_ref(source_row)
+                    .map_or_else(|| Cow::Owned(self.source.row(source_row)), Cow::Borrowed);
+                if edited_rows.contains(&source_row) {
+                    for (column, cell) in row.to_mut().iter_mut().enumerate() {
+                        if let Some(edited) = self.cell_edit.edits.get(&(source_row, column)) {
+                            *cell = edited.clone();
+                        }
+                    }
+                }
+                row
+            })
+            .collect();
+        SelectedRows { rows }
+    }
+
     pub(crate) fn selected_rows(&self, selection: Selection) -> Vec<Vec<Cell>> {
         (selection.first()..=selection.last())
             .map(|index| {
@@ -23,7 +64,8 @@ impl GridView {
             return;
         }
         let columns = column_infos_for(self.source.columns());
-        let text = result_copy::tsv(&columns, self.selected_rows(selection), with_headers);
+        let rows = self.selected_row_set(selection);
+        let text = result_copy::tsv(&columns, &rows, with_headers);
         cx.write_to_clipboard(ClipboardItem::new_string(text));
         let noun = if selection.count() == 1 { "row" } else { "rows" };
         self.status = format!(
@@ -43,7 +85,7 @@ impl GridView {
             self.status = selection.label();
             return;
         }
-        let rows = self.selected_rows(selection);
+        let rows = self.selected_row_set(selection);
         let driver_id = self
             .live
             .as_ref()

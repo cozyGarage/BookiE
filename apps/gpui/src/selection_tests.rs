@@ -3,7 +3,8 @@ use super::selection::*;
 
 fn copy_tsv(rows: impl IntoIterator<Item = Vec<crate::model::Cell>>, with_headers: bool) -> String {
     let columns = crate::core_bridge::column_infos_for(&crate::model::synthetic_columns());
-    bookie_app_services::result_copy::tsv(&columns, rows.into_iter().collect(), with_headers)
+    let rows: Vec<_> = rows.into_iter().collect();
+    bookie_app_services::result_copy::tsv(&columns, &rows, with_headers)
 }
 
 #[test]

@@ -618,13 +618,16 @@ impl Render for GridView {
             .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.late_bars(theme, cx));
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, insert_form), cx);
+        let content_width =
+            f32::from(window.viewport_size().width) - if self.sidebar.open { self.sidebar.width } else { 0.0 };
+        let compact_query = content_width < crate::query_pane::COMPACT_QUERY_WIDTH;
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
             Tab::Settings => self.settings_page(theme, cx),
             Tab::History => self.history_page(theme, cx),
             Tab::AuditLog => self.audit_page(theme, cx),
             Tab::Diagram => self.diagram_page(theme, cx),
-            Tab::Query => self.query_page(theme, grid, cx),
+            Tab::Query => self.query_page(theme, grid, compact_query, cx),
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };

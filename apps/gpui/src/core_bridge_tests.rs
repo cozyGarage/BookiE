@@ -2,9 +2,10 @@ use crate::core_bridge::parse_edit;
 use crate::model::{Cell, row_at};
 
 fn render_tsv(rows: impl IntoIterator<Item = Vec<crate::model::Cell>>, with_headers: bool) -> String {
+    let rows: Vec<_> = rows.into_iter().collect();
     bookie_app_services::result_copy::tsv(
         &crate::core_bridge::column_infos(),
-        rows.into_iter().collect(),
+        &rows,
         with_headers,
     )
 }
@@ -96,6 +97,6 @@ fn copied_headers_are_the_result_columns_not_a_fixed_list() {
         data_type: String::new(),
         primary_key: false,
     }]);
-    let text = bookie_app_services::result_copy::tsv(&columns, vec![vec![Cell::Text("Ada".into())]], true);
+    let text = bookie_app_services::result_copy::tsv(&columns, &[vec![Cell::Text("Ada".into())]], true);
     assert_eq!(text, "customer_name\nAda");
 }
