@@ -133,12 +133,12 @@ impl GridView {
             task_bar(format!("Set {rows} selected row(s)"), theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
-                    button(ButtonKind::Primary, "apply-set-cells", "Set value", theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.apply_set_cells(false, cx))),
-                )
-                .child(
                     button(ButtonKind::Ghost, "apply-set-null", "Set NULL", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.apply_set_cells(true, cx))),
+                )
+                .child(
+                    button(ButtonKind::Primary, "apply-set-cells", "Set value", theme)
+                        .on_click(cx.listener(|this, _, _, cx| this.apply_set_cells(false, cx))),
                 )
                 .child(
                     button(ButtonKind::Ghost, "cancel-set-cells", "Cancel", theme).on_click(cx.listener(

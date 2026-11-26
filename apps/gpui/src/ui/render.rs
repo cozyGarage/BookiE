@@ -469,17 +469,13 @@ impl GridView {
             .children(self.detail_sidebar(theme, cx))
     }
 
-    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, bundle_bar: Option<Div>, content: Div) -> Div {
-        div().flex_1().flex().min_h_0().children(sidebar).child(
-            div()
-                .flex_1()
-                .flex()
-                .flex_col()
-                .min_w_0()
-                .child(tab_row)
-                .children(bundle_bar)
-                .child(content),
-        )
+    fn main_layout(&self, sidebar: Option<Div>, tab_row: Stateful<Div>, content: Div) -> Div {
+        div()
+            .flex_1()
+            .flex()
+            .min_h_0()
+            .children(sidebar)
+            .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content))
     }
 
     fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
@@ -610,12 +606,10 @@ impl Render for GridView {
             .or_else(|| self.save_bar(theme, cx))
             .or_else(|| self.insert_form(theme, cx))
             .or_else(|| self.data_compare_bar(theme, cx))
+            .or_else(|| self.one_shot_bar(theme, cx))
             .map(|bar| bar_dialog(theme, bar));
-        let bundle_bar = self.connection_bundle_bar(theme, cx);
         let insert_form = self
-            .structure_bar(theme, cx)
-            .or_else(|| self.structure_info_panel(theme, cx))
-            .or_else(|| self.resolve_panel(theme, cx))
+            .structure_info_panel(theme, cx)
             .or_else(|| self.late_bars(theme, cx));
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, insert_form), cx);
         let content_width =
@@ -663,7 +657,7 @@ impl Render for GridView {
                 }),
             )
             .child(toolbar)
-            .child(self.main_layout(sidebar, tab_row, bundle_bar, content))
+            .child(self.main_layout(sidebar, tab_row, content))
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme, f32::from(window.viewport_size().width), cx))
             .children(palette)

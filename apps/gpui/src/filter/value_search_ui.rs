@@ -131,23 +131,30 @@ impl GridView {
                     this.panel.open = true;
                     this.status = format!("Searched {} tables for \"{searched}\"", report.tables.len());
                 }
-                Err(message) => this.status = format!("Could not search: {message}"),
+                Err(message) => this.report_failure("search", &message),
             },
         );
     }
 
     pub(crate) fn late_bars(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let on_query = matches!(self.tabs.current(), Tab::Query);
-        self.set_cells_bar(theme, cx)
-            .or_else(|| self.filter_rule_bar(theme, cx))
-            .or_else(|| if on_query { None } else { self.tool_bars(theme, cx) })
+        self.filter_rule_bar(theme, cx).or_else(|| {
+            if on_query {
+                None
+            } else {
+                self.value_search_bar(theme, cx)
+            }
+        })
     }
 
-    pub(crate) fn tool_bars(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
-        self.value_search_bar(theme, cx)
+    pub(crate) fn one_shot_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
+        self.structure_bar(theme, cx)
+            .or_else(|| self.set_cells_bar(theme, cx))
+            .or_else(|| self.resolve_panel(theme, cx))
             .or_else(|| self.backup_bar(theme, cx))
             .or_else(|| self.sql_file_bar(theme, cx))
             .or_else(|| self.tables_export_bar(theme, cx))
+            .or_else(|| self.connection_bundle_bar(theme, cx))
     }
 
     pub(crate) fn value_search_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
