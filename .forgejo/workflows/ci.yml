@@ -179,7 +179,20 @@ jobs:
           NEXTEST="$(bash scripts/ensure-nextest.sh)"
           "$NEXTEST" nextest run --archive-file "$BOOKIE_TEST_BUNDLE/nextest.tar.zst" \
             --workspace-remap "$workspace_root" \
-            --extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}" --profile default --no-tests=fail
+            --extract-to "$TMPDIR/bookie-gpui-${GITHUB_RUN_ID}" --profile ci --no-tests=fail
+      - name: Collect GPUI test report
+        if: failure()
+        run: |
+          mkdir -p src/target/quality/gpui-layers
+          cp -- src/apps/gpui/target/nextest/ci/junit.xml src/target/quality/gpui-layers/ || true
+      - name: Retain GPUI test report
+        if: failure()
+        uses: https://code.forgejo.org/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+        with:
+          name: gpui-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: src/target/quality/*-layers
+          if-no-files-found: warn
+          retention-days: 2
       - name: Finalize runner job
         if: always()
         shell: bash

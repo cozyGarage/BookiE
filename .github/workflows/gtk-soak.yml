@@ -76,6 +76,7 @@ jobs:
         with:
           workspaces: .
           prefix-key: linux-gtk-soak
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build application once
         run: |
           cargo build --release --locked -p bookie-app --bin bookie-app

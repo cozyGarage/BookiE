@@ -9,10 +9,12 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 PAGE_SIZE = 100
+REGRESSION_GATE = "Linux regression gate"
+FORGEJO_GATE_CONTEXT = "Forgejo regression gate"
 REQUIRED_CODE_CHECKS = (
     "Pin tested revision",
     "Ensure CI debian-testing GTK image",
-    "Linux regression gate",
+    REGRESSION_GATE,
 )
 REQUIRED_CONTRACT_CHECKS = ("harness", "workflow-lint", "workflow-security")
 REQUIRED_ALWAYS = ("pr-title",)
@@ -63,12 +65,29 @@ def latest_checks(runs):
     return {name: row[1] for name, row in latest.items()}
 
 
-def evaluate_checks(required, runs):
+def forgejo_gate_passed(statuses):
+    latest = None
+    for status in statuses:
+        if status.get("context") != FORGEJO_GATE_CONTEXT:
+            continue
+        if (status.get("creator") or {}).get("login") == "github-actions[bot]":
+            continue
+        key = (status.get("created_at") or "", int(status.get("id", 0)))
+        if latest is None or key > latest[0]:
+            latest = (key, status)
+    return latest is not None and latest[1].get("state") == "success"
+
+
+def evaluate_checks(required, runs, statuses=()):
     latest = latest_checks(runs)
+    forgejo_passed = forgejo_gate_passed(statuses)
     passed = []
     waiting = []
     failed = []
     for name in required:
+        if name == REGRESSION_GATE and forgejo_passed:
+            passed.append(name)
+            continue
         run = latest.get(name)
         if run is None:
             waiting.append(f"{name}: missing")
@@ -197,6 +216,9 @@ class GitHubApi:
             paths.append(filename)
         return paths
 
+    def commit_statuses(self, head_sha):
+        return self.pages(f"/repos/{self.repository}/commits/{head_sha}/statuses")
+
     def check_runs_for_pull_request(self, pull_number, head_sha):
         runs = self.pages(f"/repos/{self.repository}/commits/{head_sha}/check-runs", "check_runs")
         suite_ids = {run.get("check_suite", {}).get("id") for run in runs}
@@ -242,7 +264,12 @@ def wait_for_checks(
             sleep,
             monotonic,
         )
-        result = evaluate_checks(required, runs)
+        statuses = []
+        if REGRESSION_GATE in required:
+            statuses = retry_transient(
+                lambda: client.commit_statuses(head_sha), deadline, poll_seconds, sleep, monotonic
+            )
+        result = evaluate_checks(required, runs, statuses)
         if result["state"] == "passed":
             print(f"All {len(required)} applicable GitHub checks passed on {head_sha}")
             return 0

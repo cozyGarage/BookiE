@@ -46,6 +46,7 @@ jobs:
         with:
           workspaces: .
           prefix-key: sonar-rust
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Run Python tests with coverage
         env:
