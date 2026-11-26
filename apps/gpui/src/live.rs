@@ -616,9 +616,9 @@ impl LiveSession {
         &self,
         kind: bookie_core::CatalogObjectKind,
     ) -> Result<Vec<bookie_core::CatalogObject>, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(self.epoch.load(Ordering::Relaxed));
         let control = OperationControl::with_timeout(Duration::from_secs(10));
-        let event = self.runtime.block_on(dispatch_read(
+        let event = self.runtime.block_on(dispatch_once(
             DispatchContext::Sessions(&self.sessions),
             Command::ReadCatalog {
                 epoch,
@@ -626,8 +626,6 @@ impl LiveSession {
                 kind,
             },
             &control,
-            epoch,
-            &self.epoch,
         ))?;
         let Event::CatalogRead { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());

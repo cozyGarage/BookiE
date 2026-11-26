@@ -608,6 +608,26 @@ fn reading_a_tables_columns_does_not_supersede_the_running_request() {
 }
 
 #[test]
+fn reading_catalog_objects_does_not_supersede_the_running_request() {
+    let Origin::File(source) = fixture() else {
+        panic!("the fixture is a file")
+    };
+    let path = std::env::temp_dir().join(format!("bookie-gpui-catalog-{}.sqlite", uuid::Uuid::new_v4()));
+    std::fs::copy(source, &path).unwrap();
+    let file = FixtureFile(path);
+    let live = LiveSession::open(&Origin::File(file.0.clone())).unwrap();
+    let running = live.epoch.load(Ordering::Relaxed);
+
+    let _ = live.catalog_objects(bookie_core::CatalogObjectKind::Trigger);
+
+    assert_eq!(
+        live.epoch.load(Ordering::Relaxed),
+        running,
+        "expanding a catalog section must not move the epoch that the running query or load was started at"
+    );
+}
+
+#[test]
 fn completion_reuses_columns_it_has_read_until_they_are_forgotten() {
     let Origin::File(source) = fixture() else {
         panic!("the fixture is a file")
