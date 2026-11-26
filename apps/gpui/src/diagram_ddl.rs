@@ -178,7 +178,7 @@ impl GridView {
         let draft = self.search.diagram.ddl.as_ref()?;
         Some(
             div()
-                .id("diagram-ddl")
+                .debug_selector(|| "diagram-ddl".into())
                 .flex()
                 .flex_col()
                 .flex_1()
