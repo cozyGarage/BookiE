@@ -72,7 +72,7 @@ impl SidebarState {
 }
 
 fn narrow_step(window_width: f32, handled: bool) -> (bool, bool) {
-    if window_width >= SidebarState::NARROW_WINDOW {
+    if window_width > SidebarState::NARROW_WINDOW {
         (false, false)
     } else {
         (true, !handled)
@@ -87,6 +87,7 @@ mod narrow_tests {
     fn a_narrow_window_collapses_once_and_a_wide_one_rearms() {
         assert_eq!(narrow_step(700.0, false), (true, true));
         assert_eq!(narrow_step(700.0, true), (true, false));
+        assert_eq!(narrow_step(760.0, false), (true, true));
         assert_eq!(narrow_step(1100.0, true), (false, false));
         assert_eq!(narrow_step(700.0, false), (true, true));
     }
