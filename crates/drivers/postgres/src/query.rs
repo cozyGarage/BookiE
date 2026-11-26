@@ -758,4 +758,17 @@ mod tests {
         let int4 = <i32 as Type<Postgres>>::type_info();
         assert!(!has_enum_leaf(&int4));
     }
+
+    #[test]
+    fn column_origins_become_typed_integer_array_literals() {
+        assert_eq!(
+            bigint_array([Some(16385_i64), None, Some(-1)].into_iter()),
+            "ARRAY[16385,NULL,-1]::bigint[]"
+        );
+        assert_eq!(
+            smallint_array([Some(1_i16), None].into_iter()),
+            "ARRAY[1,NULL]::smallint[]"
+        );
+        assert_eq!(bigint_array(std::iter::empty()), "ARRAY[]::bigint[]");
+    }
 }
