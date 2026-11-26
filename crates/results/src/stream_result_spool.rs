@@ -73,6 +73,8 @@ struct SpoolInner {
     file: Mutex<SpoolFile>,
     #[cfg(test)]
     load_worker_started: std::sync::atomic::AtomicBool,
+    #[cfg(test)]
+    cipher_initializations: AtomicU64,
     key: SecretBox<[u8; 32]>,
     budget: Arc<SpoolBudget>,
     page_budget: crate::stream_page_budget::StreamPageBudget,
@@ -287,6 +289,8 @@ impl StreamResultSpoolManager {
                 }),
                 #[cfg(test)]
                 load_worker_started: std::sync::atomic::AtomicBool::new(false),
+                #[cfg(test)]
+                cipher_initializations: AtomicU64::new(0),
                 key: SecretBox::new(Box::new(key)),
                 budget: self.budget.clone(),
                 page_budget: self.page_budget.clone(),
@@ -717,6 +721,8 @@ fn frame_aad(page_index: u64, sequence: u64, plaintext_len: usize) -> [u8; 21] {
 }
 
 fn cipher(inner: &SpoolInner) -> Result<Aes256Gcm, StreamResultSpoolError> {
+    #[cfg(test)]
+    inner.cipher_initializations.fetch_add(1, Ordering::Relaxed);
     Aes256Gcm::new_from_slice(inner.key.expose_secret()).map_err(|_| StreamResultSpoolError::Encryption)
 }
 

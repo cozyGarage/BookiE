@@ -156,6 +156,19 @@ async fn round_trips_every_typed_value_without_changing_float_bits() {
 }
 
 #[tokio::test]
+async fn a_multi_frame_read_initializes_its_cipher_once() {
+    let spool = StreamResultSpoolManager::default().create().expect("spool");
+    let page = result(vec![Value::Text("x".repeat(ENCRYPTION_CHUNK_BYTES * 2))]);
+    spool.append_page(0, page).await.expect("append");
+    spool.inner.cipher_initializations.store(0, Ordering::Relaxed);
+
+    let loaded = spool.load_page(0, Vec::new()).await.expect("load");
+
+    assert_eq!(loaded.rows[0][0], Value::Text("x".repeat(ENCRYPTION_CHUNK_BYTES * 2)));
+    assert_eq!(spool.inner.cipher_initializations.load(Ordering::Relaxed), 1);
+}
+
+#[tokio::test]
 async fn repeated_page_loads_are_idempotent_and_do_not_reserve_more_quota() {
     let manager = StreamResultSpoolManager::with_limit(1024 * 1024);
     let spool = manager.create().expect("spool");
