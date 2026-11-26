@@ -540,16 +540,11 @@ fn pinned_columns_stay_visible_after_scroll_and_tab_reopen(cx: &mut TestAppConte
     cx.run_until_parked();
 
     cx.update(|window, cx| window.render_frame(cx));
-    let header = cx.update(|window, _| {
-        window
-            .try_find(("col-header", 1usize))
-            .expect("second column header is rendered")
-            .bounds()
-    });
-    cx.simulate_click(
-        gpui::point(header.origin.x + header.size.width - gpui::px(12.0), header.center().y),
-        Default::default(),
-    );
+    let menu_bounds = cx.update(|window, _| window.find_by_label("Actions for column_1").bounds());
+    cx.simulate_click(menu_bounds.center(), Default::default());
+    cx.run_until_parked();
+    let pin_bounds = cx.update(|window, _| window.find_by_label("Pin through column_1").bounds());
+    cx.simulate_click(pin_bounds.center(), Default::default());
     cx.run_until_parked();
 
     view.update(cx, |view, cx| {
