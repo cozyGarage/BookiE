@@ -2732,12 +2732,16 @@ fn completed_result_export_records_a_success_notice(cx: &mut TestAppContext) {
             view.write_export_file(cx);
         });
     });
-    until(&view, cx, "the export finishes", |view| view.status.starts_with("Wrote "));
+    until(&view, cx, "the export finishes", |view| {
+        view.status.starts_with("Wrote ")
+    });
     assert!(path.is_file(), "the result was written");
     view.read_with(cx, |view, _| {
-        assert!(view.notices.items.iter().any(|notice| {
-            notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status
-        }));
+        assert!(
+            view.notices.items.iter().any(|notice| {
+                notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status
+            })
+        );
     });
 }
 
