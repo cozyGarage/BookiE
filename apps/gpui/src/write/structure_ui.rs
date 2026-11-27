@@ -27,7 +27,7 @@ pub(crate) fn is_destructive(kind: StructureChangeKind) -> bool {
 }
 
 impl GridView {
-    pub(crate) fn structure_change_enabled(&self) -> bool {
+    pub(crate) fn row_change_enabled(&self) -> bool {
         self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()
     }
 
@@ -70,7 +70,7 @@ impl GridView {
     }
 
     pub(crate) fn foreign_key_change_enabled(&self) -> bool {
-        self.structure_change_enabled()
+        self.row_change_enabled()
             && self
                 .live
                 .as_ref()
@@ -78,7 +78,7 @@ impl GridView {
     }
 
     pub(crate) fn structure_info_enabled(&self) -> bool {
-        self.live.is_some() && !self.grid_is_query && self.compare.is_none() && self.structure.info.is_none()
+        self.shows_live_table() && self.compare.is_none() && self.structure.info.is_none()
     }
 
     pub(crate) fn show_structure(&mut self, cx: &mut Context<Self>) {

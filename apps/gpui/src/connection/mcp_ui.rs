@@ -235,12 +235,7 @@ impl GridView {
             cx.notify();
             return;
         };
-        let Some(connection_id) = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref())
-            .map(|(id, _)| *id)
-        else {
+        let Some(connection_id) = self.saved_connection_id() else {
             self.mcp.status = Some("A saved database connection is required to issue a token".into());
             cx.notify();
             return;

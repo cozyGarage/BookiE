@@ -106,6 +106,15 @@ impl Ticket {
         self.generation += 1;
         self.cancel.cancel();
     }
+
+    fn next(&mut self) -> u64 {
+        self.invalidate();
+        self.generation
+    }
+
+    fn is_current(&self, generation: u64) -> bool {
+        self.generation == generation
+    }
 }
 
 impl Drop for Ticket {

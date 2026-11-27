@@ -115,8 +115,7 @@ impl GridView {
         }
         self.row_inspector.references_for = Some(wanted);
         self.row_inspector.references.clear();
-        self.row_inspector.work.invalidate();
-        let generation = self.row_inspector.work.generation;
+        let generation = self.row_inspector.work.next();
         let cancel = CancellationToken::new();
         self.row_inspector.work.cancel = cancel.clone();
         let names = self.column_names();
@@ -128,7 +127,7 @@ impl GridView {
                 .spawn(async move { count_references(&query_session, &keys.referenced_by, &row, &cancel) })
                 .await;
             this.update(cx, |this, cx| {
-                if this.row_inspector.work.generation == generation && this.is_current_session(&live) {
+                if this.row_inspector.work.is_current(generation) && this.is_current_session(&live) {
                     this.row_inspector.references = counted;
                     cx.notify();
                 }

@@ -42,7 +42,7 @@ impl Selection {
 
     pub fn label(self) -> String {
         let count = self.count();
-        let noun = if count == 1 { "row" } else { "rows" };
+        let noun = crate::messages::noun(count, "row", "rows");
         let limit = if self.copyable() {
             String::new()
         } else {

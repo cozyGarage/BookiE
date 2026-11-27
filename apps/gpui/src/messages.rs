@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 pub const MAX_MESSAGES: usize = 200;
-const MAX_STATEMENT_CHARS: usize = 120;
+pub const MAX_STATEMENT_CHARS: usize = 120;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessageKind {
@@ -61,21 +61,33 @@ impl MessageLog {
         let more = if truncated { " (result may be incomplete)" } else { "" };
         self.push(
             MessageKind::Success,
-            format!("{} · {rows} rows{more} · {} ms", one_line(sql), elapsed.as_millis()),
+            format!(
+                "{} · {rows} rows{more} · {} ms",
+                one_line_sql(sql, MAX_STATEMENT_CHARS),
+                elapsed.as_millis()
+            ),
         );
     }
 
     pub fn statement_cancelled(&mut self, sql: &str, elapsed: Duration) {
         self.push(
             MessageKind::Info,
-            format!("{} · Cancelled · {} ms", one_line(sql), elapsed.as_millis()),
+            format!(
+                "{} · Cancelled · {} ms",
+                one_line_sql(sql, MAX_STATEMENT_CHARS),
+                elapsed.as_millis()
+            ),
         );
     }
 
     pub fn statement_failed(&mut self, sql: &str, reason: &str, elapsed: Duration) {
         self.push(
             MessageKind::Error,
-            format!("{} · {reason} · {} ms", one_line(sql), elapsed.as_millis()),
+            format!(
+                "{} · {reason} · {} ms",
+                one_line_sql(sql, MAX_STATEMENT_CHARS),
+                elapsed.as_millis()
+            ),
         );
     }
 }
@@ -88,9 +100,17 @@ pub fn format_elapsed(elapsed: Duration) -> String {
     }
 }
 
-fn one_line(sql: &str) -> String {
+pub fn noun<'a, N: PartialEq + From<u8>>(count: N, one: &'a str, many: &'a str) -> &'a str {
+    if count == N::from(1) { one } else { many }
+}
+
+pub fn plural<N: Copy + std::fmt::Display + PartialEq + From<u8>>(count: N, one: &str, many: &str) -> String {
+    format!("{count} {}", noun(count, one, many))
+}
+
+pub fn one_line_sql(sql: &str, max_chars: usize) -> String {
     let flat = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-    match flat.char_indices().nth(MAX_STATEMENT_CHARS) {
+    match flat.char_indices().nth(max_chars) {
         Some((end, _)) => format!("{}…", &flat[..end]),
         None => flat,
     }
@@ -99,6 +119,21 @@ fn one_line(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_count_takes_the_singular_only_for_one() {
+        assert_eq!(plural(1_usize, "row", "rows"), "1 row");
+        assert_eq!(plural(0_usize, "row", "rows"), "0 rows");
+        assert_eq!(plural(2_u64, "change", "changes"), "2 changes");
+        assert_eq!(noun(1_u64, "table", "tables"), "table");
+    }
+
+    #[test]
+    fn one_line_sql_flattens_whitespace_and_cuts_at_the_given_length() {
+        assert_eq!(one_line_sql("SELECT  1\n FROM t", 40), "SELECT 1 FROM t");
+        assert_eq!(one_line_sql("abcdef", 3), "abc…");
+        assert_eq!(one_line_sql("abc", 3), "abc");
+    }
 
     #[test]
     fn server_messages_keep_severity_code_and_omission_notice() {
