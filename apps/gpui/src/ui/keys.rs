@@ -136,7 +136,7 @@ impl GridView {
             Surface::SaveReview => self.cancel_save(cx),
             Surface::Import => self.cancel_import_bar(cx),
             Surface::ExportFile => self.close_export_file_bar(),
-            Surface::SchemaDiagram => self.search.diagram.open = false,
+            Surface::SchemaDiagram => self.close_schema_diagram_export(),
             Surface::Insert => self.cancel_insert_form(cx),
             Surface::DataCompare => self.close_data_compare(cx),
             Surface::Structure => self.cancel_structure_bar(cx),

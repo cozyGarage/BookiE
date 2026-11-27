@@ -2752,6 +2752,33 @@ fn the_pager_arrows_appear_only_when_there_is_more_than_one_page(cx: &mut TestAp
 }
 
 #[gpui::test]
+fn completed_result_export_records_a_success_notice(cx: &mut TestAppContext) {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("result.csv");
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.export.file.input.as_ref().unwrap().update(cx, |input, cx| {
+                input.set_content(&path.to_string_lossy(), cx);
+            });
+            view.write_export_file(cx);
+        });
+    });
+    until(&view, cx, "the export finishes", |view| {
+        view.status.starts_with("Wrote ")
+    });
+    assert!(path.is_file(), "the result was written");
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.notices.items.iter().any(|notice| {
+                notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status
+            })
+        );
+    });
+}
+
+#[gpui::test]
 fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppContext) {
     let orders_copy = orders();
     let (view, cx) = open(cx);

@@ -1852,6 +1852,28 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
 }
 
 #[gpui::test]
+fn cancelling_a_queued_schema_export_does_not_create_a_file(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let (view, cx) = saving_view(cx, &fixture);
+    let directory = TestDirectory::new("cancel-schema-export");
+    let target = directory.file("schema.mmd");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.open_schema_diagram_bar(cx);
+            view.search.diagram.input.as_ref().unwrap().update(cx, |input, cx| {
+                input.set_content(&target.to_string_lossy(), cx);
+            });
+            view.write_schema_diagram(cx);
+            assert!(view.close_top_surface(cx));
+        });
+    });
+    until(&view, cx, "the export settles", |view| {
+        view.status.starts_with("Wrote ") || view.status.starts_with("Canceled the diagram export")
+    });
+    assert!(!target.exists(), "cancelled export created a file");
+}
+
+#[gpui::test]
 fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx: &mut TestAppContext) {
     let path = orders();
     let (view, cx) = saving_view(cx, &path);
@@ -1882,6 +1904,13 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
         "file: {written:?}; status: {status}"
     );
     view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.notices.items.iter().any(|notice| {
+                notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status
+            })
+        );
+    });
 
     type_path(&view, cx, &target);
     view.read_with(cx, |view, _| {
@@ -1889,6 +1918,18 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     });
     type_path(&view, cx, &directory.join("schema.png"));
     view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
+    type_path(&view, cx, &directory.join("missing").join("schema.mmd"));
+    until(&view, cx, "the diagram export fails", |view| {
+        view.status.starts_with("Could not export the diagram:")
+    });
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.notices
+                .items
+                .iter()
+                .any(|notice| { notice.kind == crate::notifications::NoticeKind::Error && notice.text == view.status })
+        );
+    });
     std::fs::remove_dir_all(&directory).ok();
 }
 
