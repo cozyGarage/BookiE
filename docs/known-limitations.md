@@ -94,7 +94,6 @@ What GPUI has is described in the [GPUI README](../apps/gpui/README.md). Module 
 | Conditional cell highlighting | `highlight_settings::HighlightSettingsStore` | Yes | |
 | Table filters remembered across restarts | `filter_settings::FilterSettingsStore` | Yes | |
 | Auto-refresh a table every 15 seconds | GTK only (`ui/browse_tab/auto_refresh.rs`) | Yes | |
-| Edit updatable views with the view checks | `view_edit::resolve_view_columns` | Yes | |
 | Searchable foreign-key value picker | `browse_query::foreign_key_candidates_query` | Yes | [#4070](https://github.com/cozyGarage/BookiE/issues/4070) |
 | Other value views: Unix time, UUID styles, JSON in text (GPUI has binary hex, UTF-8 and Base64) | `display_as::display_forms` | Yes | |
 | Image preview in the value viewer | `image_preview::previewable_image` | Yes | |
