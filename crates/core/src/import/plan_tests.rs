@@ -56,6 +56,29 @@ fn every_row_binds_to_the_same_statement() {
 }
 
 #[test]
+fn csv_and_workbook_refuse_the_whole_plan_for_an_undecodable_marker() {
+    let options = CsvImportOptions::default();
+    let csv = crate::import::read_csv(b"value\ngood\n<undecodable UNION>\n", &options, None).unwrap();
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "value").unwrap();
+    worksheet.write_string(1, 0, "good").unwrap();
+    worksheet.write_string(2, 0, "<undecodable UNION>").unwrap();
+    let xlsx = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 1).unwrap();
+    let columns = [column("value", "TEXT")];
+    for sheet in [&csv, &xlsx] {
+        let error = build_insert_plan(&target(&columns, &[Some(0)]), sheet, &options).unwrap_err();
+        let PlanError::Rows { total, first } = error else {
+            panic!("expected row error")
+        };
+        assert_eq!(total, 1);
+        assert_eq!(first[0].line, 3);
+        assert_eq!(first[0].column, "value");
+        assert_eq!(first[0].reason, crate::import::CellError::UndecodableMarker);
+    }
+}
+
+#[test]
 fn mysql_empty_enum_set_and_varchar_csv_cells_are_reconstructed_without_binding_empty_text() {
     let columns = vec![
         column("id", "INT"),
