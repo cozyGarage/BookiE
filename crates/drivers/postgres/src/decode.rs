@@ -1,25 +1,147 @@
-pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<String> {
+use sqlx::TypeInfo;
+use sqlx::postgres::{PgTypeInfo, PgTypeKind};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PgBinaryTextKind {
+    Interval,
+    Bit,
+    VarBit,
+    Macaddr,
+    Macaddr8,
+    Inet,
+    Cidr,
+    PgLsn,
+    Xml,
+    Tsvector,
+    Point,
+    Int4Range,
+    Int8Range,
+    Oid,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PgColumnKind {
+    Enum,
+    Array,
+    Void,
+    Numeric,
+    Json,
+    Time,
+    TimeTz,
+    Date,
+    Timestamp,
+    TimestampTz,
+    Bool,
+    Int2,
+    Int4,
+    Int8,
+    Float4,
+    Float8,
+    Uuid,
+    Jsonb,
+    Bytea,
+    BinaryText(PgBinaryTextKind),
+    Fallback,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct PgColumnDecoder {
+    pub(super) type_name: String,
+    pub(super) kind: PgColumnKind,
+}
+
+impl PgColumnDecoder {
+    pub(super) fn new(type_info: &PgTypeInfo) -> Self {
+        let type_name = type_info.name().to_ascii_uppercase();
+        let kind = match type_info.kind() {
+            PgTypeKind::Enum(_) => PgColumnKind::Enum,
+            PgTypeKind::Array(_) => PgColumnKind::Array,
+            _ => column_kind(&type_name),
+        };
+        Self { type_name, kind }
+    }
+
+    pub(super) fn decoded_payload_length(&self, bytes: &[u8]) -> usize {
+        match self.kind {
+            PgColumnKind::BinaryText(PgBinaryTextKind::Bit | PgBinaryTextKind::VarBit) => {
+                bit_string_text_length(bytes).unwrap_or(bytes.len())
+            }
+            _ => bytes.len(),
+        }
+    }
+}
+
+fn column_kind(type_name: &str) -> PgColumnKind {
     match type_name {
-        "INTERVAL" => decode_interval(bytes),
-        "BIT" | "VARBIT" => decode_bit_string(bytes),
-        "MACADDR" => decode_macaddr(bytes),
-        "MACADDR8" => decode_macaddr8(bytes),
-        "INET" => decode_inet(bytes, false),
-        "CIDR" => decode_inet(bytes, true),
-        "PG_LSN" => decode_pg_lsn(bytes),
-        "XML" => String::from_utf8(bytes.to_vec()).ok(),
-        "TSVECTOR" => decode_tsvector(bytes),
-        "POINT" => decode_point(bytes),
-        "INT4RANGE" => decode_int_range(bytes, 4),
-        "INT8RANGE" => decode_int_range(bytes, 8),
-        "OID" | "XID" | "CID" => Some(u32::from_be_bytes(bytes.try_into().ok()?).to_string()),
+        "VOID" => PgColumnKind::Void,
+        "NUMERIC" => PgColumnKind::Numeric,
+        "JSON" => PgColumnKind::Json,
+        "TIME" => PgColumnKind::Time,
+        "TIMETZ" => PgColumnKind::TimeTz,
+        "DATE" => PgColumnKind::Date,
+        "TIMESTAMP" => PgColumnKind::Timestamp,
+        "TIMESTAMPTZ" => PgColumnKind::TimestampTz,
+        "BOOL" => PgColumnKind::Bool,
+        "INT2" => PgColumnKind::Int2,
+        "INT4" => PgColumnKind::Int4,
+        "INT8" => PgColumnKind::Int8,
+        "FLOAT4" => PgColumnKind::Float4,
+        "FLOAT8" => PgColumnKind::Float8,
+        "UUID" => PgColumnKind::Uuid,
+        "JSONB" => PgColumnKind::Jsonb,
+        "BYTEA" => PgColumnKind::Bytea,
+        name => binary_text_kind(name).map_or(PgColumnKind::Fallback, PgColumnKind::BinaryText),
+    }
+}
+
+fn binary_text_kind(type_name: &str) -> Option<PgBinaryTextKind> {
+    match type_name {
+        "INTERVAL" => Some(PgBinaryTextKind::Interval),
+        "BIT" => Some(PgBinaryTextKind::Bit),
+        "VARBIT" => Some(PgBinaryTextKind::VarBit),
+        "MACADDR" => Some(PgBinaryTextKind::Macaddr),
+        "MACADDR8" => Some(PgBinaryTextKind::Macaddr8),
+        "INET" => Some(PgBinaryTextKind::Inet),
+        "CIDR" => Some(PgBinaryTextKind::Cidr),
+        "PG_LSN" => Some(PgBinaryTextKind::PgLsn),
+        "XML" => Some(PgBinaryTextKind::Xml),
+        "TSVECTOR" => Some(PgBinaryTextKind::Tsvector),
+        "POINT" => Some(PgBinaryTextKind::Point),
+        "INT4RANGE" => Some(PgBinaryTextKind::Int4Range),
+        "INT8RANGE" => Some(PgBinaryTextKind::Int8Range),
+        "OID" | "XID" | "CID" => Some(PgBinaryTextKind::Oid),
         _ => None,
     }
 }
 
+#[cfg(test)]
+pub(crate) fn decode_pg_binary_text(type_name: &str, bytes: &[u8]) -> Option<String> {
+    decode_pg_binary_text_kind(binary_text_kind(type_name)?, bytes)
+}
+
+pub(crate) fn decode_pg_binary_text_kind(kind: PgBinaryTextKind, bytes: &[u8]) -> Option<String> {
+    match kind {
+        PgBinaryTextKind::Interval => decode_interval(bytes),
+        PgBinaryTextKind::Bit => decode_bit_string(bytes),
+        PgBinaryTextKind::VarBit => decode_bit_string(bytes),
+        PgBinaryTextKind::Macaddr => decode_macaddr(bytes),
+        PgBinaryTextKind::Macaddr8 => decode_macaddr8(bytes),
+        PgBinaryTextKind::Inet => decode_inet(bytes, false),
+        PgBinaryTextKind::Cidr => decode_inet(bytes, true),
+        PgBinaryTextKind::PgLsn => decode_pg_lsn(bytes),
+        PgBinaryTextKind::Xml => String::from_utf8(bytes.to_vec()).ok(),
+        PgBinaryTextKind::Tsvector => decode_tsvector(bytes),
+        PgBinaryTextKind::Point => decode_point(bytes),
+        PgBinaryTextKind::Int4Range => decode_int_range(bytes, 4),
+        PgBinaryTextKind::Int8Range => decode_int_range(bytes, 8),
+        PgBinaryTextKind::Oid => Some(u32::from_be_bytes(bytes.try_into().ok()?).to_string()),
+    }
+}
+
+#[cfg(test)]
 pub(crate) fn decoded_payload_length(type_name: &str, bytes: &[u8]) -> usize {
-    match type_name {
-        "BIT" | "VARBIT" => bit_string_text_length(bytes).unwrap_or(bytes.len()),
+    match binary_text_kind(type_name) {
+        Some(PgBinaryTextKind::Bit | PgBinaryTextKind::VarBit) => bit_string_text_length(bytes).unwrap_or(bytes.len()),
         _ => bytes.len(),
     }
 }

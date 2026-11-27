@@ -8,6 +8,13 @@ const PG_DATE_MAX_DAYS: i32 = 2_145_031_948;
 const PG_TIMESTAMP_MIN_MICROS: i64 = -211_810_204_800_000_000;
 const PG_TIMESTAMP_MAX_MICROS: i64 = 9_223_371_331_199_999_999;
 
+#[derive(Clone, Copy)]
+pub(super) enum PgTemporalKind {
+    Date,
+    Timestamp,
+    TimestampTz,
+}
+
 pub(crate) fn array_text(value: Value) -> Option<String> {
     match value {
         Value::Text(text) => Some(text),
@@ -67,9 +74,9 @@ pub(crate) fn clock_text(microseconds: u64) -> String {
     }
 }
 
-pub(crate) fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
+pub(crate) fn decode_temporal(bytes: &[u8], kind: PgTemporalKind) -> Option<Value> {
     let epoch = chrono::NaiveDate::from_ymd_opt(2000, 1, 1)?;
-    if type_name == "DATE" {
+    if matches!(kind, PgTemporalKind::Date) {
         let days = i32::from_be_bytes(bytes.try_into().ok()?);
         match days {
             i32::MIN => return Some(Value::Text("-infinity".into())),
@@ -100,7 +107,7 @@ pub(crate) fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
             .and_hms_opt(0, 0, 0)?
             .checked_add_signed(chrono::TimeDelta::microseconds(micros))
             .map(|time| {
-                if type_name == "TIMESTAMPTZ" {
+                if matches!(kind, PgTemporalKind::TimestampTz) {
                     Value::TimestampTz(time.and_utc())
                 } else {
                     Value::DateTime(time)
@@ -108,7 +115,7 @@ pub(crate) fn decode_temporal(bytes: &[u8], type_name: &str) -> Option<Value> {
             })
             .unwrap_or_else(|| {
                 let timestamp = calendar_timestamp(micros);
-                Value::Text(if type_name == "TIMESTAMPTZ" {
+                Value::Text(if matches!(kind, PgTemporalKind::TimestampTz) {
                     format!("{timestamp}+00")
                 } else {
                     timestamp
@@ -186,11 +193,11 @@ mod tests {
         assert_eq!(array_text(Value::Text("infinity".into())).as_deref(), Some("infinity"));
         assert_eq!(array_text(Value::Int(1)), None);
         for (kind, expected) in [
-            ("DATE", "2000-01-01"),
-            ("TIMESTAMP", "2000-01-01 00:00:00"),
-            ("TIMESTAMPTZ", "2000-01-01 00:00:00+00:00"),
+            (PgTemporalKind::Date, "2000-01-01"),
+            (PgTemporalKind::Timestamp, "2000-01-01 00:00:00"),
+            (PgTemporalKind::TimestampTz, "2000-01-01 00:00:00+00:00"),
         ] {
-            let length = if kind == "DATE" { 4 } else { 8 };
+            let length = if matches!(kind, PgTemporalKind::Date) { 4 } else { 8 };
             assert_eq!(
                 array_text(decode_temporal(&vec![0; length], kind).unwrap()).as_deref(),
                 Some(expected)

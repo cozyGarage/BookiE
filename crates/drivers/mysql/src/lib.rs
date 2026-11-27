@@ -14,16 +14,15 @@ mod catalog;
 mod decode;
 mod errors;
 mod introspection;
-mod spatial;
-use decode::extract_value;
 mod packed;
 mod pool_saturation;
 mod session;
+mod spatial;
 mod text_protocol;
 mod transaction;
 mod warnings;
+use text_protocol::statement_columns;
 pub(crate) use text_protocol::{contains_use_statement, is_call_statement, text_protocol};
-use text_protocol::{mysql_row_payload_bytes, statement_columns};
 mod temporal;
 mod view_editability;
 
@@ -999,6 +998,7 @@ async fn params_into_result_bounded(
         .await
         .map_err(map_sqlx_error)?;
     let mut columns = statement_columns(statement.columns());
+    let mut decoders = decode::column_decoders(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
     let mut stream = query.fetch(&mut *connection);
     let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
@@ -1013,11 +1013,9 @@ async fn params_into_result_bounded(
         }
         if columns.is_empty() {
             columns = statement_columns(row.columns());
+            decoders = decode::column_decoders(row.columns());
         }
-        if !budget.decode_and_admit_row_into(row.len(), mysql_row_payload_bytes(&row), &mut decoded, |values| {
-            values.extend((0..columns.len()).map(|index| extract_value(&row, index)));
-            Ok(())
-        })? {
+        if !decode::decode_row_into(&row, &decoders, &mut budget, &mut decoded) {
             truncated = true;
             break;
         }

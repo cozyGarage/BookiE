@@ -14,6 +14,20 @@ fn value_contract_bit_strings_keep_leading_zeroes_and_reject_malformed_wire_valu
 }
 
 #[test]
+fn column_decoder_plan_classifies_native_types_and_special_values() {
+    use sqlx::{Postgres, Type};
+
+    let int4 = <i32 as Type<Postgres>>::type_info();
+
+    assert!(matches!(PgColumnDecoder::new(&int4).kind, PgColumnKind::Int4));
+    assert!(matches!(
+        column_kind("BIT"),
+        PgColumnKind::BinaryText(PgBinaryTextKind::Bit)
+    ));
+    assert!(matches!(column_kind("CUSTOM_VALUE"), PgColumnKind::Fallback));
+}
+
+#[test]
 fn value_contract_macaddr_requires_six_bytes_and_uses_postgres_lowercase_text() {
     assert_eq!(
         decode_pg_binary_text("MACADDR", &[0x08, 0x00, 0x2b, 0x01, 0x02, 0x03]).as_deref(),
@@ -347,8 +361,12 @@ fn malformed_wire_values_are_refused_and_never_panic() {
             let _ = decode_pg_binary_text(type_name, bytes);
         }
         let _ = crate::numeric::decode_binary(bytes);
-        for type_name in ["DATE", "TIMESTAMP", "TIMESTAMPTZ"] {
-            let _ = crate::temporal::decode_temporal(bytes, type_name);
+        for kind in [
+            crate::temporal::PgTemporalKind::Date,
+            crate::temporal::PgTemporalKind::Timestamp,
+            crate::temporal::PgTemporalKind::TimestampTz,
+        ] {
+            let _ = crate::temporal::decode_temporal(bytes, kind);
         }
         for with_zone in [false, true] {
             let _ = crate::temporal::decode_time(bytes, with_zone);

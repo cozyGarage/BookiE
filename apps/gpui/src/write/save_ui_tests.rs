@@ -993,7 +993,15 @@ fn set_import_path(view: &gpui::Entity<GridView>, cx: &mut gpui::VisualTestConte
 #[gpui::test]
 fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
     let path = orders();
-    let workbook = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/import_two_rows.xlsx");
+    let workbook = tempfile::Builder::new()
+        .suffix(".xlsx")
+        .tempfile()
+        .expect("create a private workbook fixture");
+    std::fs::write(
+        workbook.path(),
+        include_bytes!("../../tests/fixtures/import_two_rows.xlsx"),
+    )
+    .expect("write the workbook fixture");
     let (view, cx) = saving_view(cx, &path);
     let write = write_session(&path, false);
     cx.update(|_, cx| {
@@ -1003,7 +1011,7 @@ fn an_excel_file_is_reviewed_like_a_csv_file(cx: &mut TestAppContext) {
         })
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_import_bar(cx)));
-    set_import_path(&view, cx, &workbook);
+    set_import_path(&view, cx, workbook.path());
     cx.update(|_, cx| view.update(cx, |view, cx| view.review_import(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
