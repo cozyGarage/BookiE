@@ -601,6 +601,7 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertIn("python3 scripts/run-test-layer.py supply-chain unused-dependencies", github_supply_chain)
         self.assertIn("python3 scripts/run-test-layer.py unused-dependencies", supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", github_supply_chain)
+        self.assertIn("python3 scripts/check-integrity-markers.py", github_supply_chain)
         self.assertIn("cargo install --locked cargo-shear --version 1.13.4", supply_chain)
         self.assertNotRegex(supply_chain, r"(?m)^      CARGO_HOME: /cargo$")
         self.assertNotRegex(supply_chain, r"(?m)^      PATH: /cargo/bin:")

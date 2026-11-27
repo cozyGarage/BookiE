@@ -1617,6 +1617,10 @@ jobs:
         run: |
           python3 scripts/run-test-layer.py supply-chain unused-dependencies
           python3 scripts/vendor-patches.py check
+      - name: Data-integrity known failures point at open issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-integrity-markers.py
 
   regression-gate:
     name: Linux regression gate
