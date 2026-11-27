@@ -179,6 +179,8 @@ fn database_error_diagnostic_carries_the_token_and_clears_after_edit(cx: &mut Te
     cx.simulate_input(" ");
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
-        assert!(view.sql_input.read(cx).diagnostics().unwrap().is_empty())
+        let editor = view.sql_input.read(cx);
+        assert_ne!(editor.value().as_ref(), "SELECT missing FROM t");
+        assert!(editor.diagnostics().unwrap().is_empty());
     });
 }
