@@ -106,10 +106,6 @@ literals = ["-0.", "inf", "-inf", "nan", "4.9e-324", "1.7976931348623157e308", "
 literals_from = "floats"
 carrier = "Float"
 rule = "float"
-known_failing = [
-    { route = "import_csv", issue = 4226, expect = "server stored", reason = "the largest Float64 is written as infinity" },
-    { route = "import_xlsx", issue = 4226, expect = "server stored", reason = "the largest Float64 is written as infinity" },
-]
 
 [[case]]
 id = "float32"
