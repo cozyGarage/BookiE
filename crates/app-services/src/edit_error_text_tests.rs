@@ -8,6 +8,7 @@ fn every_value_input_error() -> Vec<ValueInputError> {
         ValueInputError::InvalidEnumMetadata,
         ValueInputError::UndeclaredEnumMember,
         ValueInputError::InvalidBoolean,
+        ValueInputError::InvalidBitString,
         ValueInputError::InvalidInteger,
         ValueInputError::InvalidNumber,
         ValueInputError::InvalidDecimal,

@@ -2,7 +2,7 @@ use bookie_core::{ColumnInfo, Value};
 
 use crate::change_tracker::{EditStatement, MaterializeError, RowKey, TabChangeTracker, checked_write_indexes};
 use crate::edit_preview::preview_text;
-use crate::value_input::{ValueInputError, parse_input_for_column};
+use crate::value_input::{ParseHooks, ValueInputError, parse_bit_string, parse_input_for_column};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SaveTarget<'a> {
@@ -81,6 +81,7 @@ pub fn plan_cell_saves(
 pub fn plan_row_insert_named(
     target: SaveTarget<'_>,
     named: &[(String, String)],
+    hooks: &ParseHooks,
 ) -> Result<CellSavePlan, CellSaveError> {
     let mut values = Vec::with_capacity(named.len());
     for (name, text) in named {
@@ -91,10 +92,14 @@ pub fn plan_row_insert_named(
             .ok_or_else(|| CellSaveError::UnknownColumnName(name.clone()))?;
         values.push((at, text.clone()));
     }
-    plan_row_insert(target, &values)
+    plan_row_insert(target, &values, hooks)
 }
 
-pub fn plan_row_insert(target: SaveTarget<'_>, values: &[(usize, String)]) -> Result<CellSavePlan, CellSaveError> {
+pub fn plan_row_insert(
+    target: SaveTarget<'_>,
+    values: &[(usize, String)],
+    hooks: &ParseHooks,
+) -> Result<CellSavePlan, CellSaveError> {
     let mut tracker = TabChangeTracker::new();
     let draft = tracker.track_insert(vec![Value::Null; target.columns.len()]);
     let RowKey::Draft(draft_id) = draft else {
@@ -109,7 +114,12 @@ pub fn plan_row_insert(target: SaveTarget<'_>, values: &[(usize, String)]) -> Re
             .columns
             .get(*column)
             .ok_or(CellSaveError::UnknownColumn(*column))?;
-        let value = parse_input_for_column(text, Some(info)).map_err(|error| CellSaveError::InvalidValue {
+        let parsed = if hooks.capabilities.bit_string_input && info.data_type.trim().eq_ignore_ascii_case("bit") {
+            parse_bit_string(text.trim())
+        } else {
+            parse_input_for_column(text, Some(info))
+        };
+        let value = parsed.map_err(|error| CellSaveError::InvalidValue {
             column: info.name.clone(),
             reason: readable(&error),
         })?;
@@ -446,12 +456,23 @@ mod tests {
         vec![id, customer, total]
     }
 
+    fn hooks(bit_string_input: bool) -> ParseHooks {
+        ParseHooks::new(
+            bookie_core::EnumInputStyle::RawValue,
+            bookie_core::DriverValueInputCapabilities {
+                bit_string_input,
+                ..Default::default()
+            },
+        )
+    }
+
     #[test]
     fn a_new_row_inserts_only_the_columns_that_were_filled_in() {
         let columns = insertable();
         let plan = plan_row_insert(
             target(&columns),
             &[(0, String::new()), (1, "zed".into()), (2, "4.5".into())],
+            &hooks(false),
         )
         .unwrap();
 
@@ -467,9 +488,28 @@ mod tests {
     }
 
     #[test]
+    fn duckdb_insert_keeps_bit_strings_as_text() {
+        let mut columns = insertable();
+        columns[1].data_type = "BIT".into();
+        let target = SaveTarget {
+            driver_id: "duckdb",
+            ..target(&columns)
+        };
+        let plan = plan_row_insert(target, &[(1, "0".into())], &hooks(true)).unwrap();
+        assert_eq!(plan.statements[0].1[0], Value::Text("0".into()));
+        assert!(plan_row_insert(target, &[(1, "2".into())], &hooks(true)).is_err());
+        let mssql = SaveTarget {
+            driver_id: "mssql",
+            ..target
+        };
+        let plan = plan_row_insert(mssql, &[(1, "0".into())], &hooks(false)).unwrap();
+        assert_eq!(plan.statements[0].1[0], Value::Bool(false));
+    }
+
+    #[test]
     fn a_value_that_does_not_fit_its_column_names_the_column_and_nothing_is_planned() {
         let columns = insertable();
-        let result = plan_row_insert(target(&columns), &[(2, "abc".into())]);
+        let result = plan_row_insert(target(&columns), &[(2, "abc".into())], &hooks(false));
         match result {
             Err(CellSaveError::InvalidValue { column, reason }) => {
                 assert_eq!(column, "total");
@@ -482,7 +522,11 @@ mod tests {
     #[test]
     fn a_row_with_no_values_is_refused() {
         let columns = insertable();
-        let result = plan_row_insert(target(&columns), &[(1, String::new()), (2, String::new())]);
+        let result = plan_row_insert(
+            target(&columns),
+            &[(1, String::new()), (2, String::new())],
+            &hooks(false),
+        );
         assert_eq!(result, Err(CellSaveError::NothingToInsert));
     }
 
@@ -492,10 +536,11 @@ mod tests {
         let result = plan_row_insert_named(
             target(&columns),
             &[("customer".into(), "zed".into()), ("gone".into(), "x".into())],
+            &hooks(false),
         );
         assert_eq!(result, Err(CellSaveError::UnknownColumnName("gone".into())));
 
-        let named = plan_row_insert_named(target(&columns), &[("total".into(), "2".into())]).unwrap();
+        let named = plan_row_insert_named(target(&columns), &[("total".into(), "2".into())], &hooks(false)).unwrap();
         assert_eq!(named.statements.len(), 1);
     }
 
@@ -503,7 +548,12 @@ mod tests {
     fn an_empty_field_leaves_a_column_with_a_default_out_of_the_statement() {
         let mut columns = insertable();
         columns[1].default_value = Some("'anonymous'".into());
-        let plan = plan_row_insert(target(&columns), &[(1, String::new()), (2, "9.5".into())]).unwrap();
+        let plan = plan_row_insert(
+            target(&columns),
+            &[(1, String::new()), (2, "9.5".into())],
+            &hooks(false),
+        )
+        .unwrap();
         let (sql, values) = &plan.statements[0];
         assert!(
             !sql.contains("\"customer\""),

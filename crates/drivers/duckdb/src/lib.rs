@@ -29,6 +29,7 @@ pub struct DuckdbDriver;
 impl DatabaseDriver for DuckdbDriver {
     fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
         DriverValueInputCapabilities {
+            bit_string_input: true,
             extended_calendar_dates: true,
             timestamp_with_timezone: true,
             temporal_fraction_precision: true,
@@ -756,11 +757,23 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
     let mut column_count = 0usize;
     let mut zoned_columns = Vec::new();
     let mut uuid_columns = Vec::new();
+    let mut bit_columns = Vec::new();
+    let mut timetz_columns = Vec::new();
+    let mut json_columns = Vec::new();
     while let Some(row) = rows.next().map_err(map_duck_error)? {
         if column_count == 0 {
             column_count = row.as_ref().column_count();
             uuid_columns = (0..column_count)
                 .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Uuid)
+                .collect();
+            bit_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Bit)
+                .collect();
+            timetz_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::TimeTZ)
+                .collect();
+            json_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).get_alias().as_deref() == Some("JSON"))
                 .collect();
             zoned_columns = (0..column_count)
                 .map(|i| {
@@ -776,7 +789,7 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
             break;
         }
         let payload_bytes = (0..column_count).fold(0usize, |total, i| {
-            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i)))
+            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i), bit_columns[i]))
         });
         let admitted = budget.decode_and_admit_row_into::<std::convert::Infallible>(
             column_count,
@@ -788,8 +801,22 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
                         .iter()
                         .zip(&uuid_columns)
                         .enumerate()
-                        .map(
-                            |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                        .map(|(i, (zoned, uuid))| {
+                            match if json_columns[i] {
+                                match row.get_ref_unwrap(i) {
+                                    ValueRef::Text(bytes) => std::str::from_utf8(bytes)
+                                        .map(|text| Value::JsonText(text.to_owned()))
+                                        .unwrap_or_else(|_| Value::Undecodable("JSON".into())),
+                                    ValueRef::Null => Value::Null,
+                                    _ => Value::Undecodable("JSON".into()),
+                                }
+                            } else if timetz_columns[i] && !matches!(row.get_ref_unwrap(i), ValueRef::Null) {
+                                Value::Undecodable("TIME WITH TIME ZONE".into())
+                            } else if bit_columns[i] {
+                                duck_bit_ref_to_value(row.get_ref_unwrap(i))
+                            } else {
+                                duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid)
+                            } {
                                 Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
                                 Value::Text(timestamp)
                                     if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") =>
@@ -797,8 +824,8 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
                                     Value::Text(format!("{timestamp}+00"))
                                 }
                                 value => value,
-                            },
-                        ),
+                            }
+                        }),
                 );
                 Ok(())
             },
@@ -861,10 +888,39 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
     })
 }
 
-fn cell_payload_bytes(value: &ValueRef<'_>) -> usize {
+fn cell_payload_bytes(value: &ValueRef<'_>, bit_column: bool) -> usize {
     match value {
+        ValueRef::Blob(bytes) if bit_column => bytes
+            .len()
+            .saturating_sub(1)
+            .saturating_mul(8)
+            .saturating_sub(usize::from(bytes.first().copied().unwrap_or(0))),
         ValueRef::Text(bytes) | ValueRef::Blob(bytes) | ValueRef::Geometry(bytes) => bytes.len(),
         _ => 0,
+    }
+}
+
+fn duck_bit_ref_to_value(value: ValueRef<'_>) -> Value {
+    match value {
+        ValueRef::Null => Value::Null,
+        ValueRef::Blob(bytes) => {
+            let Some((&padding, data)) = bytes.split_first() else {
+                return Value::Undecodable("BIT".into());
+            };
+            if padding > 7 || data.is_empty() || (padding > 0 && data[0] >> (8 - padding) != (1u8 << padding) - 1) {
+                return Value::Undecodable("BIT".into());
+            }
+            let mut text = String::with_capacity(data.len().saturating_mul(8) - usize::from(padding));
+            for bit in usize::from(padding)..data.len() * 8 {
+                text.push(if data[bit / 8] & (0x80 >> (bit % 8)) == 0 {
+                    '0'
+                } else {
+                    '1'
+                });
+            }
+            Value::Text(text)
+        }
+        _ => Value::Undecodable("BIT".into()),
     }
 }
 

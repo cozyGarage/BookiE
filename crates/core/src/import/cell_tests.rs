@@ -29,6 +29,56 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
 }
 
 #[test]
+fn import_rejects_undecodable_export_markers_with_location() {
+    let columns = vec![column("value", "TEXT")];
+    let error = row_to_values(
+        &["<undecodable UNION>".to_owned()],
+        &[Some(0)],
+        &columns,
+        &CsvImportOptions::default(),
+        3,
+    )
+    .expect_err("diagnostic markers cannot be restored");
+    assert_eq!(error.line, 3);
+    assert_eq!(error.column, "value");
+    assert!(error.to_string().contains("undecodable"));
+    assert!(
+        row_to_values(
+            &["<undecodable >".to_owned()],
+            &[Some(0)],
+            &columns,
+            &CsvImportOptions::default(),
+            3
+        )
+        .is_err()
+    );
+    let ordinary = ["before <undecodable UNION>", "<undecodable UNION> after"];
+    for text in ordinary {
+        assert_eq!(
+            row_to_values(
+                &[text.to_owned()],
+                &[Some(0)],
+                &columns,
+                &CsvImportOptions::default(),
+                2
+            )
+            .expect("ordinary text must remain importable"),
+            vec![Value::Text(text.to_owned())]
+        );
+    }
+}
+
+#[test]
+fn duckdb_bit_import_keeps_the_exact_bit_string() {
+    let bit = column("value", "BIT");
+    let options = CsvImportOptions::default();
+    for text in ["0", "1", "101010"] {
+        assert_eq!(value_for(text, &bit, &options, "duckdb"), Ok(Value::Text(text.into())));
+    }
+    assert_eq!(value_for("1", &bit, &options, "mssql"), Ok(Value::Bool(true)));
+}
+
+#[test]
 fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
     let parse = |kind: ColumnKind| move |text: &str| parse_cell(text, kind).ok();
     crate::parser_contract::assert_numeric_parsers(

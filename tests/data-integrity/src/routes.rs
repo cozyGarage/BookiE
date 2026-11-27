@@ -426,7 +426,7 @@ fn plan_edit(target: SaveTarget<'_>, route: Route, edit: &RowEdit<'_>) -> Result
         Route::InsertRow => {
             let id_column = edit.names.iter().position(|name| name == "id").ok_or("no id column")?;
             let values = [(id_column, new_id.to_string()), (edit.value_column, text)];
-            return plan_row_insert(target, &values).map_err(|error| format!("insert plan: {error}"));
+            return plan_row_insert(target, &values, edit.hooks).map_err(|error| format!("insert plan: {error}"));
         }
         Route::SetCells => return plan_set_cell(target, edit, &text, new_id),
         Route::Paste => {

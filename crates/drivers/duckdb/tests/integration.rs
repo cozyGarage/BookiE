@@ -173,6 +173,68 @@ async fn native_connection() -> Box<dyn Connection> {
 }
 
 #[tokio::test]
+async fn json_columns_preserve_exact_json_text_without_changing_varchar() {
+    let connection = native_connection().await;
+    let result = connection
+        .query("SELECT '{\"b\":1,\"a\":2}'::JSON, '{\"b\":1,\"a\":2}'::VARCHAR, NULL::JSON")
+        .await
+        .unwrap();
+    assert_eq!(result.rows[0][0], Value::JsonText("{\"b\":1,\"a\":2}".into()));
+    assert_eq!(result.rows[0][1], Value::Text("{\"b\":1,\"a\":2}".into()));
+    assert_eq!(result.rows[0][2], Value::Null);
+}
+
+#[test]
+fn duckdb_json_result_exposes_its_logical_alias() {
+    let connection = duckdb::Connection::open_in_memory().unwrap();
+    let mut statement = connection.prepare("SELECT '{}'::JSON, '{}'::VARCHAR").unwrap();
+    let mut rows = statement.query([]).unwrap();
+    let row = rows.next().unwrap().unwrap();
+    assert_eq!(row.as_ref().column_logical_type(0).get_alias().as_deref(), Some("JSON"));
+    assert_eq!(row.as_ref().column_logical_type(1).get_alias(), None);
+}
+
+#[tokio::test]
+async fn timetz_never_returns_a_time_with_a_discarded_offset() {
+    let connection = native_connection().await;
+    let result = connection
+        .query("SELECT '13:45:30+05:30'::TIMETZ, NULL::TIMETZ, '13:45:30'::TIME")
+        .await
+        .unwrap();
+    assert_eq!(result.rows[0][0], Value::Undecodable("TIME WITH TIME ZONE".into()));
+    assert_eq!(result.rows[0][1], Value::Null);
+    assert!(matches!(result.rows[0][2], Value::Time(_)));
+}
+
+#[tokio::test]
+async fn bit_values_round_trip_as_exact_text_without_changing_blobs_or_nulls() {
+    assert!(DuckdbDriver.value_input_capabilities().bit_string_input);
+    let connection = native_connection().await;
+    for bits in [
+        "0",
+        "1",
+        "101010",
+        "00000000",
+        "11111111",
+        "100000001",
+        "01100110101010101",
+    ] {
+        let result = connection
+            .query(&format!("SELECT '{bits}'::BIT, '\\x07\\xfe'::BLOB, NULL::BIT"))
+            .await
+            .unwrap();
+        assert_eq!(result.rows[0][0], Value::Text(bits.into()));
+        assert_eq!(result.rows[0][1], Value::Bytes(vec![7, 254]));
+        assert_eq!(result.rows[0][2], Value::Null);
+        let stored = connection
+            .query_params("SELECT CAST(? AS BIT)::VARCHAR", &[result.rows[0][0].clone()])
+            .await
+            .unwrap();
+        assert_eq!(stored.rows[0][0], Value::Text(bits.into()));
+    }
+}
+
+#[tokio::test]
 async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
     let connection = native_connection().await;
     for (kind, text) in [

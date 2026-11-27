@@ -41,6 +41,8 @@ pub enum CellError {
     AmbiguousSqliteAnyNullOrEmpty,
     #[error("invalid tagged SQLite ANY CSV value")]
     InvalidSqliteAnyCsvValue,
+    #[error("an undecodable export marker cannot be imported as a value")]
+    UndecodableMarker,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -325,6 +327,17 @@ pub(crate) fn row_to_values_for_driver(
             let Some(text) = row.field(*index) else {
                 return Ok(Value::Null);
             };
+            if text
+                .strip_prefix("<undecodable ")
+                .and_then(|value| value.strip_suffix('>'))
+                .is_some()
+            {
+                return Err(CsvRowError {
+                    line,
+                    column: column.name.clone(),
+                    reason: CellError::UndecodableMarker,
+                });
+            }
             row.native_value(*index, column, driver_id)
                 .unwrap_or_else(|| value_for(text, column, options, driver_id))
                 .map_err(|reason| CsvRowError {

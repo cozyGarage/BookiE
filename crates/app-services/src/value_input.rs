@@ -7,6 +7,7 @@ pub enum ValueInputError {
     InvalidEnumMetadata,
     UndeclaredEnumMember,
     InvalidBoolean,
+    InvalidBitString,
     InvalidInteger,
     InvalidNumber,
     InvalidDecimal,
@@ -129,6 +130,9 @@ pub fn parse_input_for_driver_with_style(
         return result;
     }
     let trimmed = text.trim();
+    if hooks.capabilities.bit_string_input && col.is_some_and(|column| column.data_type.eq_ignore_ascii_case("bit")) {
+        return parse_bit_string(trimmed);
+    }
     if hooks.capabilities.integer_range_validation
         && let Some(result) = parse_mysql_integer_input(trimmed, col)
     {
@@ -158,6 +162,14 @@ pub fn parse_input_for_driver_with_style(
             None => Err(error),
         },
         result => result,
+    }
+}
+
+pub(crate) fn parse_bit_string(text: &str) -> Result<Value, ValueInputError> {
+    if !text.is_empty() && text.bytes().all(|byte| matches!(byte, b'0' | b'1')) {
+        Ok(Value::Text(text.to_owned()))
+    } else {
+        Err(ValueInputError::InvalidBitString)
     }
 }
 
