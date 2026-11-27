@@ -2004,7 +2004,8 @@ struct BridgeSource<'a>(&'a LiveSession);
 impl SearchSource for BridgeSource<'_> {
     async fn columns(&self, table: &TableTarget, control: &OperationControl) -> Result<Vec<ColumnInfo>, DriverError> {
         let session = self.0;
-        let epoch = session.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let table = TableInfo {
             schema: table.schema.clone(),
             name: table.name.clone(),
@@ -2018,7 +2019,7 @@ impl SearchSource for BridgeSource<'_> {
             },
             control,
             epoch,
-            &session.epoch,
+            &current_epoch,
         )
         .await
         .map_err(search_error)?;
@@ -2035,14 +2036,15 @@ impl SearchSource for BridgeSource<'_> {
         control: &OperationControl,
     ) -> Result<QueryResult, DriverError> {
         let session = self.0;
-        let epoch = session.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         bridge_query(
             &session.sessions,
             session.session_id,
             (sql, params),
             control,
             epoch,
-            &session.epoch,
+            &current_epoch,
         )
         .await
         .map_err(search_error)
