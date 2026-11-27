@@ -1,6 +1,8 @@
 use bookie_gpui::theme::{Theme, size};
 use gpui::{AnyElement, Div, ElementId, Role, SharedString, Stateful, div, prelude::*, px, rgb};
-use gpui_component::button::{Button, ButtonVariants as _};
+pub(crate) use gpui_component::button::Button;
+use gpui_component::button::ButtonVariants as _;
+use gpui_component::{Disableable as _, Selectable as _};
 use gpui_kit::component::Sizable as _;
 
 use crate::assets::icon;
@@ -16,7 +18,6 @@ pub(crate) enum ButtonKind {
 pub(crate) struct ButtonColors {
     pub fill: Option<u32>,
     pub text: u32,
-    pub hover: u32,
 }
 
 impl ButtonKind {
@@ -25,17 +26,14 @@ impl ButtonKind {
             ButtonKind::Primary => ButtonColors {
                 fill: Some(theme.foreground),
                 text: theme.background,
-                hover: crate::chrome::mix(theme.foreground, theme.background, 0.15),
             },
             ButtonKind::Ghost => ButtonColors {
                 fill: None,
                 text: theme.foreground,
-                hover: theme.accent,
             },
             ButtonKind::Destructive => ButtonColors {
                 fill: None,
                 text: theme.destructive,
-                hover: theme.accent,
             },
         }
     }
@@ -44,7 +42,6 @@ impl ButtonKind {
         ButtonColors {
             fill: (self == ButtonKind::Primary).then_some(theme.muted),
             text: theme.muted_foreground,
-            hover: theme.muted,
         }
     }
 }
@@ -111,7 +108,7 @@ pub(crate) fn icon_button(
     name: &'static str,
     tooltip: impl Into<SharedString>,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     toggle_icon_button(id, name, tooltip, false, Bar::Small, theme)
 }
 
@@ -120,7 +117,7 @@ pub(crate) fn compact_icon_button(
     name: &'static str,
     tooltip: impl Into<SharedString>,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     toggle_icon_button(id, name, tooltip, false, Bar::Compact, theme)
 }
 
@@ -131,25 +128,26 @@ pub(crate) fn toggle_icon_button(
     on: bool,
     bar: Bar,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     let id = id.into();
     let tooltip = tooltip.into();
     let selector = id.to_string();
     let marker = icon_selector(&selector, &tooltip);
-    div()
-        .id(id)
+    Button::new(id)
         .debug_selector(move || selector)
-        .role(Role::Button)
-        .aria_label(tooltip.clone())
-        .tooltip(tip(tooltip))
-        .flex()
-        .items_center()
-        .justify_center()
+        .ghost()
+        .accessibility_label(tooltip.clone())
+        .tooltip(tooltip)
         .size(px(bar.height()))
+        .w(px(bar.height()))
+        .h(px(bar.height()))
+        .p_0()
         .rounded(px(theme.radius))
         .cursor_pointer()
+        .selected(on)
+        .toggled(on)
+        .text_color(rgb(if on { theme.foreground } else { theme.muted_foreground }))
         .when(on, |button| button.bg(rgb(theme.accent)))
-        .hover(move |style| style.bg(rgb(theme.accent)))
         .child(
             div()
                 .debug_selector(move || marker)
@@ -274,7 +272,7 @@ pub(crate) fn button(
     id: impl Into<ElementId>,
     label: impl Into<SharedString>,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     sized_button(kind, id, label, Bar::Small, theme)
 }
 
@@ -283,7 +281,7 @@ pub(crate) fn compact_button(
     id: impl Into<ElementId>,
     label: impl Into<SharedString>,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     sized_button(kind, id, label, Bar::Compact, theme)
 }
 
@@ -293,11 +291,9 @@ fn sized_button(
     label: impl Into<SharedString>,
     bar: Bar,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     let colors = kind.colors(theme);
-    button_frame(id, label.into(), colors, bar, theme)
-        .cursor_pointer()
-        .hover(move |style| style.bg(rgb(colors.hover)))
+    button_frame(id, label.into(), kind, colors, bar, theme).cursor_pointer()
 }
 
 pub(crate) fn unavailable_button(
@@ -306,45 +302,44 @@ pub(crate) fn unavailable_button(
     label: impl Into<SharedString>,
     reason: impl Into<SharedString>,
     theme: Theme,
-) -> Stateful<Div> {
-    button_frame(id, label.into(), kind.unavailable_colors(theme), Bar::Small, theme)
-        .cursor_default()
-        .tooltip(tip(reason))
+) -> Button {
+    button_frame(
+        id,
+        label.into(),
+        kind,
+        kind.unavailable_colors(theme),
+        Bar::Small,
+        theme,
+    )
+    .cursor_default()
+    .disabled(true)
+    .tooltip(reason)
 }
 
 fn button_frame(
     id: impl Into<ElementId>,
     label: SharedString,
+    kind: ButtonKind,
     colors: ButtonColors,
     bar: Bar,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     let id = id.into();
     let selector = id.to_string();
-    div()
-        .id(id)
-        .debug_selector(move || selector)
-        .role(Role::Button)
-        .aria_label(label.clone())
-        .flex()
-        .items_center()
-        .justify_center()
-        .h(px(bar.height()))
-        .min_w(px(bar.min_button_width()))
-        .max_w(px(size::BUTTON_MAX_WIDTH))
-        .px(px(bar.button_padding()))
-        .overflow_hidden()
-        .rounded(px(theme.radius))
-        .when_some(colors.fill, |button, fill| button.bg(rgb(fill)))
-        .text_color(rgb(colors.text))
-        .child(
-            div()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .text_ellipsis()
-                .child(label),
-        )
+    let button = match kind {
+        ButtonKind::Primary => Button::new(id).primary(),
+        ButtonKind::Ghost | ButtonKind::Destructive => Button::new(id).ghost(),
+    }
+    .debug_selector(move || selector)
+    .label(label)
+    .h(px(bar.height()))
+    .min_w(px(bar.min_button_width()))
+    .max_w(px(size::BUTTON_MAX_WIDTH))
+    .px(px(bar.button_padding()))
+    .overflow_hidden()
+    .rounded(px(theme.radius))
+    .text_color(rgb(colors.text));
+    button.when_some(colors.fill, |button, fill| button.bg(rgb(fill)))
 }
 
 pub(crate) fn segment(
@@ -352,34 +347,32 @@ pub(crate) fn segment(
     label: impl Into<SharedString>,
     selected: bool,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     let label = label.into();
     let selector = label.to_string();
-    div()
-        .id(id)
+    Button::new(id)
         .debug_selector(move || selector)
-        .role(Role::Button)
-        .aria_label(label.clone())
-        .flex()
-        .items_center()
+        .ghost()
+        .accessibility_label(label.clone())
+        .selected(selected)
+        .toggled(selected)
         .gap_1()
         .h(px(size::SEGMENT))
         .px_2()
         .rounded(px(theme.radius))
-        .cursor_pointer()
         .whitespace_nowrap()
         .when(selected, |segment| {
             segment.bg(rgb(theme.background)).text_color(rgb(theme.foreground))
         })
-        .when(!selected, |segment| {
-            segment
-                .text_color(rgb(theme.muted_foreground))
-                .hover(move |style| style.text_color(rgb(theme.foreground)))
-        })
+        .when(!selected, |segment| segment.text_color(rgb(theme.muted_foreground)))
         .child(div().min_w_0().overflow_hidden().text_ellipsis().child(label))
 }
 
-pub(crate) fn segmented(segments: impl IntoIterator<Item = Stateful<Div>>, theme: Theme) -> Div {
+pub(crate) fn segmented<I, E>(segments: I, theme: Theme) -> Div
+where
+    I: IntoIterator<Item = E>,
+    E: IntoElement,
+{
     div()
         .flex()
         .flex_none()
@@ -449,7 +442,7 @@ pub(crate) struct ConfirmDialog {
 
 pub(crate) fn confirm_dialog(
     dialog: ConfirmDialog,
-    actions: impl IntoIterator<Item = Stateful<Div>>,
+    actions: impl IntoIterator<Item = Button>,
     theme: Theme,
 ) -> Stateful<Div> {
     let id = dialog.id;

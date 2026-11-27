@@ -5,11 +5,11 @@ use bookie_app_services::mcp_service::{
     AppConnectionProvider, McpBridge, McpToken, RunningMcpServer, TokenPermissions,
 };
 use bookie_gpui::theme::Theme;
-use gpui::{Context, Div, Entity, Stateful, div, prelude::*};
+use gpui::{Context, Div, Entity, div, prelude::*};
 use gpui_kit::component::setting::{SettingField, SettingGroup, SettingItem};
 
 use crate::GridView;
-use crate::surfaces::{ButtonKind, button};
+use crate::surfaces::{Button, ButtonKind, button};
 use crate::ui_theme::ThemeExt;
 
 #[derive(Default)]
@@ -124,7 +124,7 @@ fn issue_token_button(
     view: Entity<GridView>,
     permissions: TokenPermissions,
     theme: Theme,
-) -> Stateful<Div> {
+) -> Button {
     button(kind, id, label, theme)
         .debug_selector(move || id.into())
         .on_click(move |_, _, cx| {

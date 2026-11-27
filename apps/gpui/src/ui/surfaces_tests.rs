@@ -2,6 +2,7 @@ use super::*;
 use crate::ui_theme::ThemeExt;
 use gpui::{Context, TestAppContext, Window};
 use gpui_kit::test::TestQueryExt;
+use std::{cell::Cell, rc::Rc};
 
 struct Probe;
 
@@ -53,6 +54,10 @@ fn menu_button_exposes_its_name_tooltip_and_dropdown(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn an_icon_button_carries_its_tooltip_on_the_control(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Theme::light().install(cx);
+    });
     let (_view, cx) = cx.add_window_view(|_, _| Probe);
     cx.run_until_parked();
     let control = cx.debug_bounds("probe").expect("the icon button is drawn");
@@ -69,6 +74,64 @@ fn an_icon_button_carries_its_tooltip_on_the_control(cx: &mut TestAppContext) {
         .expect("the compact icon button is drawn");
     assert_eq!(compact.size.height, px(size::COMPACT_CONTROL));
     assert!(cx.debug_bounds("probe-compact tooltip: Close tab").is_some());
+}
+
+struct KeyboardButtonProbe(Rc<Cell<usize>>, gpui::FocusHandle, gpui::FocusHandle);
+
+impl Render for KeyboardButtonProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let first_clicks = self.0.clone();
+        let second_clicks = self.0.clone();
+        div()
+            .tab_group()
+            .child(
+                button(ButtonKind::Primary, "keyboard-save", "Save", Theme::light())
+                    .track_focus(&self.1)
+                    .on_click(move |_, _, _| first_clicks.set(first_clicks.get() + 1)),
+            )
+            .child(
+                icon_button("keyboard-close", "x", "Close", Theme::light())
+                    .track_focus(&self.2)
+                    .on_click(move |_, _, _| second_clicks.set(second_clicks.get() + 1)),
+            )
+    }
+}
+
+#[gpui::test]
+fn shared_buttons_are_reachable_and_activate_with_enter_and_space(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Theme::light().install(cx);
+    });
+    let clicks = Rc::new(Cell::new(0));
+    let (view, cx) = cx.add_window_view({
+        let clicks = clicks.clone();
+        move |_, cx| KeyboardButtonProbe(clicks, cx.focus_handle(), cx.focus_handle())
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+
+    cx.update(|window, cx| window.focus_next(cx));
+    assert!(cx.update(|window, cx| { view.read(cx).1.is_focused(window) }));
+    let enter = gpui::Keystroke::parse("enter").expect("known button key");
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: enter.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke: enter });
+    assert_eq!(clicks.get(), 1, "Tab reaches the primary button and Enter activates it");
+
+    cx.update(|window, cx| window.focus_next(cx));
+    assert!(cx.update(|window, cx| view.read(cx).2.is_focused(window)));
+    let space = gpui::Keystroke::parse("space").expect("known button key");
+    cx.simulate_event(gpui::KeyDownEvent {
+        keystroke: space.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(gpui::KeyUpEvent { keystroke: space });
+    assert_eq!(clicks.get(), 2, "Tab reaches the icon button and Space activates it");
 }
 
 #[test]
@@ -156,7 +219,7 @@ impl Render for ConfirmProbe {
         };
         div().size_full().child(confirm_dialog(
             dialog,
-            [
+            vec![
                 button(ButtonKind::Destructive, "probe-drop", "Drop", theme),
                 button(ButtonKind::Ghost, "probe-cancel", "Cancel", theme),
             ],
@@ -167,6 +230,10 @@ impl Render for ConfirmProbe {
 
 #[gpui::test]
 fn a_confirm_dialog_shows_its_sql_above_actions_in_order(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Theme::light().install(cx);
+    });
     let (_view, cx) = cx.add_window_view(|_, _| ConfirmProbe);
     cx.run_until_parked();
     let dialog = cx.debug_bounds("probe-dialog").expect("the dialog is drawn");

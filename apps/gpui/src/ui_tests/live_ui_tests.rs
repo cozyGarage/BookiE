@@ -10,7 +10,7 @@ use gpui_kit::test::{TestQueryExt, TestWindowExt};
 use crate::GridView;
 use crate::text_input;
 use crate::ui_tests::open;
-use crate::ui_tests::test_kit::{NARROW, WIDE, orders, until};
+use crate::ui_tests::test_kit::{NARROW, WIDE, add_rooted_grid, orders, until};
 use bookie_core::TableInfo;
 use bookie_gpui::model::{Cell, ColumnMeta, Diff, FindResult, Predicate};
 use bookie_gpui::shell::table_info;
@@ -172,7 +172,7 @@ fn clicking_another_table_of_a_live_connection_loads_it_into_the_grid(cx: &mut T
         .expect("load"),
     );
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| {
+    let (view, cx) = add_rooted_grid(cx, move |window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
         view.attach_live(table.clone());
         view
@@ -3016,7 +3016,16 @@ fn compact_menu_can_be_opened_from_find_with_keyboard(cx: &mut TestAppContext) {
         let focus = view.read(cx).search.find.read(cx).focus_handle_for_tests();
         window.focus(&focus, cx);
     });
-    cx.simulate_keystrokes("tab enter down enter");
+    let mut more_is_focused = false;
+    for _ in 0..64 {
+        cx.simulate_keystrokes("tab");
+        more_is_focused = cx.update(|window, _| window.find_by_label("More grid actions").focused() == Some(true));
+        if more_is_focused {
+            break;
+        }
+    }
+    assert!(more_is_focused, "Tab reaches the compact grid menu");
+    cx.simulate_keystrokes("enter down enter");
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
         assert!(view.palette.open);

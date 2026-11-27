@@ -583,7 +583,7 @@ impl GridView {
             let title = format!("{label} {}", diagram_table_name(table));
             Some(
                 compact_button(ButtonKind::Ghost, ("diagram-link", other), title, theme)
-                    .tooltip(crate::surfaces::tip(relation.name.clone()))
+                    .tooltip(relation.name.clone())
                     .on_click(cx.listener(move |this, _, _, cx| this.select_diagram_card(other, true, cx))),
             )
         });

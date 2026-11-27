@@ -1,4 +1,4 @@
-use gpui::{Focusable, TestAppContext};
+use gpui::{Focusable, KeyDownEvent, KeyUpEvent, Keystroke, TestAppContext};
 use gpui_kit::test::TestWindowExt;
 
 use crate::GridView;
@@ -6,6 +6,16 @@ use crate::save_ui_tests::{saving_view, settle_saving};
 use crate::ui::keys::Surface;
 use crate::ui_tests::test_kit::orders;
 use bookie_app_services::structure_change_plan::StructureChangeKind;
+
+fn press_key(cx: &mut gpui::VisualTestContext, key: &str) {
+    let keystroke = cx.update(|_, cx| Keystroke::parse_with_os(key, cx.platform_info().os).unwrap());
+    cx.simulate_event(KeyDownEvent {
+        keystroke: keystroke.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(KeyUpEvent { keystroke });
+}
 
 type Opener = fn(&mut GridView, &mut gpui::Context<GridView>);
 
@@ -202,6 +212,99 @@ fn the_host_key_prompt_cancels_on_escape_and_has_no_enter_default(cx: &mut TestA
     cx.simulate_keystrokes("escape");
     view.read_with(cx, |view, _| assert_eq!(view.top_surface(), None));
     assert_eq!(answer.try_recv().ok(), Some(false), "escape refuses the key");
+
+    let (respond, mut trust_answer) = tokio::sync::oneshot::channel();
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.host_key.current = Some(bookie_app_services::ssh_prompt::PendingHostKey {
+                host: "db.example".into(),
+                algorithm: "ssh-ed25519".into(),
+                fingerprint: "SHA256:abc".into(),
+                respond,
+            });
+        })
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    let focus = cx.update(|_, cx| view.read(cx).surface_focus.handles[&Surface::HostKey].clone());
+    cx.simulate_keystrokes("tab");
+    assert!(
+        !cx.update(|window, _| focus.is_focused(window)),
+        "Tab moves from the dialog to Trust"
+    );
+    press_key(cx, "enter");
+    assert_eq!(trust_answer.try_recv().ok(), Some(true), "Tab and Enter trust the key");
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn host_key_dialog_keeps_tab_traversal_inside_its_focus_trap(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    let (respond, _answer) = tokio::sync::oneshot::channel();
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.host_key.current = Some(bookie_app_services::ssh_prompt::PendingHostKey {
+                host: "db.example".into(),
+                algorithm: "ssh-ed25519".into(),
+                fingerprint: "SHA256:abc".into(),
+                respond,
+            });
+        })
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    let trap = cx.update(|_, cx| view.read(cx).surface_focus.handles[&Surface::HostKey].clone());
+    assert!(cx.update(|window, cx| {
+        gpui_kit::base::active_focus_trap(window, cx).is_some_and(|active| active.contains(&trap, window))
+    }));
+    for _ in 0..12 {
+        cx.simulate_keystrokes("tab");
+        assert!(cx.update(|window, cx| trap.contains_focused(window, cx)));
+    }
+    cx.simulate_keystrokes("shift-tab");
+    assert!(cx.update(|window, cx| trap.contains_focused(window, cx)));
+    cx.simulate_keystrokes("escape");
+    view.read_with(cx, |view, _| assert_eq!(view.top_surface(), None));
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn approval_actions_can_be_approved_and_denied_with_the_keyboard(cx: &mut TestAppContext) {
+    use bookie_app_services::approval_prompt::{ApprovalOutcome, PendingApproval, sample_request};
+
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    for (keys, expected) in [
+        ("tab enter", ApprovalOutcome::AllowOnce),
+        ("tab tab space", ApprovalOutcome::Deny),
+    ] {
+        let (respond, mut answer) = tokio::sync::oneshot::channel();
+        cx.update(|_, cx| {
+            view.update(cx, |view, cx| {
+                view.approval.current = Some(PendingApproval {
+                    request: sample_request("UPDATE t SET a = 1"),
+                    respond,
+                });
+                cx.notify();
+            })
+        });
+        cx.update(|window, cx| window.render_frame(cx));
+        let focus = cx.update(|_, cx| view.read(cx).surface_focus.handles[&Surface::Approval].clone());
+        for key in keys.split_whitespace() {
+            if key == "tab" {
+                cx.simulate_keystrokes("tab");
+            } else {
+                press_key(cx, key);
+            }
+        }
+        assert!(
+            !cx.update(|window, _| focus.is_focused(window)),
+            "Tab reaches an approval action"
+        );
+        cx.run_until_parked();
+        assert_eq!(answer.try_recv().ok(), Some(expected), "{keys} answers the prompt");
+    }
     std::fs::remove_file(&path).ok();
 }
 
@@ -242,14 +345,53 @@ fn escape_closes_notifications_without_stopping_a_focused_query(cx: &mut TestApp
         })
     });
     view.read_with(cx, |view, _| assert!(view.can_stop_query(), "the test query is active"));
-    assert!(cx.update(|window, cx| view.read(cx).sql_input.read(cx).focus_handle(cx).is_focused(window)));
+    assert!(
+        cx.update(|window, cx| { view.read(cx).surface_focus.handles[&Surface::Notifications].is_focused(window) })
+    );
     cx.simulate_keystrokes("escape");
+    cx.update(|window, cx| window.render_frame(cx));
     view.read_with(cx, |view, _| {
         assert!(!view.notices.open, "Escape closes the notification drawer");
         assert!(
             !view.queries.cancel.is_cancelled(),
             "closing the drawer does not stop the query"
         );
+    });
+    assert!(
+        cx.update(|window, cx| { view.read(cx).sql_input.read(cx).focus_handle(cx).is_focused(window) }),
+        "closing the drawer returns focus to the query editor"
+    );
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
+fn notifications_can_be_dismissed_with_tab_and_space(cx: &mut TestAppContext) {
+    use crate::ui::notifications::NoticeKind;
+
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.notices
+                .push("A connection needs attention".into(), NoticeKind::Error);
+            view.notices.open = true;
+            cx.notify();
+        })
+    });
+    cx.update(|window, cx| window.render_frame(cx));
+    let focus = cx.update(|_, cx| view.read(cx).surface_focus.handles[&Surface::Notifications].clone());
+    cx.simulate_keystrokes("tab");
+    assert!(
+        !cx.update(|window, _| focus.is_focused(window)),
+        "Tab reaches the close button"
+    );
+    cx.simulate_keystrokes("tab");
+    press_key(cx, "space");
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.notices.open, "dismissing an item leaves the drawer open");
+        assert!(view.notices.items.is_empty(), "Tab and Space dismiss the notice");
     });
     std::fs::remove_file(&path).ok();
 }

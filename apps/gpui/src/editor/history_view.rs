@@ -171,7 +171,7 @@ impl GridView {
         status: StatusFilter,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> crate::surfaces::Button {
         segment(id, label, self.history_page.status == status, theme).on_click(cx.listener(move |this, _, _, cx| {
             this.history_page.status = status;
             this.reload_history_page(cx);
@@ -185,7 +185,7 @@ impl GridView {
         window: TimeWindow,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> crate::surfaces::Button {
         segment(id, label, self.history_page.window == window, theme).on_click(cx.listener(move |this, _, _, cx| {
             this.history_page.window = window;
             this.reload_history_page(cx);
@@ -252,7 +252,7 @@ impl GridView {
         let filters = choice_row(
             theme,
             "Show",
-            [
+            vec![
                 self.history_status_chip("history-all", "All", StatusFilter::All, theme, cx),
                 self.history_status_chip("history-ok", "Succeeded", StatusFilter::Succeeded, theme, cx),
                 self.history_status_chip("history-failed", "Failed", StatusFilter::Failed, theme, cx),
@@ -262,7 +262,7 @@ impl GridView {
         let windows = choice_row(
             theme,
             "When",
-            [
+            vec![
                 self.history_window_chip("history-any", "Any time", TimeWindow::Any, theme, cx),
                 self.history_window_chip("history-day", "24 hours", TimeWindow::Day, theme, cx),
                 self.history_window_chip("history-week", "7 days", TimeWindow::Week, theme, cx),
