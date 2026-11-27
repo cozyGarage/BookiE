@@ -31,6 +31,16 @@ async fn duckdb_bit_values_survive_reads_and_write_routes() {
 }
 
 #[tokio::test]
+async fn duckdb_json_reads_keep_exact_source_text() {
+    let mut corpus = load_corpus("duckdb");
+    corpus.cases.retain(|case| case.id == "json");
+    assert_eq!(corpus.cases.len(), 1);
+    let server = duckdb::start("duckdb");
+    let reads = runner::run_reads(&server, &corpus).await;
+    judge_and_report(&corpus, &reads).assert_clean();
+}
+
+#[tokio::test]
 async fn duckdb_timetz_corpus_reports_unsupported_values() {
     let mut corpus = load_corpus("duckdb");
     corpus.cases.retain(|case| case.id == "timetz");
