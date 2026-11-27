@@ -255,9 +255,6 @@ type = "ENUM('a', 'b c', '')"
 literals = ["'a'", "'b c'", "''", "NULL"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
-]
 
 [[case]]
 id = "set"
@@ -265,9 +262,6 @@ type = "SET('x', 'y', 'z')"
 literals = ["'x,z'", "''", "'y'"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
-]
 
 [[case]]
 id = "date"
@@ -291,13 +285,6 @@ type = "TIME(6)"
 literals = ["'00:00:00'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
 carrier = "Time"
 rule = "temporal"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "time-extended"
@@ -340,14 +327,6 @@ literals = ["1901", "2155", "0", "NULL"]
 carrier = "Int"
 rule = "number"
 note = "The server renders YEAR 0 as 0000; leading zeros are display only."
-known_failing = [
-    { route = "import_csv", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-    { route = "edit", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-    { route = "paste", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-    { route = "set_cells", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-    { route = "insert_row", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-    { route = "noop_edit", issue = 4225, expect = "server stored", reason = "YEAR 0000 is written back as 2000" },
-]
 
 [[case]]
 id = "json"

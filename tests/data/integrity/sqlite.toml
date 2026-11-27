@@ -80,7 +80,6 @@ skip = [
 known_failing = [
     { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
     { route = "import_xlsx", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "noop_edit", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
 ]
 
 [[case]]
@@ -150,14 +149,6 @@ carrier = "Time"
 rule = "temporal"
 param_carrier = "Text"
 note = "SELECT ? has no declared type, so the bound time comes back as text; the bind spells fractions with three digits, so only trailing zeros may differ."
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "export_sql", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
-]
 
 [[case]]
 id = "boolean-flag"

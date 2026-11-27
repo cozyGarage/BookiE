@@ -278,10 +278,10 @@ Engines and routes. "Refused" lists cases where BookiE refuses a value on that r
 | Interactive editor session: `session_query` | planned | planned | planned | planned | planned | planned |
 | Copy as TSV and paste back | covered | covered except #4221 | covered except #4221 | covered except #4214, #4238 | covered except #4235, #4236, #4237 | not yet |
 | Export CSV, JSON, JSON Lines, re-read | covered except #4223 (JSON) | covered except #4223 (JSON) | covered | covered except #4214, #4223, #4238 | covered except #4235, #4236, #4237 | not yet |
-| Export SQL INSERT, run into an empty table | covered | covered | covered except #4220 | covered except #4214, #4238 | covered except #4237 | not applicable |
-| Export to CSV or XLSX, import into an empty table | covered except #4206, #4222 | covered except #4225 | covered except #4220 | covered except #4218, #4219, #4238 | covered except #4226, #4227, #4237 | not applicable |
-| Grid edit, paste, set cells, insert row | covered except #4206, #4217, #4218, #4224 | covered except #4217, #4224, #4225 | covered except #4217; NULL cells store text by rule | covered except #4217, #4218 | not yet (MergeTree rows have no unique key) | not yet |
-| No-op edit, table unchanged | covered except #4217, #4218 | covered except #4217, #4225 | covered except #4220 | covered except #4217, #4218 | not yet | not yet |
+| Export SQL INSERT, run into an empty table | covered | covered | covered | covered except #4214, #4238 | covered except #4237 | not applicable |
+| Export to CSV or XLSX, import into an empty table | covered except #4206, #4222 | covered | covered except #4220 | covered except #4219, #4238 | covered except #4226, #4227, #4237 | not applicable |
+| Grid edit, paste, set cells, insert row | covered except #4206 | covered | covered; NULL cells store text by rule | covered | not yet (MergeTree rows have no unique key) | not yet |
+| No-op edit, table unchanged | covered | covered | covered | covered | not yet | not yet |
 | GPUI and GTK display formatting | not covered by this suite | not covered | not covered | not covered | not covered | not covered |
 
 Defects found while building the corpus that do not affect a route above:

@@ -194,13 +194,6 @@ type = "time"
 literals = ["'00:00:00'", "'13:45:30'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
 carrier = "Time"
 rule = "temporal"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "time-2400"
@@ -251,13 +244,6 @@ literals = ["'2024-02-29 13:45:30.123456+05:30'", "'1970-01-01 00:00:00+00'", "'
 carrier = "TimestampTz"
 rule = "instant"
 note = "DST gap and fold literals are resolved by the server; the referee is the stored instant, not a guess."
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "timestamptz-infinity"
@@ -288,11 +274,6 @@ carrier = "JsonText"
 rule = "exact"
 note = "json keeps its source text exactly: key order, duplicate keys, number spelling and whitespace."
 known_failing = [
-    { route = "edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "paste", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "set_cells", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "insert_row", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "noop_edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
     { route = "export_json", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
     { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
 ]
@@ -340,9 +321,6 @@ setup = ["CREATE TYPE {table}_mood AS ENUM ('sad', 'ok', 'happy', 'with space', 
 literals = ["'sad'", "'with space'", "''", "NULL"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
-]
 
 [[case]]
 id = "domain"
@@ -434,9 +412,6 @@ type = "varbit"
 literals = ["B'1'", "B''", "B'0101010101010101010101010101010101010101010101010101010101010101010101'"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
-]
 
 [[case]]
 id = "point"
@@ -502,13 +477,6 @@ type = "timestamptz(3)"
 literals = ["'2024-02-29 13:45:30.1235+05:30'", "'1969-12-31 23:59:59.9995+00'"]
 carrier = "TimestampTz"
 rule = "instant"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "time-precision-0"
@@ -523,13 +491,6 @@ type = "time(3)"
 literals = ["'13:45:30.1235'", "'00:00:00.0004'"]
 carrier = "Time"
 rule = "temporal"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "int8range"
@@ -622,13 +583,6 @@ literals = ["'2024-02-29 13:45:30.123456+00'", "'2024-04-07 02:44:59+13:45'", "'
 carrier = "TimestampTz"
 rule = "instant"
 note = "BookiE's session runs in a +13:45 zone with DST; the instant must not move."
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "session-timezone-st-johns-text"

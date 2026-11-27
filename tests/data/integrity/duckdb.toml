@@ -152,13 +152,6 @@ type = "TIME"
 literals = ["'00:00:00'", "'13:45:30.123456'", "'23:59:59.999999'"]
 carrier = "Time"
 rule = "temporal"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "timestamp"
@@ -181,13 +174,6 @@ type = "TIMESTAMPTZ"
 literals = ["'2024-02-29 13:45:30.123456+05:30'", "'1970-01-01 00:00:00+00'", "'2024-03-10 02:30:00-05'", "NULL"]
 carrier = "TimestampTz"
 rule = "instant"
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
 
 [[case]]
 id = "interval"
@@ -216,13 +202,6 @@ known_failing = [
     { route = "browse", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "param_where", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "param_select", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
-    { route = "import_csv", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "import_xlsx", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "paste", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "set_cells", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "insert_row", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
-    { route = "noop_edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
     { route = "export_json", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
     { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
 ]
@@ -396,10 +375,3 @@ literals = ["'2024-02-29 13:45:30.123456+05:30'", "'2024-11-03 05:30:00+00'"]
 carrier = "TimestampTz"
 rule = "instant"
 note = "BookiE's session sets TimeZone first, as a user would in the editor; the stored instants must not move."
-known_failing = [
-    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
-]
