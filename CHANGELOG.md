@@ -47,7 +47,7 @@ GTK remains the supported Linux application. The GPUI Linux x86_64 artifact is a
 - GPUI bounds retained query results and skips hidden or manually sized columns when growing widths during scrolling.
 - GPUI: Saved SQL snippets load without blocking the editor.
 - GPUI cuts long names, statements and labels on one line with the full text in a tooltip, shows shortcuts as keycaps without "None", and draws list rows, chips, empty states and grouped settings the same way everywhere; closing notifications returns focus to where it was.
-- - GPUI: SQL completion ranks referenced columns and functions ahead of unrelated tables and keywords.
+- GPUI: SQL completion ranks referenced columns and functions ahead of unrelated tables and keywords.
 - GPUI stops a running query from the command palette or with Escape in the SQL editor, shows a stopped run as cancelled instead of failed, and labels the elapsed time as Running.
 - GPUI: the release binary is stripped of symbols, making it about a quarter smaller.
 - MySQL and MariaDB statements need about three fewer network round trips: the session settings are restored in one trip when a connection is taken from the pool, and the connection id used for cancelling is read in one trip.
