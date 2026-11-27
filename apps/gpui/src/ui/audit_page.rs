@@ -5,7 +5,7 @@ use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::surfaces::{ListState, list_state};
+use crate::surfaces::{ListState, list_row, list_state, truncated};
 use crate::text_input::{InputEvent, TextInput};
 use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
@@ -103,15 +103,8 @@ impl GridView {
             ("circle", theme.success)
         };
         let status = audit_view::status_text(row.status);
-        div()
-            .id(("audit-row", index))
-            .flex()
+        list_row(("audit-row", index), false, theme)
             .items_start()
-            .gap_2()
-            .px_3()
-            .py_1()
-            .rounded(px(theme.radius))
-            .hover(move |style| style.bg(rgb(theme.accent)))
             .child(div().pt_1().child(icon(mark, color)))
             .child(
                 div()
@@ -121,22 +114,14 @@ impl GridView {
                     .flex()
                     .flex_col()
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("audit-sql", index), one_line_sql(&row.sql, MAX_STATEMENT_CHARS))
                             .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace")
-                            .child(one_line_sql(&row.sql, MAX_STATEMENT_CHARS)),
+                            .font_family("monospace"),
                     )
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("audit-meta", index), format!("{status} · {}", meta(row)))
                             .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(format!("{status} · {}", meta(row))),
+                            .text_color(rgb(theme.muted_foreground)),
                     )
                     .children(row.error.as_ref().map(|error| {
                         div()

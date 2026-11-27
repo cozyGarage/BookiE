@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use bookie_app_services::approval_prompt::{ApprovalInbox, ApprovalOutcome, PendingApproval, prompt_channel};
 
-use crate::chrome::tip;
+use crate::surfaces::tip;
 use crate::surfaces::{ButtonKind, ConfirmDialog, button, confirm_dialog};
 use crate::*;
 

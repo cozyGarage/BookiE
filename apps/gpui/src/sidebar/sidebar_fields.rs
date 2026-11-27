@@ -4,6 +4,7 @@ use gpui::{Context, Div, div, prelude::*, px, rgb};
 use crate::GridView;
 use crate::assets::icon;
 use crate::sidebar_state::{FieldRow, FieldState};
+use crate::surfaces::{ListState, list_state, truncated};
 use bookie_gpui::theme::{Theme, size};
 
 impl GridView {
@@ -63,7 +64,18 @@ impl GridView {
     pub(crate) fn field_row(&self, table: &TableInfo, depth: usize, index: usize, theme: Theme) -> Option<Div> {
         let (_, state) = self.sidebar.fields.iter().find(|(open, _)| open == table)?;
         let indent = crate::chrome::tree_indent((depth + 1) as f32);
-        let line = |marker: Option<&'static str>, name: String, detail: String, dim: bool| {
+        let id = format!("sidebar-field-{}-{index}", bookie_gpui::shell::table_label(table));
+        let note = |state: ListState<'_>| {
+            list_state(state, theme)
+                .relative()
+                .children(crate::chrome::indent_guides(depth + 1, theme))
+                .h(px(size::TREE_ROW))
+                .py_0()
+                .pr(px(size::SM))
+                .pl(px(indent + size::CHEVRON))
+                .text_size(px(size::TEXT_SMALL))
+        };
+        let line = |marker: Option<&'static str>, name: String, detail: String| {
             div()
                 .relative()
                 .children(crate::chrome::indent_guides(depth + 1, theme))
@@ -74,33 +86,24 @@ impl GridView {
                 .pr(px(size::SM))
                 .gap_1()
                 .text_size(px(size::TEXT_SMALL))
-                .text_color(rgb(if dim { theme.muted_foreground } else { theme.foreground }))
+                .text_color(rgb(theme.foreground))
                 .child(
                     div()
                         .w(px(size::CHEVRON))
                         .flex_none()
                         .children(marker.map(|name| icon(name, theme.muted_foreground))),
                 )
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .child(name),
-                )
+                .child(truncated(id.clone(), name).flex_1())
                 .child(div().text_color(rgb(theme.muted_foreground)).child(detail))
         };
         match state {
-            FieldState::Loading => Some(line(None, "Loading fields…".into(), String::new(), true)),
-            FieldState::Failed(message) => Some(line(None, message.clone(), String::new(), true)),
+            FieldState::Loading => Some(note(ListState::Loading("Loading fields…"))),
+            FieldState::Failed(message) => Some(note(ListState::Failed(message))),
             FieldState::Loaded(fields) => fields.get(index).map(|field| {
                 line(
                     field.primary_key.then_some("key-round"),
                     field.name.clone(),
                     field.data_type.clone(),
-                    false,
                 )
             }),
         }

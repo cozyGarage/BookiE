@@ -355,21 +355,18 @@ impl GridView {
             return None;
         }
         if let Some(pending) = &self.connection_bundle.pending {
-            let rows = pending.plan.items.iter().map(|item| {
+            let rows = pending.plan.items.iter().enumerate().map(|(index, item)| {
                 div()
                     .flex()
                     .justify_between()
                     .gap_2()
+                    .child(crate::surfaces::truncated(
+                        ("connection-import-name", index),
+                        item.connection.name.clone(),
+                    ))
                     .child(
                         div()
-                            .min_w_0()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(item.connection.name.clone()),
-                    )
-                    .child(
-                        div()
+                            .flex_none()
                             .text_color(rgb(theme.muted_foreground))
                             .child(disposition_name(&item.disposition)),
                     )
@@ -401,14 +398,9 @@ impl GridView {
                                     "{} will be skipped",
                                     plural(skipped, "unsupported connection", "unsupported connections")
                                 )))
-                                .children(pending.skipped.iter().map(|name| {
-                                    div()
-                                        .min_w_0()
-                                        .overflow_hidden()
-                                        .whitespace_nowrap()
-                                        .text_ellipsis()
+                                .children(pending.skipped.iter().enumerate().map(|(index, name)| {
+                                    crate::surfaces::truncated(("connection-import-skipped", index), name.clone())
                                         .text_color(rgb(theme.muted_foreground))
-                                        .child(name.clone())
                                 }))
                             }),
                     )

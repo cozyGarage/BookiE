@@ -3,21 +3,13 @@ use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::{STATUS_HEIGHT, tip};
-use crate::surfaces::{ButtonKind, button, compact_button, icon_button, section_header};
+use crate::chrome::STATUS_HEIGHT;
+use crate::surfaces::{
+    ButtonKind, ListState, button, card, compact_button, icon_button, list_state, section_header, tip, truncated,
+};
 use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 use bookie_gpui::shell::table_label;
 use bookie_gpui::theme::{Theme, size};
-
-pub(crate) fn card(theme: Theme) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .rounded(px(size::SURFACE_RADIUS))
-        .border_1()
-        .border_color(rgb(theme.border))
-        .bg(rgb(theme.background))
-}
 
 pub(crate) fn card_title(text: &str, theme: Theme) -> Div {
     section_header(text.to_string(), theme)
@@ -217,10 +209,7 @@ impl GridView {
                 .collect()
         };
         let content = if rows.is_empty() {
-            div()
-                .p_4()
-                .text_color(rgb(theme.muted_foreground))
-                .child("No recent statements executed yet")
+            list_state(ListState::Empty("No recent statements executed yet"), theme)
         } else {
             div()
                 .p_2()
@@ -283,24 +272,12 @@ impl GridView {
                 .on_click(cx.listener(|this, _, _, cx| this.count_table_rows(cx)))
         });
         let details = sql.map(|sql| {
-            let full = sql.clone();
             div()
                 .flex()
                 .flex_none()
                 .items_center()
                 .gap_1()
-                .child(
-                    div()
-                        .id("result-sql-preview")
-                        .max_w(px(size::STATUS_SQL_PREVIEW_WIDTH))
-                        .overflow_hidden()
-                        .whitespace_nowrap()
-                        .text_ellipsis()
-                        .tooltip(move |window, cx| {
-                            gpui_component::tooltip::Tooltip::new(full.clone()).build(window, cx)
-                        })
-                        .child(sql.clone()),
-                )
+                .child(truncated("result-sql-preview", sql.clone()).max_w(px(size::STATUS_SQL_PREVIEW_WIDTH)))
                 .child(
                     compact_button(ButtonKind::Ghost, "copy-result-sql", "Copy SQL", theme)
                         .on_click(move |_, _, cx| cx.write_to_clipboard(gpui::ClipboardItem::new_string(sql.clone()))),
@@ -315,27 +292,12 @@ impl GridView {
             .overflow_hidden()
             .whitespace_nowrap()
             .text_ellipsis()
-            .tooltip(move |window, cx| {
-                gpui_component::tooltip::Tooltip::new(connection_tooltip.clone()).build(window, cx)
-            })
+            .tooltip(tip(connection_tooltip))
             .child(self.connection_chip_text());
         let shown_status = footer_status(self.save.banner.as_ref(), &self.status);
-        let full_status = shown_status.clone();
-        let status = div()
-            .id("status-text")
-            .debug_selector(|| "status-text".into())
+        let status = truncated("status-text", shown_status)
             .flex_1()
-            .min_w_0()
-            .overflow_hidden()
-            .whitespace_nowrap()
-            .text_ellipsis()
-            .text_color(rgb(theme.foreground))
-            .when(!shown_status.is_empty(), |status| {
-                status.tooltip(move |window, cx| {
-                    gpui_component::tooltip::Tooltip::new(full_status.clone()).build(window, cx)
-                })
-            })
-            .child(shown_status);
+            .text_color(rgb(theme.foreground));
         div()
             .id("status-bar")
             .debug_selector(|| "status-bar".into())

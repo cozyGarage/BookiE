@@ -63,7 +63,7 @@ pub fn judge_with<'a>(
                 tally.refused += 1;
                 verdict
                     .refusals
-                    .push(format!("{label}: refused as expected: {}", shorten(first(details))));
+                    .push(format!("{label}: refused: {}", shorten(first(details))));
             }
             (Outcome::Broken(error), _) => {
                 tally.failed += 1;

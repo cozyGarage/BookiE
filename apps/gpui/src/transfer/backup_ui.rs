@@ -239,7 +239,7 @@ impl GridView {
         )
         .child(div().flex_1().min_w_0().child(path));
         if restore {
-            bar = bar.child(div().w(px(size::FORM_CONTROL * 5.0)).child(confirm));
+            bar = bar.child(div().w(px(size::CONFIRM_INPUT_WIDTH)).child(confirm));
         }
         Some(
             bar.child(

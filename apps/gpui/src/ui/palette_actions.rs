@@ -749,7 +749,7 @@ impl GridView {
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "collapse-sidebar-sections" => self.collapse_sidebar_sections(),
             "sidebar-active-only" => self.toggle_sidebar_active_only(),
-            "notifications" => self.toggle_notifications(cx),
+            "notifications" => self.toggle_notifications(window, cx),
             "sidebar-regex" => self.toggle_sidebar_regex(cx),
             "append-pages" => self.pager.append = !self.pager.append,
             "import-connections" => self.pick_connection_import(cx),

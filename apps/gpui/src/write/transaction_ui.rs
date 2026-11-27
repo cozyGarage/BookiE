@@ -442,20 +442,11 @@ impl GridView {
         } else {
             theme.warning
         };
-        div()
+        crate::surfaces::badge(label, color)
             .id("transaction-badge")
             .debug_selector(|| "transaction-badge".into())
-            .px_2()
-            .min_w_0()
-            .whitespace_nowrap()
-            .overflow_hidden()
-            .text_ellipsis()
-            .rounded(px(theme.radius))
-            .border_1()
-            .border_color(rgb(color))
-            .text_color(rgb(color))
-            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(detail.clone()).build(window, cx))
-            .child(label)
+            .flex_shrink(1.0)
+            .tooltip(crate::surfaces::tip(detail))
     }
 }
 

@@ -242,11 +242,11 @@ impl GridView {
                         .items_center()
                         .gap_1()
                         .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .truncate()
-                                .child(format!("{} → {}", left.name, right.name)),
+                            crate::surfaces::truncated(
+                                ("relationship-pair", index),
+                                format!("{} → {}", left.name, right.name),
+                            )
+                            .flex_1(),
                         )
                         .child(
                             compact_button(ButtonKind::Ghost, ("remove-column-pair", index), "Remove", theme).on_click(

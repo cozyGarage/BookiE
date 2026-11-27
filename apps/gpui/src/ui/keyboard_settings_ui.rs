@@ -106,14 +106,7 @@ impl GridView {
                     SettingField::render(move |_, _, cx| {
                         let current = view.read(cx);
                         let recording = current.recording_shortcut == Some(command);
-                        let label = if recording {
-                            "Press keys…".to_string()
-                        } else {
-                            current
-                                .keymap
-                                .binding(command)
-                                .map_or_else(|| "None".to_string(), Chord::label)
-                        };
+                        let keys = current.keymap.binding(command).map(Chord::label);
                         let (record, remove, reset) = (view.clone(), view.clone(), view.clone());
                         div()
                             .flex()
@@ -123,7 +116,8 @@ impl GridView {
                                 div()
                                     .debug_selector(move || format!("shortcut-{}", command.name()))
                                     .min_w(gpui::px(bookie_gpui::theme::size::SHORTCUT_CHORD_WIDTH))
-                                    .child(label),
+                                    .when(recording, |slot| slot.child("Press keys…"))
+                                    .when(!recording, |slot| slot.children(crate::surfaces::shortcut(keys, theme))),
                             )
                             .child(
                                 button(

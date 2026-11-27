@@ -131,7 +131,7 @@ impl GridView {
             Surface::CloseConfirm => self.keep_editing(cx),
             Surface::CancelProcess => self.keep_process_running(cx),
             Surface::DeleteConnection => self.cancel_delete_connection(cx),
-            Surface::Notifications => self.toggle_notifications(cx),
+            Surface::Notifications => self.close_notifications(cx),
             Surface::ConnectionForm => self.close_connection_dialog(cx),
             Surface::SaveReview => self.cancel_save(cx),
             Surface::Import => self.cancel_import_bar(cx),

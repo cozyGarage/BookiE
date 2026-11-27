@@ -8,7 +8,7 @@ use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 use crate::GridView;
 use crate::assets::icon;
 use crate::connection_form::choice_row;
-use crate::surfaces::{Bar, ListState, icon_button, list_state, segment, toggle_icon_button};
+use crate::surfaces::{Bar, ListState, icon_button, list_row, list_state, segment, toggle_icon_button, truncated};
 use crate::text_input::{InputEvent, TextInput};
 use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
@@ -212,15 +212,8 @@ impl GridView {
         }));
         let delete = icon_button(("history-delete", index), "trash-2", "Delete", theme)
             .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
-        div()
-            .id(("history-row", index))
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
+        list_row(("history-row", index), false, theme)
             .h(px(size::LIST_ROW))
-            .rounded(px(theme.radius))
-            .hover(move |style| style.bg(rgb(theme.accent)))
             .child(icon(if row.succeeded { "circle" } else { "x" }, dot))
             .child(
                 div()
@@ -233,22 +226,14 @@ impl GridView {
                     .flex()
                     .flex_col()
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("history-sql", index), one_line_sql(&row.query, MAX_STATEMENT_CHARS))
                             .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace")
-                            .child(one_line_sql(&row.query, MAX_STATEMENT_CHARS)),
+                            .font_family("monospace"),
                     )
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("history-meta", index), meta(row))
                             .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(meta(row)),
+                            .text_color(rgb(theme.muted_foreground)),
                     ),
             )
             .child(pin)

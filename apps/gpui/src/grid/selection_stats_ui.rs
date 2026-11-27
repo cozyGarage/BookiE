@@ -130,9 +130,7 @@ impl GridView {
                         .debug_selector(move || format!("selection-stat-{label}"))
                         .cursor_pointer()
                         .hover(move |style| style.text_color(rgb(theme.foreground)))
-                        .tooltip(move |window, cx| {
-                            gpui_component::tooltip::Tooltip::new(format!("Copy {label}")).build(window, cx)
-                        })
+                        .tooltip(crate::surfaces::tip(format!("Copy {label}")))
                         .on_click(move |_, _, cx| cx.write_to_clipboard(ClipboardItem::new_string(copied.clone())))
                         .child(format!("{label} {value}"))
                 }))
