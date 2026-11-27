@@ -725,7 +725,8 @@ impl LiveSession {
         window: Duration,
         cancellation: &CancellationToken,
     ) -> Result<SubscriptionSample, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
         let control = OperationControl::new(cancellation.clone(), Some(deadline));
         let event = self.runtime.block_on(dispatch_read(
@@ -741,7 +742,7 @@ impl LiveSession {
             },
             &control,
             epoch,
-            &self.epoch,
+            &current_epoch,
         ))?;
         let Event::SubscriptionSampled { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());

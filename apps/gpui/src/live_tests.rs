@@ -226,6 +226,32 @@ fn unsupported_server_sort_is_refused_instead_of_sorting_a_partial_page() {
 }
 
 #[test]
+fn unsupported_subscription_sampling_does_not_supersede_an_independent_query() {
+    let session = LiveSession::open(&fixture()).unwrap();
+    let query_epoch = session.next_epoch();
+    let sample = session.sample_pubsub(
+        &["updates".to_string()],
+        1,
+        Duration::from_millis(10),
+        &CancellationToken::new(),
+    );
+    assert!(sample.is_err(), "SQLite does not support subscriptions");
+    let (result, _) = session
+        .runtime
+        .block_on(query_pages(
+            &session.sessions,
+            session.session_id,
+            ("SELECT id FROM orders", &[]),
+            100,
+            &CancellationToken::new(),
+            query_epoch,
+            &session.epoch,
+        ))
+        .unwrap();
+    assert!(!result.rows.is_empty());
+}
+
+#[test]
 fn reading_the_data_dictionary_does_not_supersede_an_independent_query() {
     let session = LiveSession::open(&fixture()).unwrap();
     let query_epoch = session.next_epoch();

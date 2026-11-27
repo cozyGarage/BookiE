@@ -1,1 +1,1 @@
-GPUI opening a table or data dictionary no longer interrupts an unrelated query.
+GPUI table, dictionary, and subscription reads no longer interrupt an unrelated query.
