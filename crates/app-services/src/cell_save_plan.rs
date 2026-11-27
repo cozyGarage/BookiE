@@ -71,7 +71,7 @@ pub fn plan_cell_saves(
             .collect();
         let row_key = RowKey::from_pk_values(&key_values).ok_or(CellSaveError::UnreadableKey)?;
         let original = change.original_row.get(change.column).cloned().unwrap_or(Value::Null);
-        if original != change.new_value {
+        if !bookie_results::value_exact::exact_equal(&original, &change.new_value) {
             tracker.track_cell_edit(row_key, table_column, original, change.new_value.clone());
         }
     }
@@ -320,6 +320,36 @@ mod tests {
         )
         .unwrap();
         assert!(plan.statements.is_empty());
+    }
+
+    #[test]
+    fn an_unchanged_value_makes_no_statement_and_a_numerically_equal_change_is_saved() {
+        let columns = orders();
+        let change = |total: f64, new_value: Value| CellChange {
+            original_row: row(1, "ada", total),
+            column: 2,
+            new_value,
+        };
+        let unchanged =
+            plan_cell_saves(target(&columns), &names(), &[change(f64::NAN, Value::Float(f64::NAN))]).unwrap();
+        assert!(unchanged.statements.is_empty());
+        let signed = plan_cell_saves(target(&columns), &names(), &[change(0.0, Value::Float(-0.0))]).unwrap();
+        assert_eq!(signed.statements.len(), 1);
+        let scaled = plan_cell_saves(
+            target(&columns),
+            &names(),
+            &[CellChange {
+                original_row: vec![
+                    Value::Int(1),
+                    Value::Text("ada".into()),
+                    Value::Decimal("1.5".parse().unwrap()),
+                ],
+                column: 2,
+                new_value: Value::Decimal("1.50".parse().unwrap()),
+            }],
+        )
+        .unwrap();
+        assert_eq!(scaled.statements.len(), 1);
     }
 
     #[test]

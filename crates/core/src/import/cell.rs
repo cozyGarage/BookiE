@@ -429,6 +429,11 @@ fn parse_non_null_cell(text: &str, column: &ColumnInfo, kind: ColumnKind, driver
     if driver_id == "mysql" && mysql_calendar::invalid_text(text, &column.data_type) {
         return Ok(Value::Text(text.to_owned()));
     }
+    if kind == ColumnKind::Json && column.data_type.trim().eq_ignore_ascii_case("json") {
+        return serde_json::from_str::<serde::de::IgnoredAny>(text)
+            .map(|_| Value::JsonText(text.to_owned()))
+            .map_err(|_| CellError::NotJson);
+    }
     if driver_id == "postgres"
         && let Some(value) = postgres_temporal::import_override(text, &column.data_type, kind)
     {

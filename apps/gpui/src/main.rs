@@ -341,7 +341,6 @@ impl GridView {
             |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
                 if matches!(event, gpui_kit::component::input::InputEvent::Change) {
                     this.last_edit = Some(input.read(cx).cursor_position());
-                    input.update(cx, Self::clear_sql_diagnostics);
                 }
                 if matches!(
                     event,
@@ -1085,6 +1084,7 @@ mod crypto_provider_tests {
 
 fn main() {
     bookie_app_services::initialize_process_crypto();
+    bookie_app_services::use_user_state();
     let started = Instant::now();
     init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());

@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   group: gpui-macos-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
@@ -103,7 +103,7 @@ jobs:
   result:
     name: GPUI macOS
     needs: [changes, build-and-test]
-    if: always()
+    if: always() && !cancelled()
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

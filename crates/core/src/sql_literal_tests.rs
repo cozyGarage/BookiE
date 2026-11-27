@@ -127,6 +127,19 @@ fn dialect_specific_decimal_and_temporal_literals_stay_with_their_engines() {
 }
 
 #[test]
+fn a_time_literal_keeps_its_fraction_without_padding_zeros() {
+    let time = |text: &str| Value::Time(text.parse().unwrap());
+    for (value, expected) in [
+        (time("00:00:00.5"), "'00:00:00.5'"),
+        (time("13:45:30"), "'13:45:30'"),
+        (time("23:59:59.999999"), "'23:59:59.999999'"),
+        (time("01:02:03.000000001"), "'01:02:03.000000001'"),
+    ] {
+        assert_eq!(render_sql_literal("sqlite", &value).unwrap(), expected);
+    }
+}
+
+#[test]
 fn negative_zero_is_refused_for_sqlite_and_kept_as_a_float8_for_postgres() {
     assert_eq!(
         render_sql_literal("sqlite", &Value::Float(-0.0)),
