@@ -11,7 +11,7 @@ impl GridView {
         );
         let target = pattern.clone();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| {
                 live.sample_pubsub(
@@ -36,7 +36,7 @@ impl GridView {
     pub(crate) fn kafka_topics(&mut self, broker: String, cx: &mut Context<Self>) {
         self.status = format!("Listing topics at {broker}…");
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |_| bookie_gpui::net_check::kafka_topics(&broker),
             |this, outcome| {
@@ -54,7 +54,7 @@ impl GridView {
         self.status = format!("Checking {address}…");
         let target = address.clone();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |_| bookie_gpui::net_check::run_check(&target),
             move |this, outcome| {

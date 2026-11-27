@@ -120,7 +120,7 @@ impl GridView {
         self.status = format!("Searching every table for \"{term}\"…");
         let searched = term.clone();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| session.search_values(&term, options, &cancel),
             move |this, result| match result {

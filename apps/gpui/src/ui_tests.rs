@@ -611,6 +611,100 @@ fn applying_a_filter_does_not_discard_a_pending_load(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn switching_grid_owner_does_not_cancel_a_pending_table_load(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
+            let cancel = view.loads.cancel.clone();
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert!(
+                !cancel.is_cancelled(),
+                "switching grids must leave the table load running"
+            );
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the table load result was dropped after switching grids");
+}
+
+#[gpui::test]
+fn a_query_result_survives_switching_home_and_back(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.begin_background(Work::Query, cx, |_| (), move |_, ()| mark.set(true));
+            let query = view.queries.cancel.clone();
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert!(!query.is_cancelled(), "switching tabs must leave the query running");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the query result was dropped after switching tabs");
+}
+
+#[gpui::test]
+fn starting_a_tool_does_not_discard_a_pending_query(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Query, cx, |_| (), move |_, ()| mark.set(true));
+            let query = view.queries.cancel.clone();
+            view.begin_background(Work::Tool, cx, |_| (), |_, ()| {});
+            assert!(!query.is_cancelled(), "a tool task must not cancel a query");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the query result was dropped by a tool task");
+}
+
+#[gpui::test]
+fn starting_a_tool_does_not_discard_a_pending_table_load(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Load, cx, |_| (), move |_, ()| mark.set(true));
+            let load = view.loads.cancel.clone();
+            view.begin_background(Work::Tool, cx, |_| (), |_, ()| {});
+            assert!(!load.is_cancelled(), "a tool task must not cancel a table load");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the table load result was dropped by a tool task");
+}
+
+#[gpui::test]
+fn starting_a_table_load_does_not_discard_a_pending_tool(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let (applied, mark) = flag();
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(Work::Tool, cx, |_| (), move |_, ()| mark.set(true));
+            let tool = view.tool_jobs.cancel.clone();
+            view.begin_background(Work::Load, cx, |_| (), |_, ()| {});
+            assert!(!tool.is_cancelled(), "a table load must not cancel a tool task");
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    assert!(applied.get(), "the tool result was dropped by a table load");
+}
+
+#[gpui::test]
 fn starting_a_load_discards_a_pending_scan(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let (applied, mark) = flag();
@@ -2000,8 +2094,8 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
     cx.simulate_keystrokes("ctrl-t");
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale".into());
-            let cancel = view.loads.cancel.clone();
+            view.begin_background(Work::Query, cx, |_| (), |view, ()| view.status = "stale".into());
+            let cancel = view.queries.cancel.clone();
             let query = view.tabs.active;
             view.panel.error_location = Some(("SELECT missing".into(), 8, 0, None));
             view.tabs.open_home();
@@ -2141,12 +2235,11 @@ fn selecting_a_result_scrolls_its_tab_into_view(cx: &mut TestAppContext) {
 fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
-        view.update(cx, |view, cx| {
+        view.update(cx, |view, _| {
             view.tabs.open_query();
             view.sync_grid_owner();
             view.add_run(None);
             view.cell_edit.edits.insert((1, 1), Cell::Text("second".into()));
-            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
             view.close_run(1);
             assert_eq!(view.run_tabs.slots.len(), 2);
             assert_eq!(view.cell_at(1, 1), Cell::Text("second".into()));
@@ -2157,23 +2250,24 @@ fn closing_the_active_run_restores_the_surviving_runs_edits(cx: &mut TestAppCont
             assert_eq!(view.cell_at(1, 1), Cell::Text("Sample 1".into()));
         });
     });
-    cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
 }
 
 #[gpui::test]
-fn a_previous_runs_background_result_cannot_replace_the_current_run(cx: &mut TestAppContext) {
+fn a_new_query_replaces_the_previous_query_work(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.update(|_, cx| {
         view.update(cx, |view, cx| {
-            view.tabs.open_query();
-            view.sync_grid_owner();
-            view.begin_background(Work::Load, cx, |_| (), |view, ()| view.status = "stale result".into());
-            view.add_run(None);
+            view.begin_background(Work::Query, cx, |_| (), |view, ()| view.status = "stale result".into());
+            let previous = view.queries.cancel.clone();
+            view.begin_background(Work::Query, cx, |_| (), |view, ()| view.status = "latest result".into());
+            assert!(
+                previous.is_cancelled(),
+                "a new query replaces work owned by the previous query"
+            );
         });
     });
     cx.run_until_parked();
-    view.read_with(cx, |view, _| assert_ne!(view.status, "stale result"));
+    view.read_with(cx, |view, _| assert_eq!(view.status, "latest result"));
 }
 
 #[gpui::test]

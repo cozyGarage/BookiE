@@ -304,6 +304,7 @@ impl GridView {
         self.row_inspector.reset();
         if !self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, &session)) {
             self.invalidate_query();
+            self.tool_jobs.invalidate();
             self.params.rows.clear();
             self.params.remembered.clear();
             self.schema_context = None;
@@ -520,7 +521,7 @@ impl GridView {
         let wanted = self.catalog.grid_table.clone();
         let sort = self.table_sort(&wanted).cloned();
         let where_sql = self.table_where(&wanted);
-        self.invalidate_background();
+        self.invalidate_load();
         let generation = self.loads.generation;
         let cancel = CancellationToken::new();
         self.loads.cancel = cancel.clone();

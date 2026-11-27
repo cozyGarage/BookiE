@@ -208,6 +208,13 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
                     .is_some_and(|transaction| transaction.running.is_some())
             );
             view.invalidate_background();
+            let statement = view.transaction_statement().expect("the statement runs");
+            let cancel = statement.cancel.clone();
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            assert!(!cancel.is_cancelled(), "switching tabs must leave the transaction statement running");
         })
     });
     until(&view, cx, "the transaction step finishes", |view| {

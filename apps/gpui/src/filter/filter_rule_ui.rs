@@ -137,7 +137,7 @@ impl GridView {
         self.search.rule.open = false;
         self.status = "Filtering…".into();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| {
                 let started = Instant::now();

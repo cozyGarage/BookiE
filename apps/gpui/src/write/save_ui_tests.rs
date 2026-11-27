@@ -3,10 +3,10 @@ use std::time::Instant;
 use gpui::TestAppContext;
 use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
-use crate::GridView;
 use crate::live_ui_tests::open_live;
 use crate::text_input;
 use crate::ui_tests::test_kit::{Orders, orders, until};
+use crate::{GridView, Work};
 use bookie_core::TableInfo;
 
 #[path = "paste_literal_save_tests.rs"]
@@ -1796,6 +1796,32 @@ fn selection_stats_drop_edits_cleared_by_a_reload_after_save(cx: &mut TestAppCon
             view.reload_after_save("Saved".into(), cx);
             assert_eq!(view.selection_stat_items()[1], ("Sum", "3".to_string()));
         })
+    });
+}
+
+#[gpui::test]
+fn a_post_save_reload_survives_tab_switch_and_tool_work(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    let before = view.read_with(cx, |view, _| view.table_source.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.reload_after_save("Saved".into(), cx);
+            let reload = view.loads.cancel.clone();
+            let table = view.catalog.grid_table.clone();
+            view.tabs.open_home();
+            view.sync_grid_owner();
+            view.tabs.open_table(&table);
+            view.sync_grid_owner();
+            assert!(!reload.is_cancelled(), "switching tabs must leave the post-save reload running");
+            view.begin_background(Work::Tool, cx, |_| (), |_, ()| {});
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!std::sync::Arc::ptr_eq(&before, &view.table_source));
+        assert!(!view.save.busy);
+        assert_eq!(view.status, "Saved");
     });
 }
 
