@@ -1,1 +1,0 @@
-GPUI's export dialog is a form: choose the rows (current page, selection, loaded rows or the whole table), the format and, for CSV, the separator, the text written for NULL and whether to include column names.

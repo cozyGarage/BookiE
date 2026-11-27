@@ -1,1 +1,0 @@
-MySQL and MariaDB statements need about three fewer network round trips: the session settings are restored in one trip when a connection is taken from the pool, and the connection id used for cancelling is read in one trip.
