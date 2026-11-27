@@ -48,7 +48,7 @@ class RunDriverGroupTests(unittest.TestCase):
 
 
 class ConformanceTargetTests(unittest.TestCase):
-    def run_in_scratch_tree(self, driver, with_conformance):
+    def run_in_scratch_tree(self, driver, with_conformance, with_integrity=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "scripts").mkdir()
@@ -63,6 +63,10 @@ class ConformanceTargetTests(unittest.TestCase):
             tests.mkdir(parents=True)
             if with_conformance:
                 (tests / "conformance.rs").write_text("")
+            if with_integrity:
+                integrity = root / "tests" / "data-integrity" / "tests"
+                integrity.mkdir(parents=True)
+                (integrity / f"{driver}.rs").write_text("")
             result = subprocess.run(
                 ["bash", "scripts/run-driver-group.sh", driver], cwd=root, capture_output=True, text=True, check=False
             )
@@ -80,6 +84,18 @@ class ConformanceTargetTests(unittest.TestCase):
             commands = self.run_in_scratch_tree(driver, with_conformance=False)
             self.assertIn(f"-p bookie-driver-{driver} --test integration -- ", commands[0])
             self.assertNotIn("conformance", " ".join(commands))
+
+    def test_a_driver_with_a_data_integrity_corpus_runs_it_after_its_own_targets(self):
+        commands = self.run_in_scratch_tree("postgres", with_conformance=True, with_integrity=True)
+        self.assertEqual(len(commands), 2, commands)
+        self.assertIn("-p bookie-data-integrity-tests --test postgres -- --include-ignored --test-threads=1", commands[1])
+
+    def test_every_data_integrity_engine_target_is_reachable_through_a_group(self):
+        grouped = {driver for drivers in group_arms().values() for driver in drivers}
+        for path in (ROOT / "tests" / "data-integrity" / "tests").glob("*.rs"):
+            if path.stem == "corpus":
+                continue
+            self.assertIn(path.stem, grouped, f"{path} is not run by any driver group")
 
     def test_every_network_driver_conformance_file_is_reachable_through_a_group(self):
         grouped = {driver for drivers in group_arms().values() for driver in drivers}

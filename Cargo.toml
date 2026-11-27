@@ -20,6 +20,7 @@ members = [
     "crates/storage",
     "crates/transport",
     "tests/driver-tls",
+    "tests/data-integrity",
     "crates/drivers/clickhouse",
     "crates/drivers/duckdb",
     "crates/drivers/mongodb",
