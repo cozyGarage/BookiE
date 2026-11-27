@@ -324,7 +324,7 @@ impl GridView {
         if !self.export.file.open {
             return None;
         }
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        use gpui_component::menu::DropdownMenu as _;
 
         let format_owner = cx.entity().downgrade();
         let scope_options = self.export_scope_options();
@@ -352,27 +352,26 @@ impl GridView {
                 }
             }))
         });
-        let format_menu = crate::surfaces::menu_button(
+        let current = self.export.file.format;
+        let options: Vec<(gpui::SharedString, bookie_core::export::ResultFormat)> =
+            formats.iter().map(|format| (format.label().into(), *format)).collect();
+        let format_menu = crate::surfaces::select_button(
             "export-format",
-            Some(div().whitespace_nowrap().child(format_label).into_any_element()),
-            None,
+            Some(format_label),
             "Export file format",
-            "Choose export file format",
-            true,
+            crate::surfaces::Bar::Compact,
+            theme,
         )
-        .dropdown_menu(move |mut menu, _, _| {
-            for format in formats.iter().copied() {
-                let owner = format_owner.clone();
-                menu = menu.item(PopupMenuItem::new(format.label()).on_click(move |_, _, cx| {
-                    let _ = owner.update(cx, |this, cx| {
-                        if this.export.file.cancel.is_none() {
-                            this.export.file.format = format;
-                            cx.notify();
-                        }
-                    });
-                }));
-            }
-            menu
+        .dropdown_menu(move |menu, _, _| {
+            let owner = format_owner.clone();
+            crate::menus::select(menu, &options, Some(&current), move |format, _, cx| {
+                let _ = owner.update(cx, |this, cx| {
+                    if this.export.file.cancel.is_none() {
+                        this.export.file.format = format;
+                        cx.notify();
+                    }
+                });
+            })
         });
         Some(
             div()

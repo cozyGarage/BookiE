@@ -103,8 +103,7 @@ async fn run_statement(
         confirms_cancellation,
         control,
     )
-    .await
-    .map(QueryResultBatch::single);
+    .await;
     if params.is_empty() && result.as_ref().is_err_and(needs_text_protocol) {
         result = run_server_cancellable(
             crate::text_protocol(connection, sql),

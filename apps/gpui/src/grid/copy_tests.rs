@@ -1,5 +1,5 @@
 use bookie_gpui::keymap::Command;
-use bookie_gpui::palette::{GROUPS, known_group};
+use bookie_gpui::palette::{GROUPS, known_group, menu_label, opens_dialog};
 use gpui::TestAppContext;
 
 use crate::live_ui_tests::open_live;
@@ -130,7 +130,7 @@ fn a_command_has_one_name_in_the_palette_and_the_shortcut_list(cx: &mut TestAppC
     let actions = view.read_with(cx, |view, _| view.palette_actions());
     let mismatched: Vec<(String, &str)> = actions
         .iter()
-        .filter(|action| action.id != "sidebar")
+        .filter(|action| !matches!(action.id, "sidebar" | "detail"))
         .filter_map(|action| Command::for_action(action.id).map(|command| (action.label.clone(), command.title())))
         .filter(|(label, title)| label != title)
         .collect();
@@ -186,5 +186,91 @@ fn the_palette_shows_shortcuts_in_the_same_format_as_the_editor_hints(cx: &mut T
         assert_eq!(view.action_shortcut("run").as_deref(), Some("Ctrl+Shift+Enter"));
         assert_eq!(view.action_shortcut("go-to-last-edit").as_deref(), Some("Ctrl+Alt+-"));
         assert_eq!(view.action_shortcut("query").as_deref(), Some("Ctrl+T"));
+    });
+}
+
+#[gpui::test]
+fn a_label_ends_with_an_ellipsis_exactly_when_the_command_asks_for_more(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    let actions = view.read_with(cx, |view, _| view.palette_actions());
+    let mut wrong: Vec<String> = actions
+        .iter()
+        .filter(|action| action.id != "font-choice")
+        .flat_map(|action| {
+            [
+                (action.id, action.label.clone()),
+                (action.id, action.menu_label().to_string()),
+            ]
+        })
+        .filter(|(id, label)| label.ends_with('…') != opens_dialog(id))
+        .map(|(id, label)| format!("{id}: {label}"))
+        .collect();
+    wrong.extend(
+        Command::ALL
+            .into_iter()
+            .filter(|command| command.title().ends_with('…') != opens_dialog(command.name()))
+            .map(|command| format!("{}: {}", command.name(), command.title())),
+    );
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+#[test]
+fn every_menu_item_has_a_short_menu_label_that_follows_the_copy_rules() {
+    let ids = crate::menus::MENUS
+        .iter()
+        .flat_map(|groups| groups.iter().flat_map(|group| group.iter().copied()));
+    let mut problems = Vec::new();
+    for id in ids {
+        let Some(label) = menu_label(id) else {
+            problems.push(format!("{id} has no menu label"));
+            continue;
+        };
+        if label.split_whitespace().count() > 3 {
+            problems.push(format!("{id}: {label:?} is longer than three words"));
+        }
+        problems.extend(copy_problems(label));
+    }
+    assert!(problems.is_empty(), "{problems:#?}");
+}
+
+#[test]
+fn menu_groups_hold_at_most_seven_items() {
+    let long: Vec<&[&str]> = crate::menus::MENUS
+        .iter()
+        .flat_map(|groups| groups.iter().copied())
+        .filter(|group| group.len() > crate::menus::MAX_GROUP_ITEMS)
+        .collect();
+    assert!(long.is_empty(), "{long:?}");
+}
+
+#[gpui::test]
+fn menu_items_show_the_keymap_shortcut_and_a_check_for_the_current_state(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    view.read_with(cx, |view, _| {
+        let groups = crate::menus::command_groups(view, crate::menus::OVERFLOW_GROUPS);
+        let entries: Vec<_> = groups.iter().flatten().collect();
+        let entry = |id: &str| entries.iter().find(|entry| entry.id == id).copied().expect("listed");
+        assert_eq!(entry("run").shortcut.as_deref(), Some("Ctrl+Shift+Enter"));
+        assert_eq!(entry("detail").shortcut.as_deref(), Some("F3"));
+        assert_eq!(entry("sidebar").checked, view.sidebar.open);
+        assert_eq!(entry("theme").checked, view.dark_mode);
+        assert_eq!(entry("home").shortcut, None);
+    });
+}
+
+#[gpui::test]
+fn the_palette_has_one_command_for_the_session_list(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            assert!(
+                !view
+                    .palette_actions()
+                    .iter()
+                    .any(|action| action.id == "activity-console")
+            );
+            assert!(!view.execute_palette_action("activity-console", window, cx));
+            assert!(!view.execute_palette_action("not-a-command", window, cx));
+        })
     });
 }

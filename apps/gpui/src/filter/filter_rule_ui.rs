@@ -54,6 +54,8 @@ impl Default for FilterRuleState {
     }
 }
 
+const OPERATOR_GROUPS: [std::ops::Range<usize>; 3] = [0..6, 6..13, 13..OPERATORS.len()];
+
 impl GridView {
     pub(crate) fn filter_rule_actions(&self) -> Vec<Action> {
         vec![Action {
@@ -157,6 +159,39 @@ impl GridView {
         );
     }
 
+    pub(crate) fn set_filter_operator(&mut self, index: usize) {
+        self.search.rule.operator = index % OPERATORS.len();
+    }
+
+    fn operator_menu(&self, label: &str, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu as _;
+        let selected = self.search.rule.operator % OPERATORS.len();
+        let owner = cx.entity().downgrade();
+        crate::surfaces::select_button(
+            "filter-rule-operator",
+            Some(label),
+            "Operator",
+            crate::surfaces::Bar::Small,
+            theme,
+        )
+        .dropdown_menu(move |menu, _, _| {
+            OPERATOR_GROUPS.iter().enumerate().fold(menu, |menu, (group, range)| {
+                let options: Vec<(gpui::SharedString, usize)> = range
+                    .clone()
+                    .map(|index| (OPERATORS[index].label.into(), index))
+                    .collect();
+                let owner = owner.clone();
+                let menu = if group > 0 { menu.separator() } else { menu };
+                crate::menus::select(menu, &options, Some(&selected), move |index, _, cx| {
+                    let _ = owner.update(cx, |this, cx| {
+                        this.set_filter_operator(index);
+                        cx.notify();
+                    });
+                })
+            })
+        })
+    }
+
     pub(crate) fn filter_rule_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let (column, value) = (self.search.rule.column.clone()?, self.search.rule.value.clone()?);
         if !self.search.rule.open {
@@ -166,14 +201,7 @@ impl GridView {
         let needs_value = entry.shape != ValueShape::None;
         let mut bar = task_bar("Filter by rule", theme)
             .child(div().w(px(size::FORM_CONTROL * 3.0)).child(column))
-            .child(
-                button(ButtonKind::Ghost, "filter-rule-operator", entry.label, theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.search.rule.operator = (this.search.rule.operator + 1) % OPERATORS.len();
-                        cx.notify();
-                    },
-                )),
-            );
+            .child(self.operator_menu(entry.label, theme, cx));
         if needs_value {
             bar = bar.child(div().flex_1().min_w_0().child(value));
         } else {
