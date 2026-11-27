@@ -14,10 +14,30 @@ pub enum Route {
     ParamSelect,
     Command,
     FullValue,
+    CopyTsv,
+    ExportCsv,
+    ExportJson,
+    ExportJsonLines,
+    ExportSql,
+    ImportCsv,
+    ImportXlsx,
+    Edit,
+    Paste,
+    SetCells,
+    InsertRow,
+    NoopEdit,
 }
 
 impl Route {
     pub const READS: [Route; 4] = [Route::Query, Route::Browse, Route::ParamWhere, Route::ParamSelect];
+    pub const ARTEFACTS: [Route; 4] = [
+        Route::CopyTsv,
+        Route::ExportCsv,
+        Route::ExportJson,
+        Route::ExportJsonLines,
+    ];
+    pub const COPIES: [Route; 3] = [Route::ExportSql, Route::ImportCsv, Route::ImportXlsx];
+    pub const EDITS: [Route; 4] = [Route::Edit, Route::Paste, Route::SetCells, Route::InsertRow];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -27,6 +47,18 @@ impl Route {
             Route::ParamSelect => "param_select",
             Route::Command => "command",
             Route::FullValue => "full_value",
+            Route::CopyTsv => "copy_tsv",
+            Route::ExportCsv => "export_csv",
+            Route::ExportJson => "export_json",
+            Route::ExportJsonLines => "export_json_lines",
+            Route::ExportSql => "export_sql",
+            Route::ImportCsv => "import_csv",
+            Route::ImportXlsx => "import_xlsx",
+            Route::Edit => "edit",
+            Route::Paste => "paste",
+            Route::SetCells => "set_cells",
+            Route::InsertRow => "insert_row",
+            Route::NoopEdit => "noop_edit",
         }
     }
 }
@@ -146,6 +178,8 @@ pub struct Case {
     pub bookie_session: Vec<String>,
     #[serde(default)]
     pub referee: Option<String>,
+    #[serde(default)]
+    pub text_referee: Option<String>,
     #[serde(default)]
     pub param: Option<String>,
     #[serde(default)]
