@@ -15,7 +15,7 @@ use gpui_kit::TestSupportExt as _;
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, toggle_icon_button};
+use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, tip, toggle_icon_button};
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::theme::{Theme, size};
 
