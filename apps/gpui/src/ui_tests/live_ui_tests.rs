@@ -1751,9 +1751,19 @@ fn diagram_palette_prefers_opening_the_diagram_to_exporting_it(cx: &mut TestAppC
     cx.simulate_input("diagram");
     view.read_with(cx, |view, cx| {
         let actions = view.palette_actions();
-        let ids: Vec<_> = view.palette_shown(cx).into_iter().map(|index| actions[index].id).collect();
-        let show = ids.iter().position(|id| *id == "show-schema-diagram").expect("show action");
-        let export = ids.iter().position(|id| *id == "export-schema-diagram").expect("export action");
+        let ids: Vec<_> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| actions[index].id)
+            .collect();
+        let show = ids
+            .iter()
+            .position(|id| *id == "show-schema-diagram")
+            .expect("show action");
+        let export = ids
+            .iter()
+            .position(|id| *id == "export-schema-diagram")
+            .expect("export action");
         assert!(show < export, "{ids:?}");
     });
     cx.update(|_, cx| {
