@@ -5,9 +5,9 @@ use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::one_line;
-use crate::surfaces::{ListState, list_state};
+use crate::surfaces::{ListState, list_row, list_state, truncated};
 use crate::text_input::{InputEvent, TextInput};
+use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
 const RECENT_RECORDS: usize = 1_000;
 
@@ -16,7 +16,7 @@ pub(crate) struct AuditPage {
     pub rows: Vec<OperationRow>,
     pub loading: bool,
     pub error: Option<String>,
-    generation: u64,
+    requests: crate::Ticket,
 }
 
 impl AuditPage {
@@ -33,7 +33,7 @@ impl AuditPage {
             rows: Vec::new(),
             loading: false,
             error: None,
-            generation: 0,
+            requests: crate::Ticket::new(),
         }
     }
 }
@@ -70,16 +70,15 @@ fn shown<'a>(rows: &'a [OperationRow], query: &str) -> Vec<&'a OperationRow> {
 
 impl GridView {
     pub(crate) fn reload_audit_page(&mut self, cx: &mut Context<Self>) {
-        self.audit_page.generation += 1;
+        let generation = self.audit_page.requests.next();
         self.audit_page.loading = true;
-        let generation = self.audit_page.generation;
         cx.spawn(async move |this, cx| {
             let rows = cx
                 .background_executor()
                 .spawn(async move { block_on(audit_view::recent_operations(RECENT_RECORDS)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if this.audit_page.generation != generation {
+                if !this.audit_page.requests.is_current(generation) {
                     return;
                 }
                 this.audit_page.loading = false;
@@ -104,15 +103,8 @@ impl GridView {
             ("circle", theme.success)
         };
         let status = audit_view::status_text(row.status);
-        div()
-            .id(("audit-row", index))
-            .flex()
+        list_row(("audit-row", index), false, theme)
             .items_start()
-            .gap_2()
-            .px_3()
-            .py_1()
-            .rounded(px(theme.radius))
-            .hover(move |style| style.bg(rgb(theme.accent)))
             .child(div().pt_1().child(icon(mark, color)))
             .child(
                 div()
@@ -122,28 +114,20 @@ impl GridView {
                     .flex()
                     .flex_col()
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("audit-sql", index), one_line_sql(&row.sql, MAX_STATEMENT_CHARS))
                             .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace")
-                            .child(one_line(&row.sql)),
+                            .font_family("monospace"),
                     )
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("audit-meta", index), format!("{status} · {}", meta(row)))
                             .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(format!("{status} · {}", meta(row))),
+                            .text_color(rgb(theme.muted_foreground)),
                     )
                     .children(row.error.as_ref().map(|error| {
                         div()
                             .text_size(px(size::TEXT_SMALL))
                             .text_color(rgb(theme.destructive))
-                            .child(one_line(error))
+                            .child(one_line_sql(error, MAX_STATEMENT_CHARS))
                     })),
             )
     }

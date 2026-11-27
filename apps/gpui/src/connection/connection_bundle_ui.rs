@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use crate::surfaces::{ButtonKind, button, task_bar_frame};
 use crate::*;
 use bookie_app_services::connection_bundle as bundles;
+use bookie_gpui::messages::plural;
 use gpui_component::scroll::ScrollableElement;
 
 #[derive(Default)]
@@ -289,7 +290,7 @@ impl GridView {
         match (result, saved) {
             (Ok(count), Ok(connections)) => {
                 self.connections = connections;
-                self.status = format!("Imported {count} connection(s)");
+                self.status = format!("Imported {}", plural(count, "connection", "connections"));
             }
             (Err(message), Ok(connections)) => {
                 self.connections = connections;
@@ -335,7 +336,10 @@ impl GridView {
                 this.connection_bundle.busy = false;
                 match result {
                     Ok(count) => {
-                        this.status = format!("Exported {count} connection(s); passwords and SSH secrets were omitted")
+                        this.status = format!(
+                            "Exported {}; passwords and SSH secrets were omitted",
+                            plural(count, "connection", "connections")
+                        )
                     }
                     Err(message) => this.report_failure("export connections", &message),
                 }
@@ -351,21 +355,18 @@ impl GridView {
             return None;
         }
         if let Some(pending) = &self.connection_bundle.pending {
-            let rows = pending.plan.items.iter().map(|item| {
+            let rows = pending.plan.items.iter().enumerate().map(|(index, item)| {
                 div()
                     .flex()
                     .justify_between()
                     .gap_2()
+                    .child(crate::surfaces::truncated(
+                        ("connection-import-name", index),
+                        item.connection.name.clone(),
+                    ))
                     .child(
                         div()
-                            .min_w_0()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(item.connection.name.clone()),
-                    )
-                    .child(
-                        div()
+                            .flex_none()
                             .text_color(rgb(theme.muted_foreground))
                             .child(disposition_name(&item.disposition)),
                     )
@@ -389,23 +390,17 @@ impl GridView {
                             .child(
                                 div()
                                     .font_weight(gpui::FontWeight::MEDIUM)
-                                    .child(format!("Review {count} connection(s)")),
+                                    .child(format!("Review {}", plural(count, "connection", "connections"))),
                             )
                             .children(rows)
                             .when(skipped > 0, |view| {
-                                view.child(
-                                    div()
+                                view.child(div().text_color(rgb(theme.muted_foreground)).child(format!(
+                                    "{} will be skipped",
+                                    plural(skipped, "unsupported connection", "unsupported connections")
+                                )))
+                                .children(pending.skipped.iter().enumerate().map(|(index, name)| {
+                                    crate::surfaces::truncated(("connection-import-skipped", index), name.clone())
                                         .text_color(rgb(theme.muted_foreground))
-                                        .child(format!("{skipped} unsupported connection(s) will be skipped")),
-                                )
-                                .children(pending.skipped.iter().map(|name| {
-                                    div()
-                                        .min_w_0()
-                                        .overflow_hidden()
-                                        .whitespace_nowrap()
-                                        .text_ellipsis()
-                                        .text_color(rgb(theme.muted_foreground))
-                                        .child(name.clone())
                                 }))
                             }),
                     )

@@ -1,6 +1,6 @@
 use bookie_core::TableInfo;
 
-use crate::surfaces::{ButtonKind, compact_button, tooltip_view};
+use crate::surfaces::{ButtonKind, compact_button, tip, truncated};
 use crate::*;
 
 const PLACEHOLDER: &str = "e.g. created_at > now() - interval '1 day'";
@@ -25,7 +25,7 @@ impl GridView {
     }
 
     fn shows_server_filter(&self) -> bool {
-        self.live.is_some() && !self.grid_is_query && matches!(self.tabs.current(), Tab::Table(_))
+        self.shows_live_table() && matches!(self.tabs.current(), Tab::Table(_))
     }
 
     pub(crate) fn server_filter_actions(&self) -> Vec<Action> {
@@ -171,7 +171,7 @@ impl GridView {
                 if applied { "WHERE active" } else { "WHERE" },
                 theme,
             )
-            .tooltip(tooltip_view("Filter this table on the server".into()))
+            .tooltip(tip("Filter this table on the server"))
             .on_click(cx.listener(|this, _, window, cx| {
                 if this.search.server.visible {
                     this.search.server.visible = false;
@@ -216,16 +216,9 @@ impl GridView {
                         .on_click(cx.listener(|this, _, _, cx| this.clear_where(cx))),
                 )
                 .children(self.sort_chip().map(|text| {
-                    let tooltip = tooltip_view(text.clone().into());
-                    div()
-                        .id("sort-chip")
-                        .debug_selector(|| "sort-chip".into())
-                        .min_w_0()
+                    truncated("sort-chip", text)
                         .max_w(px(size::FIND_WIDTH))
-                        .truncate()
                         .text_color(rgb(theme.muted_foreground))
-                        .tooltip(tooltip)
-                        .child(text)
                 })),
         )
     }

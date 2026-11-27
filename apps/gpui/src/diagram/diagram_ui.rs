@@ -8,7 +8,7 @@ use gpui::{MouseDownEvent, PathBuilder, canvas, point};
 use std::collections::BTreeSet;
 
 use crate::diagram_scene::{Scene, build_scene};
-use crate::surfaces::{ButtonKind, compact_button, compact_icon_button};
+use crate::surfaces::{ButtonKind, ListState, compact_button, compact_icon_button, list_state};
 use crate::*;
 
 const DIAGRAM_EDGE_STROKE_WIDTH: f32 = 1.5;
@@ -441,7 +441,7 @@ impl GridView {
             .child(self.diagram_scope_menu(theme, cx));
         if let Some(view) = &state.view {
             toolbar = toolbar
-                .child(div().flex_1().min_w_0().truncate().child(diagram_count(view)))
+                .child(crate::surfaces::truncated("diagram-count", diagram_count(view)).flex_1())
                 .child(
                     compact_icon_button("diagram-zoom-out", "minus", "Zoom out", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.change_diagram_zoom(|z, _| zoom::step_out(z), cx))),
@@ -479,7 +479,11 @@ impl GridView {
 
     pub(crate) fn diagram_page(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
         let state = &self.search.diagram;
-        let message = state.failure.as_deref().or(state.loading.then_some("Loading schema…"));
+        let message = match (&state.failure, state.loading) {
+            (Some(failure), _) => Some(ListState::Failed(failure)),
+            (None, true) => Some(ListState::Loading("Loading schema…")),
+            (None, false) => None,
+        };
         let body = if let Some(form) = self.diagram_ddl_editor(theme, cx) {
             form
         } else {
@@ -509,13 +513,7 @@ impl GridView {
             .flex_col()
             .min_h_0()
             .child(self.diagram_toolbar(theme, cx))
-            .children(message.map(|text| {
-                div()
-                    .px_2()
-                    .py_1()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child(text.to_owned())
-            }))
+            .children(message.map(|state| list_state(state, theme).px_2().py_1()))
             .child(body)
     }
 
@@ -582,7 +580,7 @@ impl GridView {
             let title = format!("{label} {}", diagram_table_name(table));
             Some(
                 compact_button(ButtonKind::Ghost, ("diagram-link", other), title, theme)
-                    .tooltip(crate::surfaces::tooltip_view(relation.name.clone().into()))
+                    .tooltip(crate::surfaces::tip(relation.name.clone()))
                     .on_click(cx.listener(move |this, _, _, cx| this.select_diagram_card(other, true, cx))),
             )
         });
@@ -592,18 +590,15 @@ impl GridView {
             .min_h_0()
             .overflow_y_scroll()
             .child(crate::surfaces::section_header("Columns", theme))
-            .children(table.columns.iter().map(|column| {
+            .children(table.columns.iter().enumerate().map(|(index, column)| {
                 div()
                     .flex()
                     .gap_1()
                     .py_1()
-                    .child(div().flex_1().min_w_0().truncate().child(column.name.clone()))
+                    .child(crate::surfaces::truncated(("diagram-column-name", index), column.name.clone()).flex_1())
                     .child(
-                        div()
-                            .min_w_0()
-                            .truncate()
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(column.type_name.clone()),
+                        crate::surfaces::truncated(("diagram-column-type", index), column.type_name.clone())
+                            .text_color(rgb(theme.muted_foreground)),
                     )
             }))
             .child(crate::surfaces::section_header("Relationships", theme))
@@ -626,9 +621,11 @@ impl GridView {
             name: table.name.clone(),
         };
         let open_data = target.clone();
-        let can_add_relationship = self.live.as_ref().is_some_and(|live| {
-            live.writable.is_some() && bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id)
-        });
+        let can_add_relationship = self.is_writable()
+            && self
+                .live
+                .as_ref()
+                .is_some_and(|live| bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id));
         let relationship_source = target.clone();
         let column_target = target.clone();
         div()
@@ -636,10 +633,8 @@ impl GridView {
             .flex_col()
             .gap_1()
             .child(
-                div()
-                    .truncate()
-                    .font_weight(gpui::FontWeight::MEDIUM)
-                    .child(diagram_table_name(table)),
+                crate::surfaces::truncated("diagram-selected-table", diagram_table_name(table))
+                    .font_weight(gpui::FontWeight::MEDIUM),
             )
             .child(
                 div()
@@ -870,7 +865,7 @@ fn table_card(
                         this.begin_diagram_gesture(index, event, false, cx);
                     }),
                 )
-                .child(div().flex_1().min_w_0().truncate().child(diagram_table_name(table)))
+                .child(crate::surfaces::truncated(("diagram-card-name", index), diagram_table_name(table)).flex_1())
                 .child(
                     div()
                         .flex_none()

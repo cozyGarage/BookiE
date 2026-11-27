@@ -458,7 +458,8 @@ impl LiveSession {
         capabilities: bookie_core::DriverCapabilities,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let started = std::time::Instant::now();
         let result = self.runtime.block_on(dictionary_pages(
             &self.sessions,
@@ -466,7 +467,7 @@ impl LiveSession {
             capabilities,
             cancellation,
             epoch,
-            &self.epoch,
+            &current_epoch,
         ))?;
         Ok(LiveTable {
             session: self.clone(),
@@ -724,7 +725,8 @@ impl LiveSession {
         window: Duration,
         cancellation: &CancellationToken,
     ) -> Result<SubscriptionSample, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let deadline = tokio::time::Instant::now() + window + Duration::from_secs(15);
         let control = OperationControl::new(cancellation.clone(), Some(deadline));
         let event = self.runtime.block_on(dispatch_read(
@@ -740,7 +742,7 @@ impl LiveSession {
             },
             &control,
             epoch,
-            &self.epoch,
+            &current_epoch,
         ))?;
         let Event::SubscriptionSampled { outcome, .. } = event else {
             return Err("The command bridge returned an unexpected event".into());
@@ -788,13 +790,14 @@ impl LiveSession {
         if sort.is_some() && !self.supports_snapshot_cursor {
             return Err("Server-side table sorting is not available for this connection".into());
         }
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let started = std::time::Instant::now();
         let reader = PageReader {
             sessions: &self.sessions,
             session_id: self.session_id,
             epoch,
-            current_epoch: &self.epoch,
+            current_epoch: &current_epoch,
         };
         let result = self
             .runtime

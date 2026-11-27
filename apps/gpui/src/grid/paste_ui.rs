@@ -156,7 +156,10 @@ impl GridView {
                     self.record_edit(key, value);
                 }
                 self.edits_changed();
-                self.status = format!("{count} cell(s) pasted; review and save to apply");
+                self.status = format!(
+                    "{} pasted; review and save to apply",
+                    bookie_gpui::messages::plural(count, "cell", "cells")
+                );
             }
             Err(reason) => self.status = format!("Nothing was pasted: {reason}"),
         }

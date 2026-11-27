@@ -61,7 +61,7 @@ impl GridView {
         vec![Action {
             id: "filter-rule",
             label: "Filter this table by a column, operator and value…".to_string(),
-            enabled: self.live.is_some() && !self.grid_is_query,
+            enabled: self.shows_live_table(),
         }]
     }
 
@@ -86,7 +86,7 @@ impl GridView {
     }
 
     pub(crate) fn open_filter_rule_bar(&mut self, cx: &mut Context<Self>) {
-        if self.live.is_none() || self.grid_is_query {
+        if !self.shows_live_table() {
             self.status = "Open a table to filter it by a rule".into();
             return;
         }

@@ -3,8 +3,11 @@ use bookie_gpui::messages::MessageKind;
 use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, rgb};
 use gpui_component::menu::DropdownMenu as _;
 
-use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
-use crate::surfaces::{Bar, ButtonKind, button, compact_icon_button, segment, segmented, select_button};
+use crate::chrome::{SQL, TOOLBAR_HEIGHT};
+use crate::surfaces::{
+    Bar, ButtonKind, ListState, button, compact_icon_button, list_state, picker_chip, segment, segmented,
+    select_button, shortcut, tip, truncated,
+};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -266,38 +269,14 @@ impl GridView {
     }
 
     fn query_connection_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
-        div()
-            .id("query-connection-chip")
-            .debug_selector(|| "query-connection-chip".into())
-            .flex()
-            .items_center()
-            .gap_1()
-            .min_w_0()
-            .overflow_hidden()
-            .h(px(size::SMALL_CONTROL))
-            .px_2()
-            .rounded(px(theme.radius))
-            .border_1()
-            .border_color(rgb(theme.border))
-            .cursor_pointer()
-            .text_color(rgb(theme.muted_foreground))
-            .hover(move |style| style.bg(rgb(theme.accent)))
-            .tooltip(|window, cx| {
-                gpui_component::tooltip::Tooltip::new("Show connection and tunnel status").build(window, cx)
-            })
-            .on_click(cx.listener(|this, _, _, cx| {
+        let name = self.catalog.connection.clone();
+        let tooltip = connection_chip_tooltip(&name);
+        picker_chip("query-connection-chip", Some("database"), name, tooltip, theme).on_click(cx.listener(
+            |this, _, _, cx| {
                 this.show_status();
                 cx.notify();
-            }))
-            .child(crate::assets::icon("database", theme.muted_foreground))
-            .child(
-                div()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .text_ellipsis()
-                    .child(self.catalog.connection.clone()),
-            )
+            },
+        ))
     }
 
     fn query_context_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
@@ -307,10 +286,9 @@ impl GridView {
         } else {
             format!("Connection: {}", self.catalog.connection)
         };
-        let schema = self.live.as_ref().and_then(|session| {
-            bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
-                .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()))
-        });
+        let schema = self
+            .supports_schema_context()
+            .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()));
         crate::surfaces::menu_button(
             "query-context-menu",
             crate::surfaces::MenuTrigger::new("Connection and database context", Bar::Small).icon("database"),
@@ -344,36 +322,22 @@ impl GridView {
     }
 
     fn schema_context_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
-        let session = self.live.as_ref()?;
-        if !bookie_app_services::schema_context::supports_schema_context(&session.driver_id) {
+        if !self.supports_schema_context() {
             return None;
         }
         let label = self.schema_context.clone().unwrap_or_else(|| "schema".to_owned());
         Some(
-            div()
-                .id("query-schema-chip")
-                .debug_selector(|| "query-schema-chip".into())
-                .flex()
-                .items_center()
-                .min_w_0()
-                .overflow_hidden()
-                .h(px(size::SMALL_CONTROL))
-                .px_2()
-                .rounded(px(theme.radius))
-                .border_1()
-                .border_color(rgb(theme.border))
-                .cursor_pointer()
-                .text_color(rgb(theme.muted_foreground))
-                .hover(move |style| style.bg(rgb(theme.accent)))
-                .tooltip(|window, cx| {
-                    gpui_component::tooltip::Tooltip::new("Choose the schema or database queries run in")
-                        .build(window, cx)
-                })
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.open_picker(crate::palette_state::PaletteMode::SchemaContext, window, cx);
-                    cx.notify();
-                }))
-                .child(div().whitespace_nowrap().text_ellipsis().child(label)),
+            picker_chip(
+                "query-schema-chip",
+                None,
+                label,
+                "Choose the schema or database queries run in",
+                theme,
+            )
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.open_picker(crate::palette_state::PaletteMode::SchemaContext, window, cx);
+                cx.notify();
+            })),
         )
     }
 
@@ -486,11 +450,7 @@ impl GridView {
                     }),
                 ),
         );
-        let tab = if let Some(tip) = run.tooltip() {
-            tab.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
-        } else {
-            tab
-        };
+        let tab = tab.when_some(run.tooltip(), |tab, text| tab.tooltip(tip(text)));
         tab.on_click(cx.listener(move |this, _, _, cx| {
             this.select_run(index);
             cx.notify();
@@ -713,12 +673,10 @@ impl GridView {
                     Some(took) => format!("Elapsed: {took}"),
                     None => format!("Elapsed: {} ms (synthetic)", run.millis()),
                 };
-                let el = div().id("execution-summary-elapsed").child(line);
-                if let Some(tip) = run.tooltip() {
-                    el.tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(tip.clone()).build(window, cx))
-                } else {
-                    el
-                }
+                div()
+                    .id("execution-summary-elapsed")
+                    .child(line)
+                    .when_some(run.tooltip(), |el, text| el.tooltip(tip(text)))
             })
             .children(
                 self.live
@@ -758,7 +716,7 @@ impl GridView {
                 .gap_1()
                 .p_4()
                 .text_color(rgb(theme.muted_foreground))
-                .child(div().pb_2().child("Run a query to see results"))
+                .child(list_state(ListState::Empty("Run a query to see results"), theme))
                 .children(
                     [Command::RunAtCursor, Command::RunQuery, Command::Palette]
                         .into_iter()
@@ -791,8 +749,15 @@ impl GridView {
     }
 }
 
+fn connection_chip_tooltip(name: &str) -> String {
+    if name.is_empty() {
+        "Show connection and tunnel status".to_owned()
+    } else {
+        format!("{name}: show connection and tunnel status")
+    }
+}
+
 fn shortcut_hint(label: &'static str, keys: String, theme: Theme) -> Div {
-    let selector = format!("shortcut-keycap-{keys}");
     div()
         .flex()
         .items_center()
@@ -800,27 +765,15 @@ fn shortcut_hint(label: &'static str, keys: String, theme: Theme) -> Div {
         .gap_4()
         .w(px(size::SHORTCUT_HINT_WIDTH))
         .text_size(px(size::TEXT_SMALL))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .text_ellipsis()
-                .child(label),
-        )
-        .child(
-            div()
-                .debug_selector(move || selector)
-                .flex_none()
-                .w(px(size::SHORTCUT_KEYCAP_WIDTH))
-                .flex()
-                .justify_center()
-                .py_1()
-                .rounded(px(size::CONTROL_RADIUS))
-                .border_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.chrome))
-                .child(keys),
-        )
+        .child(truncated(format!("shortcut-hint-{label}"), label).flex_1())
+        .children(shortcut(Some(keys), theme).map(|keycap| keycap.w(px(size::SHORTCUT_KEYCAP_WIDTH))))
+}
+
+#[cfg(test)]
+mod connection_chip_tests {
+    #[test]
+    fn the_connection_chip_tooltip_names_the_connection() {
+        assert!(super::connection_chip_tooltip("shop").starts_with("shop"));
+        assert_eq!(super::connection_chip_tooltip(""), "Show connection and tunnel status");
+    }
 }

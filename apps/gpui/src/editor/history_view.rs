@@ -7,10 +7,10 @@ use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::one_line;
 use crate::connection_form::choice_row;
-use crate::surfaces::{Bar, ListState, icon_button, list_state, segment, toggle_icon_button};
+use crate::surfaces::{Bar, ListState, icon_button, list_row, list_state, segment, toggle_icon_button, truncated};
 use crate::text_input::{InputEvent, TextInput};
+use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
 static PRUNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -22,7 +22,7 @@ pub(crate) struct HistoryPage {
     pub window: TimeWindow,
     pub rows: Vec<HistoryRow>,
     pub load: HistoryLoad,
-    generation: u64,
+    requests: crate::Ticket,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -57,7 +57,7 @@ impl HistoryPage {
             window: TimeWindow::Any,
             rows: Vec::new(),
             load: HistoryLoad::Loading,
-            generation: 0,
+            requests: crate::Ticket::new(),
         }
     }
 }
@@ -109,8 +109,7 @@ impl GridView {
     }
 
     pub(crate) fn reload_history_page(&mut self, cx: &mut Context<Self>) {
-        self.history_page.generation += 1;
-        let generation = self.history_page.generation;
+        let generation = self.history_page.requests.next();
         let query = HistoryQuery {
             text: self.history_page.search.read(cx).content().to_string(),
             status: self.history_page.status,
@@ -124,7 +123,7 @@ impl GridView {
                 .spawn(async move { block_on(statement_history::search(query)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if this.history_page.generation != generation {
+                if !this.history_page.requests.is_current(generation) {
                     return;
                 }
                 match rows {
@@ -213,15 +212,8 @@ impl GridView {
         }));
         let delete = icon_button(("history-delete", index), "trash-2", "Delete", theme)
             .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
-        div()
-            .id(("history-row", index))
-            .flex()
-            .items_center()
-            .gap_2()
-            .px_3()
+        list_row(("history-row", index), false, theme)
             .h(px(size::LIST_ROW))
-            .rounded(px(theme.radius))
-            .hover(move |style| style.bg(rgb(theme.accent)))
             .child(icon(if row.succeeded { "circle" } else { "x" }, dot))
             .child(
                 div()
@@ -234,22 +226,14 @@ impl GridView {
                     .flex()
                     .flex_col()
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("history-sql", index), one_line_sql(&row.query, MAX_STATEMENT_CHARS))
                             .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace")
-                            .child(one_line(&row.query)),
+                            .font_family("monospace"),
                     )
                     .child(
-                        div()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .overflow_hidden()
+                        truncated(("history-meta", index), meta(row))
                             .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(meta(row)),
+                            .text_color(rgb(theme.muted_foreground)),
                     ),
             )
             .child(pin)
