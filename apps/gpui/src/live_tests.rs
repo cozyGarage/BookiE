@@ -304,6 +304,25 @@ fn cancelled_value_search_bridge_requests_do_not_run() {
 }
 
 #[test]
+fn value_search_bridge_refuses_a_closed_session() {
+    let session = LiveSession::open(&fixture()).unwrap();
+    let source = BridgeSource(&session);
+    assert!(session.sessions.close(session.session_id));
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    let target = TableTarget {
+        schema: None,
+        name: "orders".into(),
+    };
+    assert!(session.runtime.block_on(source.columns(&target, &control)).is_err());
+    assert!(
+        session
+            .runtime
+            .block_on(source.query("SELECT id FROM orders", &[], &control))
+            .is_err()
+    );
+}
+
+#[test]
 fn a_cancelled_live_load_is_not_returned_as_a_complete_table() {
     let session = LiveSession::open(&fixture()).unwrap();
     let cancellation = CancellationToken::new();
