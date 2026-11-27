@@ -555,6 +555,7 @@ impl GridView {
                         div()
                             .id(format!("sidebar-connection-entry-{id}"))
                             .debug_selector(|| "sidebar-connection-entry".into())
+                            .test_support()
                             .aria_label(label.clone())
                             .tooltip(tip(full_name.clone()))
                             .flex()
