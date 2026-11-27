@@ -326,11 +326,14 @@ impl GridView {
             .relative()
             .children(indent_guides(depth, theme))
             .flex()
+            .w_full()
+            .min_w_0()
             .items_center()
             .h(px(size::TREE_ROW))
             .pl(px(tree_indent(depth as f32)))
             .gap_1()
             .rounded(px(theme.radius))
+            .tooltip(tip(label.clone()))
             .cursor_pointer()
             .child(div().w(px(size::CHEVRON)).flex_none().children(chevron.map(|open| {
                 icon(
@@ -676,6 +679,7 @@ impl GridView {
     fn sidebar_resize_handle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         div()
             .id("sidebar-resize")
+            .debug_selector(|| "sidebar-resize".into())
             .absolute()
             .top_0()
             .right_0()
