@@ -92,6 +92,17 @@ where
     write_atomically_checked(path, fill, || Ok(()))
 }
 
+pub fn write_atomically_no_replace_checked<F>(
+    path: &Path,
+    fill: F,
+    before_publish: impl FnOnce() -> io::Result<()>,
+) -> io::Result<()>
+where
+    F: FnOnce(&mut dyn Write) -> io::Result<()>,
+{
+    write_atomically_with_mode(path, fill, before_publish, true)
+}
+
 pub(crate) fn write_atomically_checked<E, F>(
     path: &Path,
     fill: F,
@@ -161,6 +172,21 @@ pub(crate) mod test_support {
 #[cfg(test)]
 mod atomic_write_tests {
     use super::*;
+
+    #[test]
+    fn a_cancelled_staged_no_replace_write_leaves_no_output() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("diagram.mmd");
+        let error = write_atomically_no_replace_checked(
+            &path,
+            |writer| writer.write_all(b"staged diagram"),
+            || Err(io::Error::other("cancelled")),
+        )
+        .unwrap_err();
+        assert_eq!(error.to_string(), "cancelled");
+        assert!(!path.exists());
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
 
     #[test]
     fn overlapping_exports_publish_complete_independent_files() {

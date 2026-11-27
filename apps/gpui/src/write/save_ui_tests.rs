@@ -1852,6 +1852,28 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
 }
 
 #[gpui::test]
+fn cancelling_a_queued_schema_export_does_not_create_a_file(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let (view, cx) = saving_view(cx, &fixture);
+    let directory = TestDirectory::new("cancel-schema-export");
+    let target = directory.file("schema.mmd");
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.open_schema_diagram_bar(cx);
+            view.search.diagram.input.as_ref().unwrap().update(cx, |input, cx| {
+                input.set_content(&target.to_string_lossy(), cx);
+            });
+            view.write_schema_diagram(cx);
+            assert!(view.close_top_surface(cx));
+        });
+    });
+    until(&view, cx, "the export settles", |view| {
+        view.status.starts_with("Wrote ") || view.status.starts_with("Canceled the diagram export")
+    });
+    assert!(!target.exists(), "cancelled export created a file");
+}
+
+#[gpui::test]
 fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx: &mut TestAppContext) {
     let path = orders();
     let (view, cx) = saving_view(cx, &path);

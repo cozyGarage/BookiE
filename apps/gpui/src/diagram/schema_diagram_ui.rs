@@ -1,5 +1,6 @@
-use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use bookie_app_services::er_diagram::SchemaDiagram;
 use bookie_app_services::er_diagram::export::{dbml, mermaid};
@@ -28,13 +29,22 @@ pub(crate) fn diagram_text(format: DiagramFormat, diagram: &SchemaDiagram) -> St
     }
 }
 
-fn write_new_file(path: &Path, text: &str) -> Result<(), String> {
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(path)
-        .map_err(|error| error.to_string())?;
-    file.write_all(text.as_bytes()).map_err(|error| error.to_string())
+const EXPORT_RUNNING: u8 = 0;
+const EXPORT_CANCELLED: u8 = 1;
+const EXPORT_PUBLISHING: u8 = 2;
+
+fn write_new_file(path: &Path, text: &str, phase: &AtomicU8) -> Result<(), String> {
+    bookie_core::export::write_atomically_no_replace_checked(
+        path,
+        |file| file.write_all(text.as_bytes()),
+        || {
+            phase
+                .compare_exchange(EXPORT_RUNNING, EXPORT_PUBLISHING, Ordering::AcqRel, Ordering::Acquire)
+                .map(|_| ())
+                .map_err(|_| std::io::Error::other("Canceled the diagram export"))
+        },
+    )
+    .map_err(|error| error.to_string())
 }
 
 #[derive(Default)]
@@ -52,6 +62,16 @@ pub(crate) struct SchemaDiagramState {
     pub open: bool,
     pub focus: bool,
     pub input: Option<Entity<TextInput>>,
+    export_request: crate::Ticket,
+    export_phase: Option<Arc<AtomicU8>>,
+}
+
+impl Drop for SchemaDiagramState {
+    fn drop(&mut self) {
+        if let Some(phase) = &self.export_phase {
+            let _ = phase.compare_exchange(EXPORT_RUNNING, EXPORT_CANCELLED, Ordering::AcqRel, Ordering::Acquire);
+        }
+    }
 }
 
 impl GridView {
@@ -112,6 +132,9 @@ impl GridView {
     }
 
     pub(crate) fn write_schema_diagram(&mut self, cx: &mut Context<Self>) {
+        if self.search.diagram.export_phase.is_some() {
+            return;
+        }
         let (Some(session), Some(input)) = (self.live.clone(), self.search.diagram.input.clone()) else {
             return;
         };
@@ -122,30 +145,69 @@ impl GridView {
         self.status = "Reading schema…".into();
         let scope = self.search.diagram.export_scope.clone();
         let shown = path.display().to_string();
-        self.begin_background(
-            Work::Load,
-            cx,
-            move |cancel| {
-                let read = session.schema_diagram(scope.as_deref(), &cancel)?;
-                let incomplete = read.truncated() || !read.skipped.is_empty();
-                let diagram = SchemaDiagram::build(read.reads);
-                write_new_file(&path, &diagram_text(format, &diagram))?;
-                Ok::<_, String>((diagram.tables.len(), read.total_tables, incomplete))
-            },
-            move |this, result| match result {
-                Ok((tables, total, incomplete)) => {
-                    this.search.diagram.open = false;
-                    this.status = if incomplete {
-                        format!("Wrote a partial diagram ({tables} of {total} tables) to {shown}")
-                    } else {
-                        format!("Wrote the diagram of {tables} table(s) to {shown}")
-                    };
-                    this.notices
-                        .push(this.status.clone(), crate::notifications::NoticeKind::Success);
+        self.search.diagram.export_request.invalidate();
+        let generation = self.search.diagram.export_request.generation;
+        let cancel = CancellationToken::new();
+        self.search.diagram.export_request.cancel = cancel.clone();
+        let phase = Arc::new(AtomicU8::new(EXPORT_RUNNING));
+        self.search.diagram.export_phase = Some(phase.clone());
+        cx.spawn(async move |this, cx| {
+            let result = cx
+                .background_executor()
+                .spawn(async move {
+                    let read = session.schema_diagram(scope.as_deref(), &cancel)?;
+                    if cancel.is_cancelled() {
+                        return Err("Canceled the diagram export".to_string());
+                    }
+                    let incomplete = read.truncated() || !read.skipped.is_empty();
+                    let diagram = SchemaDiagram::build(read.reads);
+                    let text = diagram_text(format, &diagram);
+                    if cancel.is_cancelled() {
+                        return Err("Canceled the diagram export".to_string());
+                    }
+                    write_new_file(&path, &text, &phase)?;
+                    Ok::<_, String>((diagram.tables.len(), read.total_tables, incomplete))
+                })
+                .await;
+            this.update(cx, |this, cx| {
+                if this.search.diagram.export_request.generation != generation {
+                    return;
                 }
-                Err(message) => this.report_failure("export the diagram", &message),
-            },
-        );
+                this.search.diagram.export_phase = None;
+                match result {
+                    Ok((tables, total, incomplete)) => {
+                        this.search.diagram.open = false;
+                        this.status = if incomplete {
+                            format!("Wrote a partial diagram ({tables} of {total} tables) to {shown}")
+                        } else {
+                            format!("Wrote the diagram of {tables} table(s) to {shown}")
+                        };
+                        this.notices
+                            .push(this.status.clone(), crate::notifications::NoticeKind::Success);
+                    }
+                    Err(message) => this.report_failure("export the diagram", &message),
+                }
+                cx.notify();
+            })
+            .ok();
+        })
+        .detach();
+    }
+
+    pub(crate) fn close_schema_diagram_export(&mut self) {
+        if let Some(phase) = &self.search.diagram.export_phase {
+            if phase
+                .compare_exchange(EXPORT_RUNNING, EXPORT_CANCELLED, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {
+                self.status = "The diagram export is finishing and can no longer be canceled".into();
+                return;
+            }
+            self.search.diagram.export_request.invalidate();
+            self.search.diagram.export_phase = None;
+            self.status = "Canceled the diagram export".into();
+        }
+        self.search.diagram.open = false;
     }
 
     pub(crate) fn schema_diagram_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
@@ -163,7 +225,7 @@ impl GridView {
                 .child(
                     button(ButtonKind::Ghost, "cancel-schema-diagram", "Cancel", theme).on_click(cx.listener(
                         |this, _, _, cx| {
-                            this.search.diagram.open = false;
+                            this.close_schema_diagram_export();
                             cx.notify();
                         },
                     )),
