@@ -40,7 +40,7 @@ impl GridView {
         self.viewport_rows = self.viewport_rows_for(window);
         self.sidebar
             .collapse_when_narrow(f32::from(window.viewport_size().width));
-        let sidebar_width = if self.sidebar.open { self.sidebar.width } else { 0.0 };
+        let sidebar_width = self.displayed_sidebar_width(f32::from(window.viewport_size().width));
         let content_width = (f32::from(window.viewport_size().width) - sidebar_width).max(0.0);
         let grid_width = (content_width - self.detail_sidebar_width(content_width)).max(0.0);
         self.sync_table(window, cx);
@@ -56,7 +56,7 @@ impl GridView {
             self.drag_diagram_card(event, cx);
         }
         if self.sidebar.resizing {
-            self.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
+            self.sidebar.width = f32::from(event.position.x).clamp(size::CONNECTION_SIDEBAR_MIN_WIDTH, 480.0);
             cx.notify();
         }
         if self.panel.resizing {
@@ -575,8 +575,8 @@ impl Render for GridView {
             .structure_info_panel(theme, cx)
             .or_else(|| self.late_bars(theme, cx));
         let grid = self.grid_pane(theme, strip, (filter_row, compare_bar, insert_form), cx);
-        let content_width =
-            f32::from(window.viewport_size().width) - if self.sidebar.open { self.sidebar.width } else { 0.0 };
+        let sidebar_width = self.displayed_sidebar_width(f32::from(window.viewport_size().width));
+        let content_width = f32::from(window.viewport_size().width) - sidebar_width;
         let compact_query = content_width < size::COMPACT_QUERY_WIDTH;
         let content = match self.tabs.current().clone() {
             Tab::Home => self.home_page(theme, cx),
@@ -588,7 +588,7 @@ impl Render for GridView {
             Tab::Table(name) if name == self.catalog.grid_table => grid,
             Tab::Table(table) => self.placeholder_page(&table_label(&table), theme),
         };
-        let sidebar = self.sidebar.open.then(|| self.sidebar(theme, cx));
+        let sidebar = self.sidebar.open.then(|| self.sidebar(sidebar_width, theme, cx));
         let toolbar = self.toolbar(theme, window, cx);
         let tab_row = self.tab_bar(theme, cx);
         div()

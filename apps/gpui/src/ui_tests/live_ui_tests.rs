@@ -282,6 +282,85 @@ fn a_table_row_can_be_shown_vertically_and_counted_exactly(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn hidden_query_results_do_not_shrink_the_connection_sidebar(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(800.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_query();
+        view.sidebar.open = true;
+        view.sidebar.width = 480.0;
+        view.detail_open = true;
+        view.panel.open = false;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let handle = cx.debug_bounds("sidebar-resize").expect("sidebar resize handle");
+    assert!(
+        handle.origin.x >= gpui::px(470.0),
+        "closed results should not narrow the sidebar"
+    );
+    view.update(cx, |view, cx| {
+        view.panel.open = true;
+        view.panel.view = bookie_gpui::shell::ResultView::Messages;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let handle = cx.debug_bounds("sidebar-resize").expect("sidebar resize handle");
+    assert!(
+        handle.origin.x >= gpui::px(470.0),
+        "messages should not narrow the sidebar"
+    );
+    view.update(cx, |view, cx| {
+        view.sync_grid_owner();
+        view.add_run(None);
+        view.panel.view = bookie_gpui::shell::ResultView::Table;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    let grid = cx.debug_bounds("grid-table-viewport").expect("query grid is rendered");
+    assert!(
+        grid.size.width >= gpui::px(300.0),
+        "query grid width: {:?}",
+        grid.size.width
+    );
+}
+
+#[gpui::test]
+fn a_narrow_window_keeps_the_grid_usable_with_both_sidebars_open(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(800.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(&view.catalog.grid_table);
+        view.sidebar.open = true;
+        view.sidebar.width = 480.0;
+        view.detail_open = true;
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    let grid = cx.debug_bounds("grid-table-viewport").expect("grid is rendered");
+    assert!(grid.size.width >= gpui::px(300.0), "grid width: {:?}", grid.size.width);
+    assert!(cx.debug_bounds("detail-sidebar").is_some());
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar.width, 480.0));
+    cx.simulate_keystrokes("f3");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("detail-sidebar").is_none());
+    let handle = cx.debug_bounds("sidebar-resize").expect("sidebar resize handle");
+    assert!(
+        handle.origin.x >= gpui::px(470.0),
+        "closing details restores the chosen width"
+    );
+    cx.simulate_keystrokes("f3");
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("detail-sidebar").is_some());
+    cx.simulate_resize(gpui::size(gpui::px(1500.0), gpui::px(800.0)));
+    cx.run_until_parked();
+    let handle = cx.debug_bounds("sidebar-resize").expect("sidebar resize handle");
+    assert!(handle.origin.x >= gpui::px(470.0), "the chosen sidebar width returns");
+    view.read_with(cx, |view, _| assert_eq!(view.sidebar.width, 480.0));
+}
+
+#[gpui::test]
 fn cell_and_row_details_open_in_a_sidebar_right_of_the_grid(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1200.0), gpui::px(800.0)));

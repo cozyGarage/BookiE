@@ -664,14 +664,40 @@ impl GridView {
             )
     }
 
-    pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub(crate) fn displayed_sidebar_width(&self, window_width: f32) -> f32 {
+        if !self.sidebar.open {
+            return 0.0;
+        }
+        let showing_grid = match self.tabs.current() {
+            Tab::Table(table) => *table == self.catalog.grid_table,
+            Tab::Query => {
+                self.panel.open
+                    && self.panel.view == bookie_gpui::shell::ResultView::Table
+                    && self
+                        .run_tabs
+                        .slots
+                        .get(self.run_tabs.active)
+                        .is_some_and(|slot| slot.failure.is_none())
+            }
+            _ => false,
+        };
+        if showing_grid && (self.detail_open || self.row_detail_open || self.fk_peek.is_some()) {
+            return self.sidebar.width.min(
+                (window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - size::GRID_PREFERRED_MIN_WIDTH)
+                    .max(size::CONNECTION_SIDEBAR_MIN_WIDTH),
+            );
+        }
+        self.sidebar.width
+    }
+
+    pub fn sidebar(&self, width: f32, theme: Theme, cx: &mut Context<Self>) -> Div {
         let search = self.sidebar.search.read(cx).content().to_string();
         div()
             .relative()
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(self.sidebar.width))
+            .w(px(width))
             .h_full()
             .bg(rgb(theme.sidebar))
             .border_r_1()
