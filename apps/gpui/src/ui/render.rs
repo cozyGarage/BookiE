@@ -1,7 +1,8 @@
-use crate::assets::icon;
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
-use crate::surfaces::{ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim};
+use crate::surfaces::{
+    Bar, ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim, segment, segmented,
+};
 use crate::*;
 use gpui::uniform_list;
 
@@ -21,6 +22,12 @@ impl GridView {
         }
         if std::mem::take(&mut self.search.reset) {
             self.search.find.update(cx, |find, cx| find.set_content("", cx));
+        }
+        let placeholder = crate::editor_placeholder(&self.keymap);
+        if self.editor_hint != placeholder {
+            self.editor_hint = placeholder.clone();
+            self.sql_input
+                .update(cx, |editor, cx| editor.set_placeholder(placeholder, window, cx));
         }
         if std::mem::take(&mut self.focus_editor) {
             let editor = self.sql_input.read(cx).focus_handle(cx);
@@ -70,79 +77,44 @@ impl GridView {
         })
     }
 
-    fn page_options(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+    fn page_options(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu as _;
 
         let owner = cx.entity().downgrade();
         let rows = self.pager.rows;
         let continuous = self.continuous;
-        let append = self.pager.append;
         let groups = crate::menus::command_groups(self, crate::menus::PAGE_GROUPS);
-
-        crate::surfaces::menu_button(
+        let modes = crate::menus::command_groups(self, &[&["continuous", "append-pages"]]);
+        let sizes: Vec<(gpui::SharedString, u64)> = PAGE_SIZES
+            .into_iter()
+            .map(|size| (format!("{} rows per page", thousands(size)).into(), size))
+            .collect();
+        let label = if continuous {
+            "Continuous".to_string()
+        } else {
+            format!("{} / page", thousands(rows))
+        };
+        crate::surfaces::select_button(
             "page-size",
-            Some(
-                div()
-                    .whitespace_nowrap()
-                    .child(if continuous {
-                        "Continuous".to_owned()
-                    } else {
-                        format!("{} / page", thousands(rows))
-                    })
-                    .into_any_element(),
-            ),
-            None,
-            "Paging options",
+            Some(&label),
             "Rows per page and navigation mode",
-            true,
+            Bar::Compact,
+            theme,
         )
-        .debug_selector(|| "page-size".into())
-        .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |mut menu, _, _| {
-            for size in PAGE_SIZES {
-                let owner = owner.clone();
-                menu = menu.item(
-                    PopupMenuItem::new(format!("{} rows per page", thousands(size)))
-                        .checked(rows == size && !continuous)
-                        .on_click(move |_, _, cx| {
-                            let _ = owner.update(cx, |this, cx| {
-                                this.pager = this.pager.resized(size);
-                                this.continuous = false;
-                                cx.notify();
-                            });
-                        }),
-                );
-            }
-            let owner_continuous = owner.clone();
-            let owner_append = owner.clone();
-            menu =
-                menu.separator()
-                    .item(PopupMenuItem::new("Scroll continuously").checked(continuous).on_click(
-                        move |_, window, cx| {
-                            let _ = owner_continuous.update(cx, |this, cx| {
-                                this.run_palette_id("continuous", window, cx);
-                                cx.notify();
-                            });
-                        },
-                    ))
-                    .item(
-                        PopupMenuItem::new("Append pages")
-                            .checked(append)
-                            .disabled(continuous)
-                            .on_click(move |_, window, cx| {
-                                let _ = owner_append.update(cx, |this, cx| {
-                                    this.run_palette_id("append-pages", window, cx);
-                                    cx.notify();
-                                });
-                            }),
-                    );
-            if continuous {
+        .dropdown_menu_with_anchor(gpui::Anchor::BottomRight, move |menu, _, _| {
+            let pick = owner.clone();
+            let menu = crate::menus::select(menu, &sizes, (!continuous).then_some(&rows), move |size, _, cx| {
+                let _ = pick.update(cx, |this, cx| {
+                    this.pager = this.pager.resized(size);
+                    this.continuous = false;
+                    cx.notify();
+                });
+            });
+            let menu = crate::menus::fill(menu.separator(), &owner, &modes);
+            if continuous || groups.is_empty() {
                 return menu;
             }
-            if groups.is_empty() {
-                menu
-            } else {
-                crate::menus::fill(menu.separator(), &owner, &groups)
-            }
+            crate::menus::fill(menu.separator(), &owner, &groups)
         })
     }
 
@@ -185,49 +157,93 @@ impl GridView {
                     .child(label),
             )
             .children(can_page.then_some(next))
-            .child(self.page_options(cx))
+            .child(self.page_options(theme, cx))
+    }
+
+    fn grid_icon(
+        &self,
+        id: &'static str,
+        name: &'static str,
+        tooltip: impl Into<gpui::SharedString>,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        compact_icon_button(id, name, tooltip, theme).on_click(cx.listener(move |this, _, window, cx| {
+            this.run_palette_id(id, window, cx);
+            cx.notify();
+        }))
+    }
+
+    fn grid_command_tip(&self, id: &str) -> String {
+        let label = bookie_gpui::palette::menu_label(id).unwrap_or(id);
+        bookie_gpui::keymap::Command::for_action(id)
+            .map_or_else(|| label.to_string(), |command| self.labelled_tip(label, command))
     }
 
     fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
-        (self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open()).then(
-            || {
-                compact_button(ButtonKind::Ghost, "add-row", "Add row", theme).on_click(cx.listener(
-                    |this, _, _, cx| {
-                        this.execute_edit_palette_action("insert-row", cx);
-                        cx.notify();
-                    },
-                ))
-            },
-        )
+        (self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open())
+            .then(|| self.grid_icon("insert-row", "plus", self.grid_command_tip("insert-row"), theme, cx))
     }
 
-    fn export_menu_button(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn export_menu_button(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::DropdownMenu;
         let groups = crate::menus::command_groups(self, crate::menus::EXPORT_GROUPS);
-        div().debug_selector(|| "grid-export".into()).child(
-            crate::surfaces::menu_button(
-                "grid-export",
-                Some(
-                    div()
-                        .whitespace_nowrap()
-                        .text_color(rgb(theme.foreground))
-                        .child("Export")
-                        .into_any_element(),
-                ),
-                None,
-                "Export",
-                "Export to a file or copy as CSV",
-                true,
-            )
-            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
+        crate::surfaces::menu_button(
+            "grid-export",
+            crate::surfaces::MenuTrigger::new("Export", Bar::Compact).icon("download"),
+            theme,
         )
+        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
+    }
+
+    fn grid_more_menu(&self, hidden: usize, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu;
+        let mut groups = crate::menus::command_groups(self, crate::menus::GRID_MORE_GROUPS);
+        crate::menus::set_enabled(&mut groups, "show-hidden-columns", hidden > 0);
+        crate::menus::set_enabled(&mut groups, "compare", self.live.is_none());
+        crate::surfaces::menu_button(
+            "grid-more",
+            crate::surfaces::MenuTrigger::new("More grid actions", Bar::Compact).icon("ellipsis"),
+            theme,
+        )
+        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
+    }
+
+    fn grid_wide_actions(&self, hidden: usize, theme: Theme, cx: &mut Context<Self>) -> Div {
+        use gpui_component::menu::DropdownMenu;
+        let columns = crate::menus::command_groups(self, crate::menus::COLUMN_GROUPS);
+        div()
+            .flex()
+            .items_center()
+            .gap_1()
+            .children(
+                (self.live.is_some() && !self.grid_is_query)
+                    .then(|| self.grid_icon("refresh-table", "refresh-cw", "Refresh from the database", theme, cx)),
+            )
+            .children(
+                (hidden > 0)
+                    .then(|| self.grid_icon("show-hidden-columns", "eye", show_all_columns_label(hidden), theme, cx)),
+            )
+            .children(self.add_row_button(theme, cx))
+            .child(
+                crate::surfaces::menu_button(
+                    "grid-columns-menu",
+                    crate::surfaces::MenuTrigger::new("Columns", Bar::Compact).icon("columns-3"),
+                    theme,
+                )
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
+            )
+            .children(
+                self.live
+                    .is_none()
+                    .then(|| self.grid_icon("compare", "git-compare", "Compare results", theme, cx)),
+            )
+            .child(self.export_menu_button(theme, cx))
     }
 
     fn grid_action_buttons(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
-        use gpui_component::menu::DropdownMenu;
         let compact = self.synced_width < 1000.0;
-        let groups = crate::menus::command_groups(self, crate::menus::GRID_MORE_GROUPS);
-        let columns = crate::menus::command_groups(self, crate::menus::COLUMN_GROUPS);
+        let hidden = self.table.read(cx).delegate().hidden_column_count();
         div()
             .flex()
             .flex_1()
@@ -259,81 +275,32 @@ impl GridView {
                     }),
                 ),
             )
-            .child(
-                compact_button(ButtonKind::Ghost, "toggle-loaded-filter", "Filter rows", theme)
-                    .ml_auto()
-                    .tooltip(crate::surfaces::tooltip_view("Filter only the loaded rows".into()))
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        if this.search.filter_visible {
-                            this.search.filter_visible = false;
-                            window.focus(&this.focus, cx);
-                            cx.notify();
-                        } else {
-                            this.run_palette_id("filter", window, cx);
-                            cx.notify();
-                        }
-                    })),
-            )
+            .child(self.loaded_filter_toggle(theme, cx).ml_auto())
             .children(self.pending_marker(theme, cx))
             .when(!compact, |actions| {
-                actions
-                    .children((self.live.is_some() && !self.grid_is_query).then(|| {
-                        compact_button(ButtonKind::Ghost, "refresh-table", "Refresh", theme)
-                            .tooltip(crate::surfaces::tooltip_view(
-                                "Refresh the table from the database".into(),
-                            ))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.refresh_table(cx);
-                                cx.notify();
-                            }))
-                    }))
-                    .children({
-                        let hidden = self.table.read(cx).delegate().hidden_column_count();
-                        (hidden > 0).then(|| {
-                            compact_button(
-                                ButtonKind::Ghost,
-                                "show-hidden-columns",
-                                show_all_columns_label(hidden),
-                                theme,
-                            )
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.show_all_hidden_columns(window, cx);
-                                cx.notify();
-                            }))
-                        })
-                    })
-                    .children(self.add_row_button(theme, cx))
-                    .child(
-                        crate::surfaces::menu_button(
-                            "grid-columns-menu",
-                            Some(div().whitespace_nowrap().child("Columns").into_any_element()),
-                            None,
-                            "Columns",
-                            "Choose visible columns",
-                            true,
-                        )
-                        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
-                    )
-                    .children(self.live.is_none().then(|| {
-                        compact_button(ButtonKind::Ghost, "compare", "Compare", theme)
-                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx)))
-                    }))
-                    .child(self.export_menu_button(theme, cx))
+                actions.child(self.grid_wide_actions(hidden, theme, cx))
             })
-            .when(compact, |actions| {
-                actions.child(
-                    crate::surfaces::menu_button(
-                        "grid-more",
-                        None,
-                        Some(icon("ellipsis", theme.muted_foreground).into_any_element()),
-                        "More grid actions",
-                        "More grid actions",
-                        true,
-                    )
-                    .dropdown_caret(false)
-                    .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups)),
-                )
-            })
+            .when(compact, |actions| actions.child(self.grid_more_menu(hidden, theme, cx)))
+    }
+
+    fn loaded_filter_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+        crate::surfaces::toggle_icon_button(
+            "toggle-loaded-filter",
+            "funnel",
+            self.grid_command_tip("filter"),
+            self.search.filter_visible,
+            Bar::Compact,
+            theme,
+        )
+        .on_click(cx.listener(|this, _, window, cx| {
+            if this.search.filter_visible {
+                this.search.filter_visible = false;
+                window.focus(&this.focus, cx);
+            } else {
+                this.run_palette_id("filter", window, cx);
+            }
+            cx.notify();
+        }))
     }
 
     fn grid_control_strip(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
@@ -420,14 +387,15 @@ impl GridView {
                 .px_2()
                 .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
-                .child(
-                    button(ButtonKind::Ghost, "whole", "Whole row", theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
-                )
-                .child(
-                    button(ButtonKind::Ghost, "keyed", "Key: value", theme)
-                        .on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
-                )
+                .child(segmented(
+                    [
+                        segment("whole", "Whole row", !s.keyed, theme)
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
+                        segment("keyed", "Key: value", s.keyed, theme)
+                            .on_click(cx.listener(|this, _, _, cx| this.compare(true, cx))),
+                    ],
+                    theme,
+                ))
                 .child(
                     button(ButtonKind::Ghost, "close-compare", "Close", theme).on_click(cx.listener(
                         |this, _, _, cx| {
@@ -876,7 +844,7 @@ impl GridView {
 }
 
 fn show_all_columns_label(hidden: usize) -> String {
-    format!("Show all ({hidden} hidden)")
+    format!("Show hidden columns ({hidden})")
 }
 
 #[cfg(test)]

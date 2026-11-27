@@ -329,8 +329,8 @@ impl GridView {
         }
     }
 
-    fn diagram_scope_menu(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+    fn diagram_scope_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu as _;
         let schemas: BTreeSet<_> = self
             .live
             .iter()
@@ -338,33 +338,24 @@ impl GridView {
             .filter_map(|table| table.schema.clone())
             .collect();
         let selected = self.search.diagram.scope.clone();
+        let options: Vec<(gpui::SharedString, Option<String>)> = std::iter::once(None)
+            .chain(schemas.into_iter().map(Some))
+            .map(|scope| (scope.clone().unwrap_or_else(|| "All schemas".into()).into(), scope))
+            .collect();
+        let label = selected.clone().unwrap_or_else(|| "All schemas".into());
         let owner = cx.entity().downgrade();
         crate::surfaces::menu_button(
             "diagram-scope",
-            Some(
-                div()
-                    .whitespace_nowrap()
-                    .child(selected.clone().unwrap_or_else(|| "All schemas".into()))
-                    .into_any_element(),
-            ),
-            None,
-            "Diagram schema scope",
-            "Diagram schema scope",
-            true,
+            crate::surfaces::MenuTrigger::new("Diagram schema scope", crate::surfaces::Bar::Compact)
+                .icon("database")
+                .label(label.as_str()),
+            theme,
         )
         .dropdown_menu(move |menu, _, _| {
-            std::iter::once(None)
-                .chain(schemas.iter().cloned().map(Some))
-                .fold(menu, |menu, scope| {
-                    let owner = owner.clone();
-                    menu.item(
-                        PopupMenuItem::new(scope.clone().unwrap_or_else(|| "All schemas".into()))
-                            .checked(scope == selected)
-                            .on_click(move |_, _, cx| {
-                                let _ = owner.update(cx, |this, cx| this.load_schema_diagram(scope.clone(), cx));
-                            }),
-                    )
-                })
+            let owner = owner.clone();
+            crate::menus::select(menu, &options, Some(&selected), move |scope, _, cx| {
+                let _ = owner.update(cx, |this, cx| this.load_schema_diagram(scope, cx));
+            })
         })
     }
 
@@ -408,31 +399,32 @@ impl GridView {
         cx.notify();
     }
 
-    fn diagram_layout_menu(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+    fn diagram_layout_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu as _;
         let owner = cx.entity().downgrade();
         let saving = self.search.diagram.view.as_ref().is_some_and(|view| view.saving_layout);
         crate::surfaces::menu_button(
             "diagram-layout",
-            Some(div().whitespace_nowrap().child("Layout").into_any_element()),
-            None,
-            "Layout",
-            "Diagram layout options",
-            true,
+            crate::surfaces::MenuTrigger::new("Save or reset the card layout", crate::surfaces::Bar::Compact)
+                .icon("layout-grid")
+                .label("Layout"),
+            theme,
         )
         .dropdown_menu(move |menu, _, _| {
             let save = owner.clone();
             let reset = owner.clone();
             menu.item(
-                PopupMenuItem::new("Save layout")
+                crate::menus::item("Save layout", None, None, false)
                     .disabled(saving)
                     .on_click(move |_, _, cx| {
                         let _ = save.update(cx, |this, cx| this.save_diagram_layout(cx));
                     }),
             )
-            .item(PopupMenuItem::new("Reset layout").on_click(move |_, _, cx| {
-                let _ = reset.update(cx, |this, cx| this.reset_diagram_layout(cx));
-            }))
+            .item(
+                crate::menus::item("Reset layout", None, None, false).on_click(move |_, _, cx| {
+                    let _ = reset.update(cx, |this, cx| this.reset_diagram_layout(cx));
+                }),
+            )
         })
     }
 
@@ -446,7 +438,7 @@ impl GridView {
             .flex_none()
             .border_b_1()
             .border_color(rgb(theme.border))
-            .child(self.diagram_scope_menu(cx));
+            .child(self.diagram_scope_menu(theme, cx));
         if let Some(view) = &state.view {
             toolbar = toolbar
                 .child(div().flex_1().min_w_0().truncate().child(diagram_count(view)))
@@ -470,7 +462,7 @@ impl GridView {
                 );
         }
         toolbar
-            .children(state.view.as_ref().map(|_| self.diagram_layout_menu(cx)))
+            .children(state.view.as_ref().map(|_| self.diagram_layout_menu(theme, cx)))
             .children(self.diagram_can_draft().then(|| {
                 compact_button(ButtonKind::Ghost, "diagram-create-table", "Create table", theme)
                     .on_click(cx.listener(|this, _, window, cx| this.begin_diagram_ddl(None, window, cx)))

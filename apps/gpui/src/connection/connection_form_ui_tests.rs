@@ -397,7 +397,7 @@ fn editing_a_connection_with_a_tunnel_opens_the_ssh_section(cx: &mut TestAppCont
 }
 
 #[gpui::test]
-fn the_toolbar_labels_its_left_actions_when_wide_and_new_connection_opens_the_form(cx: &mut TestAppContext) {
+fn the_toolbar_keeps_its_left_actions_icon_only_and_new_connection_opens_the_form(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(760.0)));
     cx.run_until_parked();
@@ -409,10 +409,7 @@ fn the_toolbar_labels_its_left_actions_when_wide_and_new_connection_opens_the_fo
     let narrow = cx
         .debug_bounds("new-connection")
         .expect("the narrow toolbar draws the button");
-    assert!(
-        wide.size.width > narrow.size.width,
-        "labels widen the button at wide sizes"
-    );
+    assert_eq!(wide.size, narrow.size, "secondary toolbar actions stay icon-only");
     cx.simulate_click(narrow.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {

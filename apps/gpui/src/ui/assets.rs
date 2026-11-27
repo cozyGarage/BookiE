@@ -56,6 +56,11 @@ icons!(
     "square-check",
     "shield",
     "bell",
+    "funnel",
+    "columns-3",
+    "eye",
+    "git-compare",
+    "layout-grid",
 );
 
 const BACKDROP: (&str, &[u8]) = (

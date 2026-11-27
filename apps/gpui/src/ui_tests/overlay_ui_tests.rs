@@ -34,35 +34,35 @@ fn palette_outside_click_dismisses_without_opening_the_covered_dropdown(cx: &mut
     cx.simulate_keystrokes("ctrl-shift-p");
     cx.run_until_parked();
 
-    let trigger = cx.update(|window, _| window.find_by_label("Import / Export").bounds());
+    let trigger = cx.update(|window, _| window.find_by_label("Import or export connections").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
 
     view.read_with(cx, |view, _| assert!(!view.palette.open));
-    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import…").is_none()));
 
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import connections…").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(900.0));
     cx.simulate_keystrokes("escape");
     cx.run_until_parked();
-    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import…").is_none()));
 
     cx.simulate_resize(size(px(800.0), px(760.0)));
     cx.run_until_parked();
-    let trigger = cx.update(|window, _| window.find_by_label("Import / Export").bounds());
+    let trigger = cx.update(|window, _| window.find_by_label("Import or export connections").bounds());
     cx.simulate_click(trigger.center(), Default::default());
     cx.run_until_parked();
-    let item = cx.update(|window, _| window.find_by_label("Import connections…").bounds());
+    let item = cx.update(|window, _| window.find_by_label("Import…").bounds());
     assert!(item.origin.x >= px(0.0));
     assert!(item.origin.x + item.size.width <= px(800.0));
     assert!(item.origin.y >= px(0.0));
     assert!(item.origin.y + item.size.height <= px(760.0));
     cx.simulate_keystrokes("escape");
     cx.run_until_parked();
-    cx.update(|window, _| assert!(window.try_find_by_label("Import connections…").is_none()));
+    cx.update(|window, _| assert!(window.try_find_by_label("Import…").is_none()));
 }
 
 #[gpui::test]

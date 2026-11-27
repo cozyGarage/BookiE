@@ -4,13 +4,12 @@ use bookie_core::{ColumnInfo, QualifiedTypeName};
 use bookie_gpui::model::Cell;
 use bookie_gpui::shell::Tab;
 use bookie_gpui::source::ResultSource;
-use gpui::{Context, DismissEvent, Window};
-use gpui_component::menu::{PopupMenu, PopupMenuItem};
+use gpui::{Context, Window};
+use gpui_component::menu::PopupMenu;
 
 use crate::GridView;
 use crate::choice_edit::{Choice, choice_for, is_choice_candidate, member_cell};
 use crate::grid_edit::EditMode;
-use crate::menus::RowMenu;
 
 #[derive(Clone)]
 struct ChoiceTarget {
@@ -192,25 +191,21 @@ impl GridView {
             _ => None,
         };
         let labels: Arc<[String]> = labels.into();
-        let menu = PopupMenu::build(window, cx, move |mut menu, _, _| {
-            menu = menu.scrollable(true);
-            for label in labels.iter() {
-                let (owner, target, labels, picked) = (owner.clone(), target.clone(), labels.clone(), label.clone());
-                let item = PopupMenuItem::new(label.clone())
-                    .checked(current.as_deref() == Some(label.as_str()))
-                    .on_click(move |_, _, cx| {
-                        let _ = owner.update(cx, |this, cx| this.pick_member(&target, &picked, &labels, cx));
-                    });
-                menu = menu.item(item);
-            }
-            menu
+        let options: Vec<(gpui::SharedString, String)> = labels
+            .iter()
+            .map(|label| (label.clone().into(), label.clone()))
+            .collect();
+        let menu = PopupMenu::build(window, cx, move |menu, _, _| {
+            let (owner, target, labels) = (owner.clone(), target.clone(), labels.clone());
+            crate::menus::select(
+                menu.scrollable(true),
+                &options,
+                current.as_ref(),
+                move |picked: String, _, cx| {
+                    let _ = owner.update(cx, |this, cx| this.pick_member(&target, &picked, &labels, cx));
+                },
+            )
         });
-        let dismiss = cx.subscribe(&menu, |this, _, _: &DismissEvent, cx| {
-            this.row_menu = None;
-            cx.notify();
-        });
-        window.focus(&gpui::Focusable::focus_handle(menu.read(cx), cx), cx);
-        self.row_menu = Some(RowMenu::new(window.mouse_position(), menu, dismiss));
-        cx.notify();
+        self.show_row_menu(menu, window, cx);
     }
 }

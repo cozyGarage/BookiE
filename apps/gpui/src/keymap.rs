@@ -88,26 +88,26 @@ impl Command {
     pub fn title(self) -> &'static str {
         match self {
             Command::Palette => "Command palette",
-            Command::QuickSwitcher => "Go to table",
-            Command::JumpColumn => "Jump to column",
+            Command::QuickSwitcher => "Go to table…",
+            Command::JumpColumn => "Jump to column…",
             Command::RevealInSidebar => "Reveal table in sidebar",
-            Command::Shortcuts => "Keyboard shortcuts",
-            Command::SaveFavorite => "Save query as favorite",
-            Command::Favorites => "Open a favorite",
-            Command::SaveChanges => "Save changes",
-            Command::DeleteRows => "Delete selected rows",
-            Command::InsertRow => "Add a row",
+            Command::Shortcuts => "Keyboard shortcuts…",
+            Command::SaveFavorite => "Save as favorite",
+            Command::Favorites => "Open favorite…",
+            Command::SaveChanges => "Save changes…",
+            Command::DeleteRows => "Delete rows…",
+            Command::InsertRow => "Add row…",
             Command::Undo => "Undo edit",
             Command::Redo => "Redo edit",
-            Command::Filter => "Filter loaded rows",
+            Command::Filter => "Filter rows",
             Command::CopyCells => "Copy selected rows as TSV",
             Command::CopyCellsWithHeaders => "Copy selected rows as TSV with headers",
             Command::PasteCells => "Paste cells at the active cell",
-            Command::ToggleSidebar => "Show or hide the sidebar",
+            Command::ToggleSidebar => "Show or hide sidebar",
             Command::NewQuery => "New query",
-            Command::RunQuery => "Run all statements",
-            Command::RunAtCursor => "Run statement at cursor",
-            Command::ToggleDetail => "Show or hide the detail panel",
+            Command::RunQuery => "Run all",
+            Command::RunAtCursor => "Run statement",
+            Command::ToggleDetail => "Show or hide detail panel",
             Command::CloseTab => "Close the current tab",
             Command::ReopenTab => "Reopen the last closed tab",
             Command::RecentTab => "Switch to the previous tab",
@@ -119,6 +119,7 @@ impl Command {
             "query" => "new-query",
             "run" => "run-query",
             "sidebar" => "toggle-sidebar",
+            "detail" => "toggle-detail",
             "undo-edit" => "undo",
             "redo-edit" => "redo",
             "reveal-sidebar" => "reveal-in-sidebar",
@@ -222,6 +223,14 @@ pub fn with_shortcut(label: &str, chord: Option<&Chord>) -> String {
 
 pub fn last_edit_chord() -> Chord {
     Chord::new(true, false, true, "-")
+}
+
+pub fn full_value_chord() -> Chord {
+    Chord::new(false, false, true, "enter")
+}
+
+pub fn completion_chord() -> Chord {
+    Chord::new(true, false, false, "space")
 }
 
 const UNBOUND: &str = "none";
@@ -384,6 +393,13 @@ mod tests {
             keymap.resolve(&Chord::parse("ctrl-shift-enter").unwrap()),
             Some(Command::RunQuery)
         );
+    }
+
+    #[test]
+    fn the_detail_panel_command_uses_the_toggle_detail_shortcut() {
+        assert_eq!(Command::for_action("detail"), Some(Command::ToggleDetail));
+        assert_eq!(full_value_chord().label(), "Alt+Enter");
+        assert_eq!(completion_chord().label(), "Ctrl+Space");
     }
 
     #[test]

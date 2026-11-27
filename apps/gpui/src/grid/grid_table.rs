@@ -165,22 +165,15 @@ fn header_menu(
     has_hidden: bool,
     binary: bool,
     pin_action: Option<(gpui::Entity<TableState<GridDelegate>>, PinScope, bool)>,
-    color: u32,
+    theme: Theme,
 ) -> impl IntoElement {
     use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
     crate::surfaces::menu_button(
         format!("column-menu-{col_ix}"),
-        None,
-        Some(
-            gpui_component::Icon::default()
-                .path("icons/ellipsis.svg")
-                .text_color(gpui::rgb(color))
-                .into_any_element(),
-        ),
-        format!("Actions for {column_name}"),
-        format!("Actions for {column_name}"),
-        true,
+        crate::surfaces::MenuTrigger::new(format!("Actions for {column_name}"), crate::surfaces::Bar::Compact)
+            .icon("ellipsis"),
+        theme,
     )
     .dropdown_caret(false)
     .dropdown_menu(move |menu, _, _| {
@@ -417,7 +410,7 @@ impl TableDelegate for GridDelegate {
             self.pin_scope
                 .clone()
                 .map(|scope| (cx.entity(), scope, col_ix < self.pinned_columns)),
-            theme.muted_foreground,
+            theme,
         );
         div()
             .debug_selector(move || format!("column-header-{col_ix}"))
