@@ -344,7 +344,7 @@ impl GridView {
             .collect();
         let label = selected.clone().unwrap_or_else(|| "All schemas".into());
         let owner = cx.entity().downgrade();
-        crate::surfaces::menu_button(
+        crate::surfaces::icon_menu_button(
             "diagram-scope",
             "database",
             Some(&label),
@@ -404,7 +404,7 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
         let owner = cx.entity().downgrade();
         let saving = self.search.diagram.view.as_ref().is_some_and(|view| view.saving_layout);
-        crate::surfaces::menu_button(
+        crate::surfaces::icon_menu_button(
             "diagram-layout",
             "layout-grid",
             Some("Layout"),

@@ -2,7 +2,8 @@
 """Ratchet UI patterns that docs/ui-design.md says to stop growing in the GTK and GPUI apps.
 
 Counted per file outside test code: `thread_local!` (UI state is passed in), a margin or spacing number written as a
-literal instead of a `ui::spacing` constant, and a hand-built `ToolbarView::new()` (use `dialog_shell` for dialogs).
+literal instead of a `ui::spacing` constant, a hand-built `ToolbarView::new()` (use `dialog_shell` for dialogs), and GPUI
+`Button::new()` calls outside the shared surfaces module.
 Baselines are in baselines/ui-pattern-baselines.txt; lower a count when you remove one, never raise it.
 """
 
@@ -32,6 +33,7 @@ PATTERNS = {
     "gpui-literal-px": lambda line: any(float(number) != 0 for number in GPUI_PX.findall(line)),
 }
 GPUI_PATTERNS = {
+    "gpui-button-new": lambda line, name: "Button::new(" in line,
     "gpui-raw-colour": lambda line, name: name not in RAW_COLOUR_ALLOWED and bool(RAW_COLOUR.search(line)),
     "gpui-text-size-class": lambda line, name: len(TEXT_SIZE_CLASS.findall(line)),
     "gpui-empty-label": lambda line, name: bool(EMPTY_LABEL.search(line)),
@@ -79,6 +81,8 @@ def count(path: Path) -> dict[str, int]:
                 found[name] = found.get(name, 0) + 1
         if gpui:
             for name, matches in GPUI_PATTERNS.items():
+                if name == "gpui-button-new" and path.resolve() == (ROOT / "apps/gpui/src/ui/surfaces.rs").resolve():
+                    continue
                 hits = int(matches(line, path.name))
                 if hits:
                     found[name] = found.get(name, 0) + hits

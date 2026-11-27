@@ -212,7 +212,7 @@ impl GridView {
     fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::DropdownMenu;
         let groups = crate::menus::command_groups(self, crate::menus::OVERFLOW_GROUPS);
-        crate::surfaces::menu_button("more", "ellipsis", None, "More", Bar::Small, theme)
+        crate::surfaces::icon_menu_button("more", "ellipsis", None, "More", Bar::Small, theme)
             .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
@@ -468,7 +468,7 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
         let owner = cx.entity().downgrade();
         let groups = crate::menus::command_groups(self, crate::menus::IMPORT_EXPORT_GROUPS);
-        crate::surfaces::menu_button(
+        crate::surfaces::icon_menu_button(
             "import-export-menu",
             "arrow-down-up",
             None,
@@ -523,7 +523,7 @@ impl GridView {
             .collect();
         let new_connection = bookie_gpui::palette::menu_label("new-connection").unwrap_or_default();
 
-        crate::surfaces::menu_trigger(
+        crate::surfaces::status_menu_button(
             "sidebar-connection-switcher",
             connection_status_dot(connected, theme),
             Some(name),

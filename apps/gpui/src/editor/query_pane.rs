@@ -4,7 +4,9 @@ use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, 
 use gpui_component::menu::DropdownMenu as _;
 
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
-use crate::surfaces::{Bar, ButtonKind, button, compact_icon_button, menu_button, segment, segmented, select_button};
+use crate::surfaces::{
+    Bar, ButtonKind, button, compact_icon_button, icon_menu_button, segment, segmented, select_button,
+};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -41,7 +43,7 @@ impl GridView {
 
     fn query_file_menu(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = crate::menus::command_groups(self, crate::menus::FILE_GROUPS);
-        menu_button(
+        icon_menu_button(
             "query-file-menu",
             "folder",
             (!compact).then_some("File"),
@@ -213,7 +215,7 @@ impl GridView {
         let suggest_keys = Some(bookie_gpui::keymap::completion_chord().label());
         let label = |id| bookie_gpui::palette::menu_label(id).unwrap_or(id);
         let (explain_label, favorite_label) = (label("explain"), label("save-favorite"));
-        let tools = menu_button(
+        let tools = icon_menu_button(
             "sql-editor-tools",
             "sliders-horizontal",
             (!compact).then_some("Tools"),
@@ -313,7 +315,7 @@ impl GridView {
             bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
                 .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()))
         });
-        menu_button(
+        icon_menu_button(
             "query-context-menu",
             "database",
             None,

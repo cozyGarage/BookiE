@@ -66,6 +66,9 @@ In `apps/gpui`, these jobs have exactly one constructor in `surfaces.rs`. A view
 | --- | --- | --- |
 | Icon-only button | `icon_button(id, icon, tooltip)` | The tooltip is required and is also the accessible name. Its size follows the bar it sits in. |
 | Text button | `button(kind, id, label)` | Primary, Ghost or Destructive. One line, ending in an ellipsis. Busy and disabled states show the reason as a tooltip. Paired buttons share a minimum width. |
+| Dropdown trigger | `menu_button(id, label, icon, accessible_name, tooltip, compact)` | Small ghost button with a caret. The tooltip and accessible name are required; the label may be an empty element for an icon-only trigger. |
+| Dropdown trigger in a bar | `icon_menu_button(id, icon, label, tooltip, bar)`, `select_button(id, label, tooltip, bar)`, `status_menu_button(id, status, label, tooltip, bar)` | Thin variants of `menu_button` that take the bar's height. The tooltip is the accessible name. `select_button` shows the current choice; `status_menu_button` leads with a status mark. |
+| Menu entries | `menus::item(label, icon, shortcut, checked)`, `menus::destructive_item(label, icon, shortcut)`, `menus::select(menu, options, selected, on_pick)` | The shortcut comes from the keymap and sits on the right. A check marks the current choice. Destructive items are red and last. |
 | One-of-N choice | `segmented(options, selected)` | Selection is a fill, never a ring, never blue. |
 | Dialog and overlay | `scrim` and `dialog_surface(width)` | 6 px radius, a shadow, a scrim from the theme. Pages are flat and cast no shadow. Used for every centred dialog in the table above. |
 | Task content | `task_bar(title)` | Fields, then the primary action, then Cancel, always in that order. One-shot steps put it inside a dialog. |

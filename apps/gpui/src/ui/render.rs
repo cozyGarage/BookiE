@@ -188,7 +188,7 @@ impl GridView {
     fn export_menu_button(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::DropdownMenu;
         let groups = crate::menus::command_groups(self, crate::menus::EXPORT_GROUPS);
-        crate::surfaces::menu_button("grid-export", "download", None, "Export", Bar::Compact, theme)
+        crate::surfaces::icon_menu_button("grid-export", "download", None, "Export", Bar::Compact, theme)
             .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
@@ -197,7 +197,7 @@ impl GridView {
         let mut groups = crate::menus::command_groups(self, crate::menus::GRID_MORE_GROUPS);
         crate::menus::set_enabled(&mut groups, "show-hidden-columns", hidden > 0);
         crate::menus::set_enabled(&mut groups, "compare", self.live.is_none());
-        crate::surfaces::menu_button("grid-more", "ellipsis", None, "More grid actions", Bar::Compact, theme)
+        crate::surfaces::icon_menu_button("grid-more", "ellipsis", None, "More grid actions", Bar::Compact, theme)
             .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
@@ -218,8 +218,15 @@ impl GridView {
             )
             .children(self.add_row_button(theme, cx))
             .child(
-                crate::surfaces::menu_button("grid-columns-menu", "columns-3", None, "Columns", Bar::Compact, theme)
-                    .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
+                crate::surfaces::icon_menu_button(
+                    "grid-columns-menu",
+                    "columns-3",
+                    None,
+                    "Columns",
+                    Bar::Compact,
+                    theme,
+                )
+                .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), columns)),
             )
             .children(
                 self.live
