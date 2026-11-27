@@ -258,6 +258,7 @@ impl GridView {
                         } else {
                             format!("Wrote {count} row(s) to {shown}")
                         };
+                        this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Success, cx);
                     }
                     Err(_) if cancel.is_cancelled() => this.status = "Canceled the export; no file was created".into(),
                     Err(message) => this.report_failure("export", &message),
