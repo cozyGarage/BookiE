@@ -33,6 +33,9 @@ literals = ["'trailing  '", "'a' || char(0) || 'b'", "'e' || char(769) || ' comb
 carrier = "Text"
 rule = "exact"
 note = "SQLite TEXT keeps NUL; the referee hex-encodes the stored bytes."
+known_failing = [
+    { route = "copy_tsv", issue = 4221, reason = "pasting a quoted TSV cell keeps the formula guard" },
+]
 
 [[case]]
 id = "text-nocase"
@@ -56,6 +59,10 @@ carrier = "Text"
 rule = "exact"
 by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
 note = "NUMERIC affinity converts some text to numbers; the storage class the engine chose (typeof) decides the expected carrier."
+known_failing = [
+    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_xlsx", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+]
 
 [[case]]
 id = "untyped-mixed"
@@ -64,6 +71,17 @@ literals = ["1", "1.5", "'x'", "X'01'", "NULL", "'1'"]
 carrier = "Text"
 rule = "exact"
 by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
+skip = [
+    { route = "edit", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "paste", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "set_cells", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "insert_row", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+]
+known_failing = [
+    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_xlsx", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "noop_edit", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+]
 
 [[case]]
 id = "strict-any"
@@ -74,6 +92,12 @@ carrier = "Text"
 rule = "exact"
 by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
 note = "A STRICT ANY column keeps the stored kind of each value, including the text '1'."
+skip = [
+    { route = "edit", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "paste", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "set_cells", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+    { route = "insert_row", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
+]
 
 [[case]]
 id = "strict-integer"
@@ -126,6 +150,14 @@ carrier = "Time"
 rule = "temporal"
 param_carrier = "Text"
 note = "SELECT ? has no declared type, so the bound time comes back as text; the bind spells fractions with three digits, so only trailing zeros may differ."
+known_failing = [
+    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "export_sql", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+]
 
 [[case]]
 id = "boolean-flag"

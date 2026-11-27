@@ -152,6 +152,13 @@ type = "TIME"
 literals = ["'00:00:00'", "'13:45:30.123456'", "'23:59:59.999999'"]
 carrier = "Time"
 rule = "temporal"
+known_failing = [
+    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+]
 
 [[case]]
 id = "timestamp"
@@ -174,6 +181,13 @@ type = "TIMESTAMPTZ"
 literals = ["'2024-02-29 13:45:30.123456+05:30'", "'1970-01-01 00:00:00+00'", "'2024-03-10 02:30:00-05'", "NULL"]
 carrier = "TimestampTz"
 rule = "instant"
+known_failing = [
+    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+]
 
 [[case]]
 id = "interval"
@@ -196,6 +210,15 @@ literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'[1, 2.50, 1e400]'", 
 carrier = "Text"
 rule = "exact"
 note = "DuckDB JSON keeps its source text exactly; BookiE carries it as plain text, not JsonText."
+known_failing = [
+    { route = "import_csv", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "import_xlsx", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "paste", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "set_cells", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "insert_row", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "noop_edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+]
 
 [[case]]
 id = "list"
@@ -235,7 +258,13 @@ type = "UNION(num INTEGER, str VARCHAR)"
 literals = ["union_value(num := 2)", "union_value(str := 'x')"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+skip = [
+    { route = "param_select", reason = "a refused cell cannot be bound back as a parameter" },
+]
+known_failing = [
+    { route = "import_csv", issue = 4219, reason = "import stores the undecodable export marker as a value" },
+    { route = "import_xlsx", issue = 4219, reason = "import stores the undecodable export marker as a value" },
+]
 
 [[case]]
 id = "enum"
@@ -255,4 +284,9 @@ known_failing = [
     { route = "browse", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
     { route = "param_where", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
     { route = "param_select", issue = 4214, reason = "binding the internal bytes back stores a different bit string" },
+    { route = "copy_tsv", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_csv", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json_lines", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_sql", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
 ]

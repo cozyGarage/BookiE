@@ -203,6 +203,9 @@ literals = ["'trailing  '", "'  leading'", "'a\\0b'", "'e\u0301 combining'", "'×
 carrier = "Text"
 rule = "exact"
 note = "MySQL VARCHAR keeps NUL and trailing spaces."
+known_failing = [
+    { route = "copy_tsv", issue = 4221, reason = "pasting a quoted TSV cell keeps the formula guard" },
+]
 
 [[case]]
 id = "char"
@@ -264,6 +267,9 @@ type = "ENUM('a', 'b c', '')"
 literals = ["'a'", "'b c'", "''", "NULL"]
 carrier = "Text"
 rule = "exact"
+known_failing = [
+    { route = "paste", issue = 4224, reason = "pasting an empty value stores NULL" },
+]
 
 [[case]]
 id = "set"
@@ -271,6 +277,9 @@ type = "SET('x', 'y', 'z')"
 literals = ["'x,z'", "''", "'y'"]
 carrier = "Text"
 rule = "exact"
+known_failing = [
+    { route = "paste", issue = 4224, reason = "pasting an empty value stores NULL" },
+]
 
 [[case]]
 id = "date"
@@ -295,7 +304,14 @@ type = "TIME(6)"
 literals = ["'00:00:00'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
 carrier = "Time"
 rule = "temporal"
-known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+known_failing = [
+    { route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" },
+    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+]
 
 [[case]]
 id = "time-extended"
@@ -328,7 +344,15 @@ literals = ["1901", "2155", "0", "NULL"]
 carrier = "Int"
 rule = "number"
 note = "The server renders YEAR 0 as 0000; leading zeros are display only."
-known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+known_failing = [
+    { route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" },
+    { route = "import_csv", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+    { route = "edit", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+    { route = "paste", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+    { route = "set_cells", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+    { route = "insert_row", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+    { route = "noop_edit", issue = 4225, reason = "YEAR 0000 is written back as 2000" },
+]
 
 [[case]]
 id = "json"
@@ -339,6 +363,10 @@ carrier = "Json"
 rule = "json"
 param = "SELECT CAST(? AS JSON)"
 note = "MySQL stores JSON in a normalized binary form; the server's text rendering is the referee."
+known_failing = [
+    { route = "export_json", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+    { route = "export_json_lines", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+]
 
 [[case]]
 id = "json-mariadb"
@@ -352,9 +380,9 @@ note = "MariaDB JSON is LONGTEXT with a validity check; the source text is the v
 [[case]]
 id = "geometry"
 type = "GEOMETRY"
+text_referee = "ST_AsText({v})"
 literals = ["ST_GeomFromText('POINT(1 2)')", "ST_GeomFromText('LINESTRING(0 0, 1 1)', 4326)"]
 carrier = "Bytes"
 rule = "bytes"
 note = "The referee is the stored internal format: a 4-byte SRID followed by WKB."
 known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
-

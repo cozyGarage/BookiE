@@ -9,6 +9,8 @@ use bookie_storage::AuditJournal;
 
 pub struct Governed {
     pub guard: PolicyGuard,
+    pub capabilities: bookie_core::DriverCapabilities,
+    pub value_input: bookie_core::DriverValueInputCapabilities,
     _journal: tempfile::TempDir,
 }
 
@@ -22,6 +24,10 @@ pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> 
 
 pub async fn open_confirming(driver_id: &str, options: ConnectOptions) -> Governed {
     open_with(driver_id, options, false, Arc::new(AutoApproveSink)).await
+}
+
+pub async fn open_writable(driver_id: &str, options: ConnectOptions) -> Governed {
+    open_confirming(driver_id, options).await
 }
 
 async fn open_with(
@@ -61,6 +67,8 @@ async fn open_with(
     );
     Governed {
         guard,
+        capabilities: driver.capabilities(),
+        value_input: driver.value_input_capabilities(),
         _journal: journal_dir,
     }
 }

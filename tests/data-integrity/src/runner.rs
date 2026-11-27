@@ -11,7 +11,7 @@ use crate::server::{Dialect, Server};
 
 pub type Observed = Result<BTreeMap<i64, Value>, String>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RefereeRow {
     pub id: i64,
     pub type_name: Option<String>,
@@ -71,7 +71,7 @@ async fn read_case(guard: &PolicyGuard, dialect: &Dialect, case: &Case, referee:
             Route::Browse => read_browse(guard, dialect, &table).await,
             Route::ParamWhere => read_param_where(guard, dialect, &table, referee).await,
             Route::ParamSelect => read_param_select(guard, dialect, case, &queried).await,
-            Route::Command | Route::FullValue => Err(format!("{} is not a SQL route", route.name())),
+            other => Err(format!("{} is not a read route", other.name())),
         };
         routes.push((route, Some(observed)));
     }
@@ -111,12 +111,7 @@ pub async fn prepare_case(server: &Server, case: &Case) -> Result<(), String> {
             .await
             .map_err(|error| format!("setup failed: {error}"))?;
     }
-    let template = case.create.as_deref().unwrap_or(dialect.create_table);
-    let create = Dialect::fill(template, &table, &case.column_type(&table));
-    server
-        .run_sql(&create)
-        .await
-        .map_err(|error| format!("create failed: {error}"))?;
+    create_table(server, case, &table).await?;
     let session = case
         .session
         .as_deref()
@@ -131,8 +126,21 @@ pub async fn prepare_case(server: &Server, case: &Case) -> Result<(), String> {
     Ok(())
 }
 
+pub async fn create_table(server: &Server, case: &Case, table: &str) -> Result<(), String> {
+    let template = case.create.as_deref().unwrap_or(server.dialect.create_table);
+    let create = Dialect::fill(template, table, &case.column_type(&case.table()));
+    server
+        .run_sql(&create)
+        .await
+        .map(|_| ())
+        .map_err(|error| format!("create {table} failed: {error}"))
+}
+
 pub fn referee_columns(case: &Case) -> Vec<RefereeColumn> {
     let mut columns = vec![case.rule.referee_column()];
+    if !columns.contains(&RefereeColumn::Text) {
+        columns.push(RefereeColumn::Text);
+    }
     let typed = case.by_type.values().map(|expectation| expectation.rule);
     for rule in Route::READS.iter().map(|route| case.rule_for(*route)).chain(typed) {
         let column = rule.referee_column();
@@ -149,6 +157,11 @@ fn referee_expression(dialect: &Dialect, case: &Case, column: RefereeColumn) -> 
     {
         return Dialect::on(custom, "v");
     }
+    if column == RefereeColumn::Text
+        && let Some(custom) = &case.text_referee
+    {
+        return Dialect::on(custom, "v");
+    }
     let template = match column {
         RefereeColumn::Text => dialect.text_expr,
         RefereeColumn::Hex => dialect.hex_expr,
@@ -158,12 +171,15 @@ fn referee_expression(dialect: &Dialect, case: &Case, column: RefereeColumn) -> 
 }
 
 pub async fn referee_rows(server: &Server, case: &Case) -> Result<Vec<RefereeRow>, String> {
+    referee_rows_of(server, case, &case.table()).await
+}
+
+pub async fn referee_rows_of(server: &Server, case: &Case, table: &str) -> Result<Vec<RefereeRow>, String> {
     let dialect = server.dialect;
-    let table = case.table();
     let columns = referee_columns(case);
     let mut fields = vec![
         Dialect::on(dialect.text_expr, "id"),
-        (dialect.wrap_hex)(&Dialect::fill(dialect.type_expr, &table, "")),
+        (dialect.wrap_hex)(&Dialect::fill(dialect.type_expr, table, "")),
     ];
     fields.extend(
         columns
@@ -196,9 +212,14 @@ fn parse_referee_line(line: &str, columns: &[RefereeColumn]) -> Result<RefereeRo
         .ok_or_else(|| format!("referee line without an id: {line:?}"))?;
     let type_name = decode_field(parts.next().unwrap_or("N"))?;
     let mut decoded = BTreeMap::new();
+    let primary = columns.first().copied();
     for column in columns {
         let field = parts.next().ok_or_else(|| format!("referee line is short: {line:?}"))?;
-        decoded.insert(*column, decode_field(field)?);
+        let value = match decode_field(field) {
+            Err(_) if *column == RefereeColumn::Text && primary != Some(RefereeColumn::Text) => None,
+            other => other?,
+        };
+        decoded.insert(*column, value);
     }
     Ok(RefereeRow {
         id,
@@ -281,6 +302,21 @@ async fn read_param_select(guard: &PolicyGuard, dialect: &Dialect, case: &Case, 
         rows.insert(*id, single_value(&result, *id)?);
     }
     Ok(rows)
+}
+
+pub async fn server_render(server: &Server, case: &Case, text: &str) -> Result<String, String> {
+    let dialect = server.dialect;
+    let cast = format!(
+        "CAST({} AS {})",
+        (dialect.quote_text)(text),
+        case.column_type(&case.table())
+    );
+    let sql = format!("SELECT {}", (dialect.wrap_hex)(&Dialect::on(dialect.text_expr, &cast)));
+    let output = server
+        .run_sql(&sql)
+        .await
+        .map_err(|error| format!("the server refuses BookiE's text {text:?}: {error}"))?;
+    Ok(decode_field(output.trim())?.unwrap_or_default())
 }
 
 async fn server_cast(server: &Server, case: &Case, route: Route, observed: Observed) -> Observed {

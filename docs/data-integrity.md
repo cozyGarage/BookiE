@@ -39,6 +39,27 @@ Each case runs through every read route:
 | `param_where` | `query_params_controlled("SELECT v FROM t WHERE id = $1")` | Parameterised read of a stored column; on MySQL this is the binary protocol |
 | `param_select` | `query_params_controlled("SELECT $1::type")` on PostgreSQL, `SELECT ?` on MySQL, binding the value BookiE read in `query` | A typed parameter echoed back, the class of the #4094 decoder-plan bug |
 
+### Copy, export, import and write routes
+
+`routes::run_routes` moves the same corpus through app-services and core the way the GPUI and GTK consumers do, without their widgets. Every route ends at the server: a re-read artefact is compared with the server rendering by the case rule, and a write is compared row by row with what the server stored for the original value.
+
+| Route | Path | Compared with |
+| --- | --- | --- |
+| `copy_tsv` | `result_copy::tsv`, read back with the paste parser `clipboard_grid::parse_clipboard_grid` | Server rendering, case rule |
+| `export_csv` | `write_result_file` CSV with a NULL marker and no formula guard (the lossless settings) | Server rendering, case rule |
+| `export_json`, `export_json_lines` | `write_result_file` JSON and JSON Lines | Server rendering, case rule |
+| `export_sql` | `write_result_file` SQL INSERT into an empty copy of the table, run through the governed connection | Server rows of the copy equal the original rows |
+| `import_csv`, `import_xlsx` | CSV or XLSX export, then `plan_csv_import` into an empty copy and the governed batch | Server rows of the copy equal the original rows (export to import checksum) |
+| `edit` | Edit text of the read value, `parse_grid_cell_input_with_style`, `plan_cell_saves`, `execute_in_transaction_checked_controlled` into a placeholder row | Server row equals the original row |
+| `paste` | `copy_text`, `parse_pasted_cell_with_style`, then as `edit` | Same |
+| `set_cells` | `plan_set_cells` with the edit text, then `plan_cell_saves` | Same |
+| `insert_row` | `plan_row_insert` with the edit text | Same |
+| `noop_edit` | Re-enter the edit text of each original cell over itself | Every original row is unchanged on the server |
+
+The harness reads artefacts with its own parsers per carrier (and decodes the documented `bookie:sqlite-any:v1` tags). A spelling it cannot parse, such as a BC date, is cast by the server and compared with the server text. The writable session confirms approval prompts as a user would.
+
+An error is a safe outcome and is reported as "refused" without failing the run: an export or import that refuses a value, a plan that refuses input, or a statement the server rejects inside the batch, so nothing is written. A different value shown or stored is a failure. Rows whose value the grid cannot edit inline (NULL, binary, undecodable, text with NUL, and empty text except for `paste`) are not entered.
+
 Redis has no tables, so its routes differ:
 
 | Route | BookiE call | Server reply it is compared with |
@@ -128,6 +149,8 @@ cargo test -p bookie-data-integrity-tests --test redis -- --include-ignored --te
 cargo test -p bookie-data-integrity-tests --test sqlite --test duckdb -- --nocapture
 ```
 
+Each engine target also has a `copy_export_import_and_edits` test for the routes above (PostgreSQL 16, MySQL 8.4, MariaDB 11, SQLite, DuckDB; ClickHouse without the edit routes). Select one with a name filter, for example `-- --include-ignored copy_export`.
+
 `--nocapture` prints a summary per server and every known failure. Each Docker test starts its own container from the images listed in `ci/test-images.txt` for that driver group (PostgreSQL 16 and 18, MySQL 8.4.13, MariaDB 11, ClickHouse 24.8, Redis 7.4.12) and removes it at the end. SQLite and DuckDB use a temporary file and need no Docker. With `BOOKIE_TEST_RUN_ID` set, containers carry the run label that `scripts/cleanup-testcontainers.py` removes.
 
 ## CI tier
@@ -135,6 +158,8 @@ cargo test -p bookie-data-integrity-tests --test sqlite --test duckdb -- --nocap
 The corpus check and the SQLite and DuckDB targets run in the sandbox tier. The Docker targets belong to the driver tier: `scripts/run-driver-group.sh <driver>` runs `tests/data-integrity/tests/<driver>.rs` after that driver's own targets, so they run in the `driver-core` job (PostgreSQL and MySQL) and the `driver-analytics` job (ClickHouse and Redis) of the Forgejo and GitHub gates.
 
 ## Coverage
+
+Route results in the last local run (pass, known-failing, refused): PostgreSQL 16 549, 28, 87; MySQL 8.4 422, 16, 46; MariaDB 11 423, 14, 47; SQLite 164, 12, 28; DuckDB 317, 24, 39; ClickHouse 228, 4, 27.
 
 Current corpus: PostgreSQL 57 cases (pg16 and pg18), MySQL 43 cases shared by MySQL 8.4 and MariaDB 11, SQLite 18, DuckDB 34, ClickHouse 37 (24.8), Redis 18 (7.4.12).
 
@@ -160,14 +185,16 @@ Read routes by type family. "Covered" means every read route passes on every lis
 
 Redis: strings (UTF-8, empty, the text `NULL`, NUL, binary, number-like, integer-encoded, 300000 bytes), hashes, lists, sets, sorted sets with float scores, streams and a missing key are covered on the `command`, `full_value` and `browse` routes.
 
-Engines and routes:
+Engines and routes. "Refused" lists cases where BookiE refuses a value on that route instead of carrying it (for example NaN in SQL INSERT export, empty text in XLSX export, ClickHouse `max_query_size`); the run prints each refusal.
 
-| Route | PostgreSQL | MySQL, MariaDB | SQLite | DuckDB | ClickHouse | Redis |
+| Route | PostgreSQL 16 | MySQL 8.4, MariaDB 11 | SQLite | DuckDB | ClickHouse 24.8 | Redis |
 | --- | --- | --- | --- | --- | --- | --- |
-| Read: query, browse, param_where | covered | covered | covered | covered except #4214 | covered | covered (command, full_value, browse) |
+| Read: query, browse, param_where | covered (pg16, pg18) | covered | covered | covered except #4214 | covered | covered (command, full_value, browse) |
 | Read: param_select | covered except #4206 | known-failing #4094 for non-text types | covered | covered except #4214 | covered except #4215 | not applicable |
-| Copy as TSV | not yet | not yet | not yet | not yet | not yet | not yet |
-| Export CSV, JSON, JSON Lines, XLSX, SQL INSERT and re-read | not yet | not yet | not yet | not yet | not yet | not yet |
-| Grid edit, insert row, set cells, paste, CSV and XLSX import | not yet | not yet | not yet | not yet | not yet | not yet |
-| No-op save and export to import checksums | not yet | not yet | not yet | not yet | not yet | not yet |
+| Copy as TSV and paste back | covered | covered except #4221 | covered except #4221 | covered except #4214 | covered | not yet |
+| Export CSV, JSON, JSON Lines, re-read | covered except #4223 (JSON) | covered except #4223 (JSON) | covered | covered except #4214 | covered | not yet |
+| Export SQL INSERT, run into an empty table | covered | covered | covered except #4220 | covered except #4214 | covered | not applicable |
+| Export to CSV or XLSX, import into an empty table | covered except #4206, #4222 | covered except #4225 | covered except #4220 | covered except #4218, #4219 | covered except #4226, #4227 | not applicable |
+| Grid edit, paste, set cells, insert row | covered except #4206, #4217, #4218, #4224 | covered except #4217, #4224, #4225 | covered except #4217; NULL cells store text by rule | covered except #4217, #4218 | not yet (MergeTree rows have no unique key) | not yet |
+| No-op edit, table unchanged | covered except #4217, #4218 | covered except #4217, #4225 | covered except #4220 | covered except #4217, #4218 | not yet | not yet |
 | GPUI and GTK display formatting | not covered by this suite | not covered | not covered | not covered | not covered | not covered |
