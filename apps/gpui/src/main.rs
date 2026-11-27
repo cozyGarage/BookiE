@@ -341,7 +341,6 @@ impl GridView {
             |this, input, event: &gpui_kit::component::input::InputEvent, cx| {
                 if matches!(event, gpui_kit::component::input::InputEvent::Change) {
                     this.last_edit = Some(input.read(cx).cursor_position());
-                    input.update(cx, Self::clear_sql_diagnostics);
                 }
                 if matches!(
                     event,
