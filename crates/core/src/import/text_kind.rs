@@ -14,6 +14,9 @@ pub(crate) fn column_kind_for(column: &ColumnInfo, driver_id: &str) -> ColumnKin
     if driver_id == "mysql" && (lowered == "timestamp" || lowered.starts_with("timestamp(")) {
         return ColumnKind::TimestampTz;
     }
+    if driver_id == "mysql" && crate::import::is_year_type(&lowered) {
+        return ColumnKind::Int;
+    }
     if is_unsigned_64(column, driver_id) {
         return ColumnKind::Text;
     }

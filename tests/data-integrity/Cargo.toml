@@ -11,24 +11,29 @@ name = "bookie_data_integrity"
 path = "src/lib.rs"
 
 [dependencies]
+bookie-app-services = { path = "../../crates/app-services" }
 bookie-core = { path = "../../crates/core" }
 bookie-driver-registry = { path = "../../crates/registry" }
 bookie-policy = { path = "../../crates/policy" }
 bookie-storage = { path = "../../crates/storage" }
 bookie-transport = { path = "../../crates/transport" }
 chrono.workspace = true
+csv.workspace = true
+duckdb = { version = "1.20000", features = ["bundled"] }
 hex.workspace = true
+rust_decimal.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sqlx = { workspace = true, features = ["sqlite-unbundled"] }
 tempfile.workspace = true
-testcontainers.workspace = true
-testcontainers-modules = { workspace = true, features = ["postgres", "mysql"] }
+testcontainers = { workspace = true, features = ["http_wait_plain"] }
+testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "redis"] }
+tokio.workspace = true
 toml.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-rust_decimal.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]

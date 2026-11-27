@@ -4,6 +4,7 @@ use bookie_core::{ColumnInfo, QualifiedTypeName};
 use bookie_gpui::model::Cell;
 use bookie_gpui::shell::Tab;
 use bookie_gpui::source::ResultSource;
+use bookie_results::value_exact::exact_equal;
 use gpui::{Context, Window};
 use gpui_component::menu::PopupMenu;
 
@@ -161,7 +162,7 @@ impl GridView {
             cx.notify();
             return;
         }
-        if self.cell_at(row, column) == cell {
+        if exact_equal(&self.cell_at(row, column), &cell) {
             return;
         }
         self.record_edit((row, column), cell);

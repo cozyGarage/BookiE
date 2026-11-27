@@ -9,6 +9,9 @@ mod column_type_tests;
 #[path = "cell/tests/temporal_contracts.rs"]
 mod temporal_contracts;
 
+#[path = "cell/tests/exact_writes.rs"]
+mod exact_writes;
+
 fn column(name: &str, data_type: &str) -> ColumnInfo {
     ColumnInfo {
         name: name.to_owned(),
