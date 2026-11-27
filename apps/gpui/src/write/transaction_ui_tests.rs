@@ -588,6 +588,7 @@ fn a_transaction_statement_is_refused_while_a_schema_context_is_set(cx: &mut Tes
     until(&view, cx, "the transaction is rolled back", |view| {
         view.transaction.is_none()
     });
+    view.read_with(cx, |view, _| assert_eq!(view.status, "Transaction rolled back"));
     assert_eq!(saved_customer(&path, 1), original);
 }
 

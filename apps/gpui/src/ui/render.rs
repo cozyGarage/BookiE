@@ -20,7 +20,7 @@ impl GridView {
             self.pager = self.pager.with_total(self.dataset_count());
         }
         if std::mem::take(&mut self.search.reset) {
-            self.search.find.update(cx, |find, cx| find.set_content("", cx));
+            self.search.find.update(cx, |find, cx| find.set_content_quiet("", cx));
         }
         if std::mem::take(&mut self.focus_editor) {
             let editor = self.sql_input.read(cx).focus_handle(cx);
