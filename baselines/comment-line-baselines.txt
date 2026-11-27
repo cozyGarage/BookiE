@@ -121,6 +121,7 @@ crates/drivers/mssql/src/errors.rs 5
 crates/drivers/mssql/src/lib.rs 32
 crates/drivers/mssql/src/schema_types.rs 16
 crates/drivers/mssql/src/tests.rs 7
+crates/drivers/mysql/src/decode.rs 16
 crates/drivers/mysql/src/errors.rs 3
 crates/drivers/mysql/src/introspection.rs 16
 crates/drivers/mysql/src/lib.rs 46
