@@ -152,40 +152,93 @@ pub(crate) fn environment_color(environment: bookie_core::Environment, theme: Th
     }
 }
 
-pub(crate) fn icon_menu_button(
-    id: impl Into<ElementId>,
-    name: &'static str,
-    label: Option<&str>,
-    tooltip: impl Into<SharedString>,
-    bar: Bar,
-    theme: Theme,
-) -> Button {
-    let id = id.into();
-    let tooltip = tooltip.into();
-    let marker = icon_selector(&id.to_string(), &tooltip);
-    let leading = div()
-        .flex_none()
-        .debug_selector(move || marker)
-        .child(icon(name, theme.muted_foreground));
-    bar_menu_button(id, Some(leading.into_any_element()), label, tooltip, bar, theme)
+pub(crate) enum Leading {
+    Icon(&'static str),
+    Element(AnyElement),
 }
 
-pub(crate) fn status_menu_button(
-    id: impl Into<ElementId>,
-    status: impl IntoElement,
-    label: Option<&str>,
-    tooltip: impl Into<SharedString>,
+pub(crate) struct MenuTrigger<'a> {
+    tooltip: SharedString,
     bar: Bar,
-    theme: Theme,
-) -> Button {
-    bar_menu_button(
-        id.into(),
-        Some(status.into_any_element()),
-        label,
-        tooltip.into(),
-        bar,
-        theme,
-    )
+    leading: Option<Leading>,
+    label: Option<&'a str>,
+    accessible_name: Option<SharedString>,
+}
+
+impl<'a> MenuTrigger<'a> {
+    pub(crate) fn new(tooltip: impl Into<SharedString>, bar: Bar) -> Self {
+        Self {
+            tooltip: tooltip.into(),
+            bar,
+            leading: None,
+            label: None,
+            accessible_name: None,
+        }
+    }
+
+    pub(crate) fn icon(mut self, name: &'static str) -> Self {
+        self.leading = Some(Leading::Icon(name));
+        self
+    }
+
+    pub(crate) fn leading(mut self, element: impl IntoElement) -> Self {
+        self.leading = Some(Leading::Element(element.into_any_element()));
+        self
+    }
+
+    pub(crate) fn label(mut self, text: impl Into<Option<&'a str>>) -> Self {
+        self.label = text.into();
+        self
+    }
+
+    pub(crate) fn accessible_name(mut self, name: impl Into<SharedString>) -> Self {
+        self.accessible_name = Some(name.into());
+        self
+    }
+}
+
+pub(crate) fn menu_button(id: impl Into<ElementId>, trigger: MenuTrigger<'_>, theme: Theme) -> Button {
+    let id = id.into();
+    let selector = id.to_string();
+    let marker = icon_selector(&selector, &trigger.tooltip);
+    let name = trigger.accessible_name.unwrap_or_else(|| trigger.tooltip.clone());
+    let leading = trigger.leading.map(|leading| match leading {
+        Leading::Icon(name) => icon(name, theme.muted_foreground).into_any_element(),
+        Leading::Element(element) => element,
+    });
+    let height = px(trigger.bar.height());
+    let content = div()
+        .flex()
+        .flex_auto()
+        .items_center()
+        .min_w_0()
+        .gap_1()
+        .children(leading.map(|leading| div().flex_none().debug_selector(move || marker).child(leading)))
+        .children(trigger.label.map(|text| {
+            div()
+                .flex_auto()
+                .min_w_0()
+                .truncate()
+                .text_color(rgb(theme.foreground))
+                .child(text.to_string())
+        }));
+    let button = Button::new(id)
+        .debug_selector(move || selector)
+        .ghost()
+        .small()
+        .accessibility_label(name)
+        .tooltip(trigger.tooltip)
+        .dropdown_caret(true);
+    let button = if trigger.bar == Bar::Compact {
+        button.compact()
+    } else {
+        button
+    };
+    let button = match trigger.label {
+        None => button.p_0().size(height),
+        Some(_) => button.h(height).min_w(height),
+    };
+    button.child(content)
 }
 
 pub(crate) fn select_button(
@@ -195,68 +248,7 @@ pub(crate) fn select_button(
     bar: Bar,
     theme: Theme,
 ) -> Button {
-    bar_menu_button(id.into(), None, label, tooltip.into(), bar, theme)
-}
-
-fn bar_menu_button(
-    id: ElementId,
-    leading: Option<AnyElement>,
-    label: Option<&str>,
-    tooltip: SharedString,
-    bar: Bar,
-    theme: Theme,
-) -> Button {
-    let selector = id.to_string();
-    let labelled = label.is_some();
-    let label = label.map(|text| {
-        div()
-            .flex_auto()
-            .min_w_0()
-            .truncate()
-            .text_color(rgb(theme.foreground))
-            .child(text.to_string())
-            .into_any_element()
-    });
-    let button =
-        menu_button(id, label, leading, tooltip.clone(), tooltip, bar == Bar::Compact).debug_selector(move || selector);
-    if labelled { button.h(px(bar.height())) } else { button }
-}
-
-pub(crate) fn menu_button(
-    id: impl Into<ElementId>,
-    label: Option<AnyElement>,
-    icon: Option<AnyElement>,
-    accessible_name: impl Into<SharedString>,
-    tooltip: impl Into<SharedString>,
-    compact: bool,
-) -> Button {
-    let icon_only = label.is_none();
-    let mut content = div().flex().items_center().min_w_0().gap_1();
-    if let Some(icon) = icon {
-        content = content.child(icon);
-    }
-    if let Some(label) = label {
-        content = content.child(label);
-    }
-
-    let button = Button::new(id)
-        .ghost()
-        .small()
-        .accessibility_label(accessible_name)
-        .tooltip(tooltip)
-        .dropdown_caret(true);
-    let button = if compact { button.compact() } else { button };
-    let button = if icon_only {
-        let control = if compact {
-            size::COMPACT_CONTROL
-        } else {
-            size::SMALL_CONTROL
-        };
-        button.p_0().size(px(control))
-    } else {
-        button
-    };
-    button.child(content)
+    menu_button(id, MenuTrigger::new(tooltip, bar).label(label), theme)
 }
 
 pub(crate) fn button(

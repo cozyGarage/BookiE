@@ -34,6 +34,15 @@ fn sidebar_connection_menu_offers_saved_profiles_and_uses_the_switch_guard(cx: &
     cx.run_until_parked();
     cx.update(|window, cx| window.render_frame(cx));
     let trigger = bounds(cx, "sidebar-connection-switcher");
+    let name = view.read_with(cx, |view, _| {
+        view.live
+            .as_deref()
+            .and_then(|live| live.saved.as_ref())
+            .map_or("Connections".to_string(), |(_, name)| name.clone())
+    });
+    use gpui_kit::test::TestQueryExt as _;
+    let switcher = cx.update(|window, _| window.find_by_label(&format!("{name}, Connected. Choose connection")));
+    assert_eq!(switcher.description(), Some(format!("{name} · Connected").as_str()));
     let collapse = bounds(cx, "header-collapse-all");
     assert!(trigger.origin.x + trigger.size.width <= collapse.origin.x);
     assert!(cx.debug_bounds("connection-connected").is_some());

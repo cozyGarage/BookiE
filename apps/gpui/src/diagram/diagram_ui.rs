@@ -344,12 +344,11 @@ impl GridView {
             .collect();
         let label = selected.clone().unwrap_or_else(|| "All schemas".into());
         let owner = cx.entity().downgrade();
-        crate::surfaces::icon_menu_button(
+        crate::surfaces::menu_button(
             "diagram-scope",
-            "database",
-            Some(&label),
-            "Diagram schema scope",
-            crate::surfaces::Bar::Compact,
+            crate::surfaces::MenuTrigger::new("Diagram schema scope", crate::surfaces::Bar::Compact)
+                .icon("database")
+                .label(label.as_str()),
             theme,
         )
         .dropdown_menu(move |menu, _, _| {
@@ -404,12 +403,11 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
         let owner = cx.entity().downgrade();
         let saving = self.search.diagram.view.as_ref().is_some_and(|view| view.saving_layout);
-        crate::surfaces::icon_menu_button(
+        crate::surfaces::menu_button(
             "diagram-layout",
-            "layout-grid",
-            Some("Layout"),
-            "Save or reset the card layout",
-            crate::surfaces::Bar::Compact,
+            crate::surfaces::MenuTrigger::new("Save or reset the card layout", crate::surfaces::Bar::Compact)
+                .icon("layout-grid")
+                .label("Layout"),
             theme,
         )
         .dropdown_menu(move |menu, _, _| {

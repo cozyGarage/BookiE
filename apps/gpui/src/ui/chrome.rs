@@ -212,8 +212,12 @@ impl GridView {
     fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::DropdownMenu;
         let groups = crate::menus::command_groups(self, crate::menus::OVERFLOW_GROUPS);
-        crate::surfaces::icon_menu_button("more", "ellipsis", None, "More", Bar::Small, theme)
-            .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
+        crate::surfaces::menu_button(
+            "more",
+            crate::surfaces::MenuTrigger::new("More", Bar::Small).icon("ellipsis"),
+            theme,
+        )
+        .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
     fn toolbar_right(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
@@ -468,12 +472,9 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
         let owner = cx.entity().downgrade();
         let groups = crate::menus::command_groups(self, crate::menus::IMPORT_EXPORT_GROUPS);
-        crate::surfaces::icon_menu_button(
+        crate::surfaces::menu_button(
             "import-export-menu",
-            "arrow-down-up",
-            None,
-            "Import or export connections",
-            Bar::Small,
+            crate::surfaces::MenuTrigger::new("Import or export connections", Bar::Small).icon("arrow-down-up"),
             theme,
         )
         .dropdown_menu(crate::menus::command_menu(owner, groups))
@@ -523,12 +524,12 @@ impl GridView {
             .collect();
         let new_connection = bookie_gpui::palette::menu_label("new-connection").unwrap_or_default();
 
-        crate::surfaces::status_menu_button(
+        crate::surfaces::menu_button(
             "sidebar-connection-switcher",
-            connection_status_dot(connected, theme),
-            Some(name),
-            format!("{name} · {status}"),
-            Bar::Compact,
+            crate::surfaces::MenuTrigger::new(format!("{name} · {status}"), Bar::Compact)
+                .leading(connection_status_dot(connected, theme))
+                .label(name)
+                .accessible_name(format!("{name}, {status}. Choose connection")),
             theme,
         )
         .w_full()

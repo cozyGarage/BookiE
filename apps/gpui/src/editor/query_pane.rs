@@ -4,9 +4,7 @@ use gpui::{Context, Div, MouseDownEvent, Stateful, Window, div, prelude::*, px, 
 use gpui_component::menu::DropdownMenu as _;
 
 use crate::chrome::{SQL, TOOLBAR_HEIGHT, tip};
-use crate::surfaces::{
-    Bar, ButtonKind, button, compact_icon_button, icon_menu_button, segment, segmented, select_button,
-};
+use crate::surfaces::{Bar, ButtonKind, button, compact_icon_button, segment, segmented, select_button};
 use crate::{GridView, thousands};
 use bookie_gpui::shell::{ResultView, Run, Tab};
 use bookie_gpui::theme::{Theme, size};
@@ -43,12 +41,11 @@ impl GridView {
 
     fn query_file_menu(&self, theme: Theme, compact: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let groups = crate::menus::command_groups(self, crate::menus::FILE_GROUPS);
-        icon_menu_button(
+        crate::surfaces::menu_button(
             "query-file-menu",
-            "folder",
-            (!compact).then_some("File"),
-            "Open or save SQL files, export results or import a file",
-            Bar::Small,
+            crate::surfaces::MenuTrigger::new("Open or save SQL files, export results or import a file", Bar::Small)
+                .icon("folder")
+                .label((!compact).then_some("File")),
             theme,
         )
         .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
@@ -215,12 +212,11 @@ impl GridView {
         let suggest_keys = Some(bookie_gpui::keymap::completion_chord().label());
         let label = |id| bookie_gpui::palette::menu_label(id).unwrap_or(id);
         let (explain_label, favorite_label) = (label("explain"), label("save-favorite"));
-        let tools = icon_menu_button(
+        let tools = crate::surfaces::menu_button(
             "sql-editor-tools",
-            "sliders-horizontal",
-            (!compact).then_some("Tools"),
-            "SQL editor tools",
-            Bar::Small,
+            crate::surfaces::MenuTrigger::new("SQL editor tools", Bar::Small)
+                .icon("sliders-horizontal")
+                .label((!compact).then_some("Tools")),
             theme,
         );
         tools.dropdown_menu(move |mut menu, _, cx| {
@@ -315,12 +311,9 @@ impl GridView {
             bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
                 .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()))
         });
-        icon_menu_button(
+        crate::surfaces::menu_button(
             "query-context-menu",
-            "database",
-            None,
-            "Connection and database context",
-            Bar::Small,
+            crate::surfaces::MenuTrigger::new("Connection and database context", Bar::Small).icon("database"),
             theme,
         )
         .dropdown_menu(move |menu, _, _| {
