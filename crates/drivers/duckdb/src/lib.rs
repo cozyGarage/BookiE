@@ -758,6 +758,7 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
     let mut zoned_columns = Vec::new();
     let mut uuid_columns = Vec::new();
     let mut bit_columns = Vec::new();
+    let mut timetz_columns = Vec::new();
     while let Some(row) = rows.next().map_err(map_duck_error)? {
         if column_count == 0 {
             column_count = row.as_ref().column_count();
@@ -766,6 +767,9 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
                 .collect();
             bit_columns = (0..column_count)
                 .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Bit)
+                .collect();
+            timetz_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::TimeTZ)
                 .collect();
             zoned_columns = (0..column_count)
                 .map(|i| {
@@ -789,25 +793,25 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
             &mut decoded,
             |values| {
                 values.extend(
-                    zoned_columns
-                        .iter()
-                        .zip(&uuid_columns)
-                        .enumerate()
-                        .map(|(i, (zoned, uuid))| {
-                            match if bit_columns[i] {
-                                duck_bit_ref_to_value(row.get_ref_unwrap(i))
-                            } else {
-                                duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid)
-                            } {
-                                Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
-                                Value::Text(timestamp)
-                                    if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") =>
-                                {
-                                    Value::Text(format!("{timestamp}+00"))
-                                }
-                                value => value,
+                    zoned_columns.iter().zip(&uuid_columns).enumerate().map(
+                        |(i, (zoned, uuid))| match if timetz_columns[i]
+                            && !matches!(row.get_ref_unwrap(i), ValueRef::Null)
+                        {
+                            Value::Undecodable("TIME WITH TIME ZONE".into())
+                        } else if bit_columns[i] {
+                            duck_bit_ref_to_value(row.get_ref_unwrap(i))
+                        } else {
+                            duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid)
+                        } {
+                            Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
+                            Value::Text(timestamp)
+                                if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") =>
+                            {
+                                Value::Text(format!("{timestamp}+00"))
                             }
-                        }),
+                            value => value,
+                        },
+                    ),
                 );
                 Ok(())
             },

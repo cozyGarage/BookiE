@@ -173,6 +173,18 @@ async fn native_connection() -> Box<dyn Connection> {
 }
 
 #[tokio::test]
+async fn timetz_never_returns_a_time_with_a_discarded_offset() {
+    let connection = native_connection().await;
+    let result = connection
+        .query("SELECT '13:45:30+05:30'::TIMETZ, NULL::TIMETZ, '13:45:30'::TIME")
+        .await
+        .unwrap();
+    assert_eq!(result.rows[0][0], Value::Undecodable("TIME WITH TIME ZONE".into()));
+    assert_eq!(result.rows[0][1], Value::Null);
+    assert!(matches!(result.rows[0][2], Value::Time(_)));
+}
+
+#[tokio::test]
 async fn bit_values_round_trip_as_exact_text_without_changing_blobs_or_nulls() {
     assert!(DuckdbDriver.value_input_capabilities().bit_string_input);
     let connection = native_connection().await;
