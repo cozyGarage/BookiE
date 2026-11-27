@@ -241,10 +241,6 @@ literals = ["union_value(num := 2)", "union_value(str := 'x')"]
 carrier = "Undecodable"
 rule = "refusal"
 expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
-known_failing = [
-    { route = "import_csv", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
-    { route = "import_xlsx", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
-]
 
 [[case]]
 id = "enum"

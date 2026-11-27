@@ -42,11 +42,21 @@ fn import_rejects_undecodable_export_markers_with_location() {
     assert_eq!(error.line, 3);
     assert_eq!(error.column, "value");
     assert!(error.to_string().contains("undecodable"));
-    let ordinary = ["before <undecodable UNION>", "<undecodable >", "<undecodable UNION> after"];
+    let ordinary = [
+        "before <undecodable UNION>",
+        "<undecodable >",
+        "<undecodable UNION> after",
+    ];
     for text in ordinary {
         assert_eq!(
-            row_to_values(&[text.to_owned()], &[Some(0)], &columns, &CsvImportOptions::default(), 2)
-                .expect("ordinary text must remain importable"),
+            row_to_values(
+                &[text.to_owned()],
+                &[Some(0)],
+                &columns,
+                &CsvImportOptions::default(),
+                2
+            )
+            .expect("ordinary text must remain importable"),
             vec![Value::Text(text.to_owned())]
         );
     }
