@@ -375,6 +375,9 @@ impl GridView {
     }
 
     pub(crate) fn prepare_tools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus_import_input(window, cx);
+        self.focus_export_file_input(window, cx);
+        self.focus_insert_form_input(window, cx);
         self.focus_set_cells_input(window, cx);
         self.focus_value_search_input(window, cx);
         self.focus_schema_diagram_input(window, cx);

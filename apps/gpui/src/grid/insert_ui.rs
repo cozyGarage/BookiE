@@ -14,10 +14,20 @@ pub(crate) struct InsertField {
 pub(crate) struct InsertState {
     pub open: bool,
     pub loading: bool,
+    pub focus_input: bool,
     pub fields: Vec<InsertField>,
 }
 
 impl GridView {
+    pub(crate) fn focus_insert_form_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !std::mem::take(&mut self.insert.focus_input) {
+            return;
+        }
+        if let Some(field) = self.insert.fields.first() {
+            window.focus(&field.input.read(cx).focus_handle(cx), cx);
+        }
+    }
+
     pub(crate) fn open_insert_form(&mut self, cx: &mut Context<Self>) {
         if self.compare.is_some() {
             self.status = "Leave compare mode before adding a row".into();
@@ -97,12 +107,16 @@ impl GridView {
         }
         self.insert.fields = fields;
         self.insert.open = true;
+        self.insert.focus_input = true;
+        self.restore_grid_focus = false;
         self.status = "Fill in the new row, then review it".into();
     }
 
     pub(crate) fn close_insert_form(&mut self) {
         self.insert.open = false;
+        self.insert.focus_input = false;
         self.insert.fields.clear();
+        self.restore_grid_focus = true;
     }
 
     pub(crate) fn cancel_insert_form(&mut self, cx: &mut Context<Self>) {

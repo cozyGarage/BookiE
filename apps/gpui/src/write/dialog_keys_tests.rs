@@ -60,6 +60,52 @@ fn escape_closes_every_one_shot_dialog_and_changes_nothing(cx: &mut TestAppConte
 }
 
 #[gpui::test]
+fn import_export_and_insert_focus_the_first_field_and_return_to_the_grid(cx: &mut TestAppContext) {
+    let fixture = orders();
+    let path = fixture.to_path_buf();
+    let (view, cx) = saving_view(cx, &path);
+    let openers = openers();
+    for surface in [Surface::Import, Surface::ExportFile, Surface::Insert] {
+        let opener = openers
+            .iter()
+            .find(|(candidate, _)| *candidate == surface)
+            .expect("the surface is listed")
+            .1;
+        open_surface(&view, cx, opener);
+        let input_focused = cx.update(|window, cx| {
+            let view = view.read(cx);
+            match surface {
+                Surface::Import => view
+                    .import
+                    .input
+                    .as_ref()
+                    .is_some_and(|input| input.read(cx).focus_handle_for_tests().is_focused(window)),
+                Surface::ExportFile => view
+                    .export
+                    .file
+                    .input
+                    .as_ref()
+                    .is_some_and(|input| input.read(cx).focus_handle_for_tests().is_focused(window)),
+                Surface::Insert => view
+                    .insert
+                    .fields
+                    .first()
+                    .is_some_and(|field| field.input.read(cx).focus_handle_for_tests().is_focused(window)),
+                _ => false,
+            }
+        });
+        assert!(input_focused, "{surface:?} focuses its first field");
+        cx.simulate_keystrokes("escape");
+        settle_saving(cx);
+        assert!(
+            cx.update(|window, cx| view.read(cx).focus.is_focused(window)),
+            "{surface:?} returns focus to the grid"
+        );
+    }
+    std::fs::remove_file(&path).ok();
+}
+
+#[gpui::test]
 fn one_shot_steps_open_centred_and_leave_the_grid_where_it_was(cx: &mut TestAppContext) {
     let fixture = orders();
     let path = fixture.to_path_buf();
