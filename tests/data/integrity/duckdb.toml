@@ -198,10 +198,6 @@ carrier = "JsonText"
 rule = "exact"
 note = "DuckDB JSON keeps its source text exactly."
 known_failing = [
-    { route = "query", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
-    { route = "browse", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
-    { route = "param_where", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
-    { route = "param_select", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "export_json", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
     { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
 ]
