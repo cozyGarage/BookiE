@@ -4,6 +4,20 @@ use super::native_connection;
 use bookie_core::Value;
 
 #[tokio::test]
+async fn oversized_bit_text_is_rejected_before_expansion() {
+    let connection = native_connection().await;
+    let result = connection
+        .query(&format!(
+            "SELECT repeat('1', {})::BIT",
+            bookie_core::MAX_QUERY_RESULT_BYTES + 1
+        ))
+        .await
+        .unwrap();
+    assert!(result.rows.is_empty());
+    assert!(result.truncated);
+}
+
+#[tokio::test]
 async fn query_truncates_when_result_memory_budget_is_exceeded() {
     let connection = native_connection().await;
     let over = connection

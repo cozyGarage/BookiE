@@ -257,12 +257,6 @@ type = "BIT"
 literals = ["'101010'", "'0'"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "query", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "browse", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_where", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_select", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "binding the internal bytes back stores a different bit string" },
-]
 
 [[case]]
 id = "smallint"

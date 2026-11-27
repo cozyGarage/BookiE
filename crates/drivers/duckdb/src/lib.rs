@@ -756,11 +756,15 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
     let mut column_count = 0usize;
     let mut zoned_columns = Vec::new();
     let mut uuid_columns = Vec::new();
+    let mut bit_columns = Vec::new();
     while let Some(row) = rows.next().map_err(map_duck_error)? {
         if column_count == 0 {
             column_count = row.as_ref().column_count();
             uuid_columns = (0..column_count)
                 .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Uuid)
+                .collect();
+            bit_columns = (0..column_count)
+                .map(|i| row.as_ref().column_logical_type(i).id() == LogicalTypeId::Bit)
                 .collect();
             zoned_columns = (0..column_count)
                 .map(|i| {
@@ -776,7 +780,8 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
             break;
         }
         let payload_bytes = (0..column_count).fold(0usize, |total, i| {
-            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i)))
+            let bytes = cell_payload_bytes(&row.get_ref_unwrap(i));
+            total.saturating_add(if bit_columns[i] { bytes.saturating_mul(8) } else { bytes })
         });
         let admitted = budget.decode_and_admit_row_into::<std::convert::Infallible>(
             column_count,
@@ -788,8 +793,12 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
                         .iter()
                         .zip(&uuid_columns)
                         .enumerate()
-                        .map(
-                            |(i, (zoned, uuid))| match duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid) {
+                        .map(|(i, (zoned, uuid))| {
+                            match if bit_columns[i] {
+                                duck_bit_ref_to_value(row.get_ref_unwrap(i))
+                            } else {
+                                duck_value_ref_to_value(row.get_ref_unwrap(i), *uuid)
+                            } {
                                 Value::DateTime(timestamp) if *zoned => Value::TimestampTz(timestamp.and_utc()),
                                 Value::Text(timestamp)
                                     if *zoned && !matches!(timestamp.as_str(), "infinity" | "-infinity") =>
@@ -797,8 +806,8 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
                                     Value::Text(format!("{timestamp}+00"))
                                 }
                                 value => value,
-                            },
-                        ),
+                            }
+                        }),
                 );
                 Ok(())
             },
@@ -865,6 +874,30 @@ fn cell_payload_bytes(value: &ValueRef<'_>) -> usize {
     match value {
         ValueRef::Text(bytes) | ValueRef::Blob(bytes) | ValueRef::Geometry(bytes) => bytes.len(),
         _ => 0,
+    }
+}
+
+fn duck_bit_ref_to_value(value: ValueRef<'_>) -> Value {
+    match value {
+        ValueRef::Null => Value::Null,
+        ValueRef::Blob(bytes) => {
+            let Some((&padding, data)) = bytes.split_first() else {
+                return Value::Undecodable("BIT".into());
+            };
+            if padding > 7 || data.is_empty() || (padding > 0 && data[0] >> (8 - padding) != (1u8 << padding) - 1) {
+                return Value::Undecodable("BIT".into());
+            }
+            let mut text = String::with_capacity(data.len().saturating_mul(8) - usize::from(padding));
+            for bit in usize::from(padding)..data.len() * 8 {
+                text.push(if data[bit / 8] & (0x80 >> (bit % 8)) == 0 {
+                    '0'
+                } else {
+                    '1'
+                });
+            }
+            Value::Text(text)
+        }
+        _ => Value::Undecodable("BIT".into()),
     }
 }
 

@@ -173,6 +173,33 @@ async fn native_connection() -> Box<dyn Connection> {
 }
 
 #[tokio::test]
+async fn bit_values_round_trip_as_exact_text_without_changing_blobs_or_nulls() {
+    let connection = native_connection().await;
+    for bits in [
+        "0",
+        "1",
+        "101010",
+        "00000000",
+        "11111111",
+        "100000001",
+        "01100110101010101",
+    ] {
+        let result = connection
+            .query(&format!("SELECT '{bits}'::BIT, '\\x07\\xfe'::BLOB, NULL::BIT"))
+            .await
+            .unwrap();
+        assert_eq!(result.rows[0][0], Value::Text(bits.into()));
+        assert_eq!(result.rows[0][1], Value::Bytes(vec![7, 254]));
+        assert_eq!(result.rows[0][2], Value::Null);
+        let stored = connection
+            .query_params("SELECT CAST(? AS BIT)::VARCHAR", &[result.rows[0][0].clone()])
+            .await
+            .unwrap();
+        assert_eq!(stored.rows[0][0], Value::Text(bits.into()));
+    }
+}
+
+#[tokio::test]
 async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
     let connection = native_connection().await;
     for (kind, text) in [

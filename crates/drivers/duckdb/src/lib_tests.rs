@@ -343,3 +343,13 @@ async fn a_write_that_times_out_while_queued_never_executes() {
         Value::Int(0)
     );
 }
+#[test]
+fn malformed_bit_payloads_are_not_exposed_as_values() {
+    for bytes in [&[][..], &[0][..], &[8, 255][..], &[3, 0][..]] {
+        assert_eq!(
+            duck_bit_ref_to_value(ValueRef::Blob(bytes)),
+            Value::Undecodable("BIT".into())
+        );
+    }
+    assert_eq!(duck_bit_ref_to_value(ValueRef::Null), Value::Null);
+}
