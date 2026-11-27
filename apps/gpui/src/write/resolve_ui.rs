@@ -29,7 +29,7 @@ pub(crate) fn decision_status(decided: &Result<(), UnknownOutcomeError>, decisio
 
 impl GridView {
     pub(crate) fn resolve_enabled(&self) -> bool {
-        self.live.as_ref().is_some_and(|live| live.writable.is_some()) && !self.resolve.open
+        self.is_writable() && !self.resolve.open
     }
 
     #[cfg(test)]
@@ -45,11 +45,7 @@ impl GridView {
     }
 
     pub(crate) fn open_resolve_panel(&mut self, cx: &mut Context<Self>) {
-        let Some(connection_id) = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref().map(|(id, _)| *id))
-        else {
+        let Some(connection_id) = self.saved_connection_id() else {
             return;
         };
         if !self.resolve_enabled() {

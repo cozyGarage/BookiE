@@ -3150,3 +3150,29 @@ fn the_top_bar_menu_is_for_connections_and_the_editor_has_the_file_menu(cx: &mut
         "the editor toolbar has Import / Export"
     );
 }
+
+#[gpui::test]
+fn the_session_helpers_are_off_without_a_live_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.is_writable());
+        assert!(!view.shows_live_table());
+        assert_eq!(view.saved_connection_id(), None);
+        assert!(!view.row_change_enabled());
+    });
+}
+
+#[gpui::test]
+fn the_session_helpers_follow_the_live_table_and_its_saved_connection(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    view.update(cx, |view, _| {
+        assert!(view.shows_live_table());
+        assert!(
+            view.saved_connection_id().is_some(),
+            "a file connection has a stable saved id"
+        );
+        assert_eq!(view.row_change_enabled(), view.is_writable() && view.source.editable());
+        view.grid_is_query = true;
+        assert!(!view.shows_live_table(), "a query result is not a table");
+    });
+}

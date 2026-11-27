@@ -11,10 +11,7 @@ impl GridView {
         };
         let draft = ClosedDraft {
             sql: self.sql_input.read(cx).value().to_string(),
-            connection: self
-                .live
-                .as_ref()
-                .and_then(|live| live.saved.as_ref().map(|(id, _)| *id)),
+            connection: self.saved_connection_id(),
         };
         if let Err(error) = drafts.remember(draft) {
             tracing::warn!(%error, "could not keep the closed query draft");

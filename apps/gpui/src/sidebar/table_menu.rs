@@ -73,7 +73,7 @@ fn menu_item(item: TableMenuItem, owner: WeakEntity<GridView>, table: TableInfo)
 
 impl GridView {
     pub(crate) fn table_menu_items(&self) -> Vec<Vec<TableMenuItem>> {
-        let writable = self.live.as_ref().is_some_and(|live| live.writable.is_some());
+        let writable = self.is_writable();
         table_menu_groups(self.live.is_some(), writable)
     }
 

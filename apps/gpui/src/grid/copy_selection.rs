@@ -210,7 +210,7 @@ impl GridView {
         match result_copy::render_with(CopyFormat::Csv, &context, &rows, &self.csv_options()) {
             Ok(copied) => {
                 cx.write_to_clipboard(ClipboardItem::new_string(copied.text));
-                let noun = if count == 1 { "row" } else { "rows" };
+                let noun = bookie_gpui::messages::noun(count, "row", "rows");
                 self.status = if cut {
                     format!(
                         "Exported the first {count} {noun} as CSV to clipboard (export limit reached, more rows were not exported)"

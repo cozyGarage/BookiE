@@ -621,9 +621,11 @@ impl GridView {
             name: table.name.clone(),
         };
         let open_data = target.clone();
-        let can_add_relationship = self.live.as_ref().is_some_and(|live| {
-            live.writable.is_some() && bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id)
-        });
+        let can_add_relationship = self.is_writable()
+            && self
+                .live
+                .as_ref()
+                .is_some_and(|live| bookie_core::sql_dialect::alters_foreign_keys(&live.driver_id));
         let relationship_source = target.clone();
         let column_target = target.clone();
         div()
