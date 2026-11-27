@@ -7,7 +7,7 @@ use crate::corpus::{Case, Corpus, Route};
 use crate::governed::{self, control};
 use crate::report::{CaseResult, Outcome};
 use crate::rules::{self, RefereeColumn, Rule};
-use crate::server::{Dialect, Server};
+use crate::server::{Dialect, Server, SettingCheck};
 
 pub type Observed = Result<BTreeMap<i64, Value>, String>;
 
@@ -44,17 +44,96 @@ pub async fn run_reads(server: &Server, corpus: &Corpus) -> Vec<CaseResult> {
 }
 
 async fn read_all(server: &Server, prepared: &[Prepared<'_>]) -> Vec<RouteReads> {
+    let mut reads: Vec<RouteReads> = prepared.iter().map(|_| Vec::new()).collect();
     let governed = governed::open(server.dialect.driver_id, server.options.clone(), true).await;
-    let mut reads = Vec::new();
-    for (case, referee) in prepared {
-        let routes = match referee {
-            Ok(rows) => read_case(&governed.guard, server.dialect, case, rows).await,
-            Err(_) => Vec::new(),
-        };
-        reads.push(routes);
+    for (index, (case, referee)) in prepared.iter().enumerate() {
+        if let (Ok(rows), true) = (referee, case.bookie_session.is_empty()) {
+            reads[index] = read_case(&governed.guard, server.dialect, case, rows).await;
+        }
     }
     governed.close().await;
+    for (index, (case, referee)) in prepared.iter().enumerate() {
+        if let (Ok(rows), false) = (referee, case.bookie_session.is_empty()) {
+            reads[index] = read_in_session(server, case, rows).await;
+        }
+    }
     reads
+}
+
+async fn read_in_session(server: &Server, case: &Case, referee: &[RefereeRow]) -> RouteReads {
+    let failed = |error: String| -> RouteReads {
+        Route::READS
+            .iter()
+            .map(|route| (*route, Some(Err(error.clone()))))
+            .collect()
+    };
+    let variant = (server.dialect.session_variant)(&case.table(), &case.bookie_session);
+    for statement in &variant.setup {
+        if let Err(error) = server.run_sql(statement).await {
+            return failed(format!("session setup failed: {error}"));
+        }
+    }
+    let mut options = server.options.clone();
+    if let Some((username, password)) = &variant.login {
+        options.username.clone_from(username);
+        options.password = secrecy::SecretString::new(password.clone().into());
+    }
+    let governed = if variant.bookie_setup.is_empty() {
+        governed::open(server.dialect.driver_id, options, true).await
+    } else {
+        governed::open_writable(server.dialect.driver_id, options).await
+    };
+    let mut reads = match apply_bookie_setup(&governed.guard, &variant.bookie_setup).await {
+        Err(error) => failed(error),
+        Ok(()) => match check_settings(server, &governed.guard, &variant.checks).await {
+            Ok(()) => read_case(&governed.guard, server.dialect, case, referee).await,
+            Err(error) => failed(error),
+        },
+    };
+    governed.close().await;
+    for statement in &variant.teardown {
+        if let Err(error) = server.run_sql(statement).await {
+            reads = failed(format!("session teardown failed: {error}"));
+        }
+    }
+    reads
+}
+
+async fn apply_bookie_setup(guard: &PolicyGuard, statements: &[String]) -> Result<(), String> {
+    for statement in statements {
+        guard
+            .query_result_sets_controlled(statement, &[], &control())
+            .await
+            .map_err(|error| format!("{statement}: {error}"))?;
+    }
+    Ok(())
+}
+
+async fn check_settings(server: &Server, guard: &PolicyGuard, checks: &[SettingCheck]) -> Result<(), String> {
+    for check in checks {
+        let actual = if check.through_bookie {
+            let batch = guard
+                .query_result_sets_controlled(&check.sql, &[], &control())
+                .await
+                .map_err(|error| format!("{}: {error}", check.sql))?;
+            match batch.result_sets.first().and_then(|result| result.rows.iter().next()) {
+                Some(row) => match row.first() {
+                    Some(Value::Text(text)) => text.clone(),
+                    other => format!("{other:?}"),
+                },
+                None => String::new(),
+            }
+        } else {
+            server.run_sql(&check.sql).await?.trim().to_string()
+        };
+        if actual != check.expected {
+            return Err(format!(
+                "session setting was not applied: {} returned {actual:?}, expected {:?}",
+                check.sql, check.expected
+            ));
+        }
+    }
+    Ok(())
 }
 
 async fn read_case(guard: &PolicyGuard, dialect: &Dialect, case: &Case, referee: &[RefereeRow]) -> RouteReads {
@@ -85,7 +164,7 @@ async fn judge_case(server: &Server, case: &Case, referee: &[RefereeRow], routes
             None => Outcome::Skipped(case.skip_reason(route).unwrap_or_default().to_string()),
             Some(observed) => {
                 let observed = server_cast(server, case, route, observed).await;
-                compare_rows(case, route, referee, observed)
+                expect_refusal(case, route, compare_rows(case, route, referee, observed))
             }
         };
         results.push(CaseResult {
@@ -96,6 +175,27 @@ async fn judge_case(server: &Server, case: &Case, referee: &[RefereeRow], routes
         });
     }
     results
+}
+
+pub fn expect_refusal(case: &Case, route: Route, outcome: Outcome) -> Outcome {
+    let Some(expected) = case.expected_error(route) else {
+        return outcome;
+    };
+    match outcome {
+        Outcome::Fail(details) if details.iter().all(|detail| detail.contains(&expected.expect)) => {
+            Outcome::Refused(details)
+        }
+        Outcome::Fail(details) => Outcome::Fail(
+            std::iter::once(format!("expected an error containing {:?}", expected.expect))
+                .chain(details)
+                .collect(),
+        ),
+        Outcome::Pass { .. } => Outcome::Fail(vec![format!(
+            "the route now succeeds; the expected error {:?} is gone, remove its expect_error marker",
+            expected.expect
+        )]),
+        other => other,
+    }
 }
 
 pub async fn prepare_case(server: &Server, case: &Case) -> Result<(), String> {
@@ -296,7 +396,8 @@ async fn server_cast(server: &Server, case: &Case, route: Route, observed: Obser
             continue;
         };
         let cast = format!("CAST({} AS {column_type})", (dialect.quote_text)(text));
-        let sql = format!("SELECT {}", (dialect.wrap_hex)(&Dialect::on(dialect.text_expr, &cast)));
+        let render = (dialect.wrap_hex)(&Dialect::on(dialect.text_expr, "v"));
+        let sql = (dialect.cast_query)(&case.bookie_session, &cast, &render);
         let output = server
             .run_sql(&sql)
             .await
@@ -318,7 +419,14 @@ fn single_value(result: &QueryResult, id: i64) -> Result<Value, String> {
     }
 }
 
-fn compare_rows(case: &Case, route: Route, referee: &[RefereeRow], observed: Observed) -> Outcome {
+pub fn compare_rows(case: &Case, route: Route, referee: &[RefereeRow], observed: Observed) -> Outcome {
+    if referee.len() != case.literals.len() {
+        return Outcome::Broken(format!(
+            "the server referee returned {} rows for {} literals",
+            referee.len(),
+            case.literals.len()
+        ));
+    }
     let observed = match observed {
         Ok(rows) => rows,
         Err(error) => return Outcome::Fail(vec![error]),

@@ -4,6 +4,129 @@ pub struct Action {
     pub enabled: bool,
 }
 
+impl Action {
+    pub fn menu_label(&self) -> &str {
+        menu_label(self.id).unwrap_or(&self.label)
+    }
+}
+
+pub fn menu_label(id: &str) -> Option<&'static str> {
+    let label = match id {
+        "query" => "New query",
+        "run" => "Run all",
+        "run-at-cursor" => "Run statement",
+        "explain" => "Explain",
+        "save-favorite" => "Save as favorite",
+        "data-dictionary" => "Data dictionary",
+        "sidebar" => "Sidebar",
+        "results" => "Results pane",
+        "detail" => "Detail panel",
+        "theme" => "Dark theme",
+        "font" => "Font…",
+        "new-connection" => "New connection…",
+        "home" => "Home",
+        "history" => "History",
+        "audit" => "Audit log",
+        "settings" => "Settings",
+        "status" => "Connection status",
+        "server-status" => "Server status",
+        "import-connections" => "Import…",
+        "export-connections" => "Export…",
+        "open-sql-file" => "Open SQL file…",
+        "save-sql-file" => "Save SQL file…",
+        "export-file" => "Export to file…",
+        "export-csv" => "Copy page",
+        "import-csv" => "Import file…",
+        _ => return grid_menu_label(id),
+    };
+    Some(label)
+}
+
+fn grid_menu_label(id: &str) -> Option<&'static str> {
+    let label = match id {
+        "copy" => "Copy as TSV",
+        "copy-csv" => "Copy as CSV",
+        "copy-json" => "Copy as JSON",
+        "copy-markdown" => "Copy as Markdown",
+        "copy-insert" => "Copy as INSERT",
+        "copy-in-list" => "Copy IN list",
+        "show-row-vertically" => "Row details",
+        "selection-stats" => "Statistics",
+        "count-table-rows" => "Count rows",
+        "edit" => "Edit cell",
+        "set-cells" => "Set cells…",
+        "clear-selection" => "Clear selection",
+        "delete-rows" => "Delete rows…",
+        "insert-row" => "Add row…",
+        "filter" => "Filter rows",
+        "first" => "First page",
+        "last" => "Last page",
+        "jump-column" => "Jump to column…",
+        "fit-visible-columns" => "Fit columns",
+        "reset-grid-widths" => "Reset widths",
+        "show-hidden-columns" => "Show hidden columns",
+        "refresh-table" => "Refresh",
+        "compare" => "Compare",
+        "continuous" => "Scroll continuously",
+        "append-pages" => "Append pages",
+        _ => return None,
+    };
+    Some(label)
+}
+
+pub fn opens_dialog(id: &str) -> bool {
+    matches!(
+        id,
+        "new-connection"
+            | "import-connections"
+            | "export-connections"
+            | "quick-switcher"
+            | "jump-column"
+            | "shortcuts"
+            | "favorites"
+            | "delete-favorite"
+            | "saved-filters"
+            | "delete-saved-filter"
+            | "save-filter"
+            | "schema-context"
+            | "font"
+            | "select-theme"
+            | "open-sql-file"
+            | "save-sql-file"
+            | "export-file"
+            | "import-csv"
+            | "set-cells"
+            | "insert-row"
+            | "delete-rows"
+            | "save-changes"
+            | "resolve-outcome"
+            | "filter-rule"
+            | "search-values"
+            | "schema-compare"
+            | "export-schema-diagram"
+            | "backup-database"
+            | "restore-database"
+            | "compare-table-data"
+            | "export-all-tables"
+    ) || structure_dialog(id)
+}
+
+fn structure_dialog(id: &str) -> bool {
+    matches!(
+        id,
+        "empty-table"
+            | "drop-table"
+            | "add-column"
+            | "rename-column"
+            | "drop-column"
+            | "add-index"
+            | "drop-index"
+            | "rename-table"
+            | "add-foreign-key"
+            | "drop-foreign-key"
+    )
+}
+
 pub const GROUPS: [&str; 5] = ["Table", "Query", "Connection", "View", "App"];
 
 pub fn group(id: &str) -> &'static str {
@@ -25,7 +148,6 @@ pub fn known_group(id: &str) -> Option<&'static str> {
         | "disconnect"
         | "status"
         | "sessions"
-        | "activity-console"
         | "blocking-locks"
         | "long-running"
         | "replication-lag"
@@ -79,6 +201,7 @@ fn table_group(id: &str) -> Option<&'static str> {
             | "jump-column"
             | "fit-visible-columns"
             | "reset-grid-widths"
+            | "show-hidden-columns"
             | "reveal-sidebar"
             | "refresh-table"
             | "first"

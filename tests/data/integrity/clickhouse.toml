@@ -1,5 +1,5 @@
 engine = "clickhouse"
-servers = ["clickhouse-24.8"]
+servers = ["clickhouse-24.8", "clickhouse-24.8-new-york"]
 
 [[case]]
 id = "int8"
@@ -188,7 +188,7 @@ type = "Date32"
 literals = ["'1900-01-01'", "'2299-12-31'"]
 carrier = "Date"
 rule = "exact"
-known_failing = [{ route = "param_select", issue = 4215, reason = "a bound date is rendered as toDate, which clamps to 1970-2149" }]
+known_failing = [{ route = "param_select", issue = 4215, ids = [1, 2], expect = "(Date(", reason = "a bound date is rendered as toDate, which clamps to 1970-2149" }]
 
 [[case]]
 id = "datetime-utc"
@@ -219,7 +219,7 @@ type = "DateTime64(3, 'America/New_York')"
 literals = ["toDateTime64('2024-11-03 05:30:00', 3, 'UTC')"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+expect_error = [{ route = "param_select", expect = "cannot write back an undecodable", reason = "an undecodable cell cannot be bound back as a parameter" }]
 note = "01:30 local time occurs twice that night; the value contract refuses an ambiguous wall clock instead of guessing."
 
 [[case]]
@@ -257,7 +257,7 @@ literals = ["[1, 2, 3]", "[]", "[NULL, 1]"]
 carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
-skip = [{ route = "param_select", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
 
 [[case]]
 id = "nested-array"
@@ -266,7 +266,7 @@ literals = ["[['a', 'b'], [], ['']]"]
 carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
-skip = [{ route = "param_select", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
 
 [[case]]
 id = "tuple"
@@ -275,7 +275,7 @@ literals = ["(1, 'x y')", "(0, '')"]
 carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
-skip = [{ route = "param_select", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
 
 [[case]]
 id = "map"
@@ -284,4 +284,168 @@ literals = ["map('k', 1, 'z', 2)", "map()"]
 carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
-skip = [{ route = "param_select", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+known_failing = [
+    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+]
+
+[[case]]
+id = "int16"
+type = "Int16"
+literals = ["-32768", "32767"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "int32"
+type = "Int32"
+literals = ["-2147483648", "2147483647"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "uint8"
+type = "UInt8"
+literals = ["0", "255"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "uint16"
+type = "UInt16"
+literals = ["0", "65535"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "int256"
+type = "Int256"
+literals = ["-57896044618658097711785492504343953926634992332820282019728792003956564819968", "57896044618658097711785492504343953926634992332820282019728792003956564819967"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "uint128"
+type = "UInt128"
+literals = ["0", "340282366920938463463374607431768211455"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "decimal32"
+type = "Decimal(9, 4)"
+literals = ["12345.6789", "-0.0001", "0"]
+carrier = "Decimal"
+rule = "exact"
+referee = "toDecimalString({v}, 4)"
+
+[[case]]
+id = "decimal32-all-scale"
+type = "Decimal(9, 9)"
+literals = ["0.123456789", "-0.999999999"]
+carrier = "Decimal"
+rule = "exact"
+referee = "toDecimalString({v}, 9)"
+
+[[case]]
+id = "nullable-string"
+type = "Nullable(String)"
+literals = ["NULL", "''", "'NULL'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "enum16"
+type = "Enum16('low' = -32768, 'high' = 32767, '' = 0)"
+literals = ["'low'", "'high'", "''"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "low-cardinality-fixed-string"
+type = "LowCardinality(FixedString(3))"
+literals = ["'ab'", "'abc'"]
+carrier = "Text"
+rule = "exact"
+referee = "unhex(hex({v}))"
+note = "FixedString pads with NUL bytes inside LowCardinality too."
+
+[[case]]
+id = "named-tuple"
+type = "Tuple(a Int32, s String)"
+literals = ["(1, 'x y')", "(0, '')"]
+carrier = "Json"
+rule = "json"
+referee = "toJSONString({v})"
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+
+[[case]]
+id = "int64-nested"
+type = "Map(String, Int64)"
+literals = ["map('max', 9223372036854775807, 'big', 9007199254740993, 'neg', -1)"]
+carrier = "Json"
+rule = "json"
+referee = "toJSONString({v})"
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+note = "The referee prints 64-bit integers as JSON numbers, so an integer carried as a JSON string cannot pass."
+known_failing = [
+    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+]
+
+[[case]]
+id = "int64-array"
+type = "Array(Int64)"
+literals = ["[9223372036854775807, 9007199254740993, -1]"]
+carrier = "Json"
+rule = "json"
+referee = "toJSONString({v})"
+expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
+known_failing = [
+    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+]
+
+[[case]]
+id = "aggregate-function"
+type = "AggregateFunction(uniq, UInt64)"
+literals = ["arrayReduce('uniqState', [toUInt64(1)])"]
+carrier = "Undecodable"
+rule = "refusal"
+referee = "hex({v})"
+note = "An aggregate state has no value form a client can show; BookiE must refuse it."
+known_failing = [
+    { route = "query", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "browse", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "param_where", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "param_select", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+]
+
+[[case]]
+id = "datetime-server-zone"
+type = "DateTime"
+literals = ["'2024-02-29 13:45:30'", "'2024-07-01 00:00:00'", "'1970-01-02 00:00:00'", "toDateTime('2024-11-03 05:30:00', 'UTC')", "toDateTime('2024-11-03 06:30:00', 'UTC')"]
+carrier = "DateTime"
+rule = "temporal"
+referee = "toString({v})"
+note = "A DateTime without a zone is a wall clock in the server time zone (clickhouse-24.8-new-york runs with TZ America/New_York). Rows 4 and 5 are different instants that share the wall clock 01:30 at the New York fold."
+
+[[case]]
+id = "datetime-session-zone"
+type = "DateTime"
+bookie_session = ["session_timezone = 'America/New_York'"]
+literals = ["'2024-02-29 13:45:30'", "'2024-07-01 00:00:00'"]
+carrier = "DateTime"
+rule = "temporal"
+referee = "toString({v}, 'America/New_York')"
+note = "A login whose profile sets session_timezone sees DateTime wall clocks in that zone; the referee renders the stored instant there."
+known_failing = [
+    { route = "query", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "browse", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "param_where", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "param_select", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+]

@@ -4,7 +4,7 @@ use bookie_core::ConnectOptions;
 use sqlx::sqlite::{SqliteConnectOptions, SqliteConnection};
 use sqlx::{Connection as _, Row};
 
-use crate::server::{Dialect, Referee, Server, SqlFuture};
+use crate::server::{Dialect, Referee, Server, SessionVariant, SettingCheck, SqlFuture, setting_parts};
 
 pub static DIALECT: Dialect = Dialect {
     driver_id: "sqlite",
@@ -21,7 +21,33 @@ pub static DIALECT: Dialect = Dialect {
     drop_table: "DROP TABLE IF EXISTS {table}",
     schema: None,
     epoch_in_nanos: false,
+    session_variant,
+    cast_query,
 };
+
+fn session_variant(_table: &str, settings: &[String]) -> SessionVariant {
+    SessionVariant {
+        setup: Vec::new(),
+        teardown: Vec::new(),
+        login: None,
+        bookie_setup: settings.iter().map(|setting| format!("PRAGMA {setting}")).collect(),
+        checks: settings
+            .iter()
+            .map(|setting| {
+                let (name, expected) = setting_parts(setting);
+                SettingCheck {
+                    sql: format!("PRAGMA {name}"),
+                    expected,
+                    through_bookie: true,
+                }
+            })
+            .collect(),
+    }
+}
+
+fn cast_query(_settings: &[String], cast: &str, render: &str) -> String {
+    format!("SELECT {render} FROM (SELECT {cast} AS v) AS cast_back")
+}
 
 pub fn quote_text(text: &str) -> String {
     format!("'{}'", text.replace('\'', "''"))

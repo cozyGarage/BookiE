@@ -24,6 +24,10 @@ pub async fn open_confirming(driver_id: &str, options: ConnectOptions) -> Govern
     open_with(driver_id, options, false, Arc::new(AutoApproveSink)).await
 }
 
+pub async fn open_writable(driver_id: &str, options: ConnectOptions) -> Governed {
+    open_confirming(driver_id, options).await
+}
+
 async fn open_with(
     driver_id: &str,
     options: ConnectOptions,

@@ -8,6 +8,7 @@ pub enum Outcome {
     Fail(Vec<String>),
     Skipped(String),
     Broken(String),
+    Refused(Vec<String>),
 }
 
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub struct Tally {
     pub pass: usize,
     pub known_failing: usize,
     pub skipped: usize,
+    pub refused: usize,
     pub failed: usize,
     pub fixed: usize,
 }
@@ -31,17 +33,18 @@ pub struct Tally {
 pub struct Verdict {
     pub tallies: BTreeMap<String, Tally>,
     pub known: Vec<String>,
+    pub refusals: Vec<String>,
     pub problems: Vec<String>,
 }
 
 pub fn judge(corpus: &Corpus, results: &[CaseResult]) -> Verdict {
     judge_with(results, |result| {
-        corpus
-            .cases
-            .iter()
-            .find(|case| case.id == result.case)
-            .unwrap_or_else(|| panic!("result for unknown case {}", result.case))
-            .known_issue(result.route, &result.server)
+        assert!(
+            corpus.cases.iter().any(|case| case.id == result.case),
+            "result for unknown case {}",
+            result.case
+        );
+        corpus.known_issue(&result.case, result.route, &result.server)
     })
 }
 
@@ -56,9 +59,17 @@ pub fn judge_with<'a>(
         let label = format!("{} {} {}", result.server, result.case, result.route.name());
         match (&result.outcome, known) {
             (Outcome::Skipped(_), _) => tally.skipped += 1,
+            (Outcome::Refused(details), _) => {
+                tally.refused += 1;
+                verdict
+                    .refusals
+                    .push(format!("{label}: refused as expected: {}", shorten(first(details))));
+            }
             (Outcome::Broken(error), _) => {
                 tally.failed += 1;
-                verdict.problems.push(format!("{label}: case is broken: {error}"));
+                verdict
+                    .problems
+                    .push(format!("{label}: case is broken: {}", shorten(error)));
             }
             (Outcome::Pass { .. }, None) => tally.pass += 1,
             (Outcome::Pass { .. }, Some(known)) => {
@@ -68,19 +79,41 @@ pub fn judge_with<'a>(
                     known.issue
                 ));
             }
-            (Outcome::Fail(details), Some(known)) => {
-                tally.known_failing += 1;
-                verdict
-                    .known
-                    .push(format!("{label}: still fails as #{} ({})", known.issue, first(details)));
-            }
+            (Outcome::Fail(details), Some(known)) => match known.mismatch(details) {
+                None => {
+                    tally.known_failing += 1;
+                    verdict.known.push(format!(
+                        "{label}: still fails as #{} ({})",
+                        known.issue,
+                        shorten(first(details))
+                    ));
+                }
+                Some(mismatch) => {
+                    tally.failed += 1;
+                    verdict.problems.push(format!(
+                        "{label}: fails differently from known issue #{}: {}",
+                        known.issue,
+                        shorten(&mismatch)
+                    ));
+                }
+            },
             (Outcome::Fail(details), None) => {
                 tally.failed += 1;
-                verdict.problems.push(format!("{label}: {}", details.join("; ")));
+                let joined: Vec<String> = details.iter().map(|detail| shorten(detail)).collect();
+                verdict.problems.push(format!("{label}: {}", joined.join("; ")));
             }
         }
     }
     verdict
+}
+
+fn shorten(text: &str) -> String {
+    const LIMIT: usize = 400;
+    if text.chars().count() <= LIMIT {
+        return text.to_string();
+    }
+    let prefix: String = text.chars().take(LIMIT).collect();
+    format!("{prefix}...")
 }
 
 fn first(details: &[String]) -> &str {
@@ -92,11 +125,12 @@ impl Verdict {
         let mut lines = Vec::new();
         for (server, tally) in &self.tallies {
             lines.push(format!(
-                "{server}: {} pass, {} known-failing, {} skipped, {} unexpected failures, {} fixed known issues",
-                tally.pass, tally.known_failing, tally.skipped, tally.failed, tally.fixed
+                "{server}: {} pass, {} known-failing, {} refused, {} skipped, {} unexpected failures, {} fixed known issues",
+                tally.pass, tally.known_failing, tally.refused, tally.skipped, tally.failed, tally.fixed
             ));
         }
         lines.extend(self.known.iter().cloned());
+        lines.extend(self.refusals.iter().cloned());
         lines.join("\n")
     }
 
@@ -110,3 +144,7 @@ impl Verdict {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "report_tests.rs"]
+mod tests;

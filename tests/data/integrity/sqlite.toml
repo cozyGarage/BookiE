@@ -152,3 +152,20 @@ literals = ["'1.50'", "'12345678.90'", "'0.10'"]
 carrier = "Float"
 rule = "float"
 note = "DECIMAL has NUMERIC affinity, so the engine stores a REAL; the stored double is the value, not the declared scale."
+
+[[case]]
+id = "text-invalid-utf8"
+type = "TEXT"
+literals = ["CAST(X'FF' AS TEXT)", "CAST(X'61C3' AS TEXT)", "CAST(X'C328' AS TEXT)"]
+carrier = "Bytes"
+rule = "bytes"
+note = "SQLite TEXT can hold bytes that are not UTF-8; they must stay exact bytes, never replacement characters."
+
+[[case]]
+id = "integer-overflow-to-real"
+type = "INTEGER"
+literals = ["9223372036854775808", "-9223372036854775809", "1"]
+carrier = "Float"
+rule = "float"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" } }
+note = "A literal past i64 is stored as REAL even in an INTEGER column; the storage class decides the carrier."

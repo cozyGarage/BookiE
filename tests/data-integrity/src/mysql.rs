@@ -6,7 +6,7 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, Image, ImageExt};
 use testcontainers_modules::mysql::Mysql;
 
-use crate::server::{Cli, ContainerCli, Dialect, Server, labelled};
+use crate::server::{Cli, ContainerCli, Dialect, Server, SessionVariant, SettingCheck, labelled, setting_parts};
 
 pub const DATABASE: &str = "integrity";
 pub const MYSQL_TAG: &str = "8.4.13";
@@ -27,7 +27,51 @@ pub static DIALECT: Dialect = Dialect {
     drop_table: "DROP TABLE IF EXISTS {table}",
     schema: None,
     epoch_in_nanos: false,
+    session_variant,
+    cast_query,
 };
+
+fn setting_name(setting: &str) -> &str {
+    setting_parts(setting).0
+}
+
+fn session_variant(_table: &str, settings: &[String]) -> SessionVariant {
+    SessionVariant {
+        setup: settings.iter().map(|setting| format!("SET GLOBAL {setting}")).collect(),
+        teardown: settings
+            .iter()
+            .map(|setting| format!("SET GLOBAL {} = DEFAULT", setting_name(setting)))
+            .collect(),
+        login: None,
+        bookie_setup: Vec::new(),
+        checks: settings
+            .iter()
+            .map(|setting| {
+                let (name, expected) = setting_parts(setting);
+                SettingCheck {
+                    sql: format!("SELECT @@GLOBAL.{name}"),
+                    expected,
+                    through_bookie: false,
+                }
+            })
+            .collect(),
+    }
+}
+
+fn cast_query(settings: &[String], cast: &str, render: &str) -> String {
+    if settings.is_empty() {
+        return format!("SELECT {render} FROM (SELECT {cast} AS v) AS cast_back");
+    }
+    let set: String = settings
+        .iter()
+        .map(|setting| format!("SET SESSION {setting}; "))
+        .collect();
+    let reset: String = settings
+        .iter()
+        .map(|setting| format!("SET SESSION {} = DEFAULT; ", setting_name(setting)))
+        .collect();
+    format!("{set}CREATE TEMPORARY TABLE cast_back AS SELECT {cast} AS v; {reset}SELECT {render} FROM cast_back")
+}
 
 pub fn quote_text(text: &str) -> String {
     let escaped = text.replace('\\', "\\\\").replace('\'', "''").replace('\0', "\\0");
