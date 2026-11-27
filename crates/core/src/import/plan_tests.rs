@@ -64,7 +64,7 @@ fn csv_and_workbook_refuse_the_whole_plan_for_an_undecodable_marker() {
     worksheet.write_string(0, 0, "value").unwrap();
     worksheet.write_string(1, 0, "good").unwrap();
     worksheet.write_string(2, 0, "<undecodable UNION>").unwrap();
-    let xlsx = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 1).unwrap();
+    let xlsx = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 10).unwrap();
     let columns = [column("value", "TEXT")];
     for sheet in [&csv, &xlsx] {
         let error = build_insert_plan(&target(&columns, &[Some(0)]), sheet, &options).unwrap_err();
