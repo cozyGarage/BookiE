@@ -150,3 +150,33 @@ fn clicking_go_to_error_selects_the_second_line_token(cx: &mut TestAppContext) {
         assert_eq!(view.sql_input.read(cx).selected_value().as_ref(), "missing")
     });
 }
+
+#[gpui::test]
+fn database_error_diagnostic_carries_the_token_and_clears_after_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            let sql = "SELECT missing FROM t";
+            view.sql_input
+                .update(cx, |editor, cx| editor.set_value(sql, window, cx));
+            view.panel.error_location = Some((sql.into(), 8, 0, None));
+            view.show_sql_diagnostic("Unknown column".into(), cx);
+        });
+    });
+    view.read_with(cx, |view, cx| {
+        let editor = view.sql_input.read(cx);
+        let diagnostic = editor.diagnostics().unwrap().iter().next().unwrap();
+        assert_eq!(diagnostic.diagnostic.message, "Unknown column");
+        assert_eq!(&editor.value().as_ref()[diagnostic.range.clone()], "missing");
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.sql_input
+                .update(cx, |editor, cx| editor.set_value("SELECT 1", window, cx));
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert!(view.sql_input.read(cx).diagnostics().unwrap().is_empty())
+    });
+}
