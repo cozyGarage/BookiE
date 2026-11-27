@@ -46,6 +46,7 @@ CRATES=(
   bookie-driver-cassandra
   bookie-release-tests
   bookie-driver-tls-tests
+  bookie-data-integrity-tests
 )
 
 PKG_ARGS=()

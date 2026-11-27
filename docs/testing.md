@@ -50,6 +50,8 @@ Value tests cover the path from the native driver through each relevant consumer
 
 The PostgreSQL snapshot export fixture runs in the consumers layer. It checks concurrent changes, cancellation, per-table limits and publication without replacing a file created during export. Drivers without a verified snapshot path are refused by multi-table export.
 
+The [data-integrity suite](data-integrity.md) is the server-refereed corpus for these values: each case is stored with the engine's own SQL, rendered by the server and compared with what BookiE reads through its governed routes.
+
 [ADR 0007](decisions/0007-type-and-value-preservation.md) defines the outcomes: exact typed support, exact text fallback, explicit refusal, or untested. This is a data-correctness contract, not a requirement for one universal cross-engine type system. Use the selected case and its concrete consumer to decide what must be proven.
 
 ## Test runner
