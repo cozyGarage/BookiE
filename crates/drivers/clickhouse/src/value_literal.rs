@@ -1,4 +1,5 @@
 use bookie_core::{DriverError, Value};
+use chrono::Datelike;
 
 pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
     let rendered = match value {
@@ -18,7 +19,12 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
         }
         Value::Text(s) => format!("'{}'", escape_str(s)),
         Value::Bytes(b) => format!("unhex('{}')", hex_encode(b)),
-        Value::Date(d) => format!("toDate('{}')", d.format("%Y-%m-%d")),
+        Value::Date(d) if (1900..=2299).contains(&d.year()) => format!("toDate32('{}')", d.format("%Y-%m-%d")),
+        Value::Date(_) => {
+            return Err(DriverError::Unsupported(
+                "ClickHouse Date32 cannot represent this date".into(),
+            ));
+        }
         Value::Time(t) => format!("'{}'", t.format("%H:%M:%S%.f")),
         Value::DateTime(dt) => bookie_core::sql_literal::clickhouse_datetime64_literal(*dt, None)
             .ok_or_else(unsupported_datetime64_range)?,
@@ -64,6 +70,18 @@ fn hex_encode(bytes: &[u8]) -> String {
 mod tests {
     use super::literal;
     use bookie_core::{DriverError, Value};
+
+    #[test]
+    fn date_literals_preserve_date32_boundaries_and_refuse_outside_them() {
+        for date in [(1900, 1, 1), (1970, 1, 1), (2149, 6, 6), (2299, 12, 31)] {
+            let value = chrono::NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap();
+            assert_eq!(literal(&Value::Date(value)).unwrap(), format!("toDate32('{value}')"));
+        }
+        for date in [(1899, 12, 31), (2300, 1, 1)] {
+            let value = chrono::NaiveDate::from_ymd_opt(date.0, date.1, date.2).unwrap();
+            assert!(matches!(literal(&Value::Date(value)), Err(DriverError::Unsupported(_))));
+        }
+    }
 
     #[test]
     fn finite_float_literals_round_trip_and_use_exponents() {

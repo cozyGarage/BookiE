@@ -192,7 +192,6 @@ type = "Date32"
 literals = ["'1900-01-01'", "'2299-12-31'"]
 carrier = "Date"
 rule = "exact"
-known_failing = [{ route = "param_select", issue = 4215, ids = [1, 2], expect = "(Date(", reason = "a bound date is rendered as toDate, which clamps to 1970-2149" }]
 
 [[case]]
 id = "datetime-utc"
