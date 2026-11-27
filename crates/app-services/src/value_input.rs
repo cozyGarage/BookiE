@@ -131,11 +131,7 @@ pub fn parse_input_for_driver_with_style(
     }
     let trimmed = text.trim();
     if hooks.capabilities.bit_string_input && col.is_some_and(|column| column.data_type.eq_ignore_ascii_case("bit")) {
-        return if !trimmed.is_empty() && trimmed.bytes().all(|byte| matches!(byte, b'0' | b'1')) {
-            Ok(Value::Text(trimmed.to_owned()))
-        } else {
-            Err(ValueInputError::InvalidBitString)
-        };
+        return parse_bit_string(trimmed);
     }
     if hooks.capabilities.integer_range_validation
         && let Some(result) = parse_mysql_integer_input(trimmed, col)
@@ -166,6 +162,14 @@ pub fn parse_input_for_driver_with_style(
             None => Err(error),
         },
         result => result,
+    }
+}
+
+pub(crate) fn parse_bit_string(text: &str) -> Result<Value, ValueInputError> {
+    if !text.is_empty() && text.bytes().all(|byte| matches!(byte, b'0' | b'1')) {
+        Ok(Value::Text(text.to_owned()))
+    } else {
+        Err(ValueInputError::InvalidBitString)
     }
 }
 

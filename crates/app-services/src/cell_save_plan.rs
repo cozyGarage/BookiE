@@ -2,7 +2,7 @@ use bookie_core::{ColumnInfo, Value};
 
 use crate::change_tracker::{EditStatement, MaterializeError, RowKey, TabChangeTracker, checked_write_indexes};
 use crate::edit_preview::preview_text;
-use crate::value_input::{ValueInputError, parse_input_for_column};
+use crate::value_input::{ValueInputError, parse_bit_string, parse_input_for_column};
 
 #[derive(Debug, Clone, Copy)]
 pub struct SaveTarget<'a> {
@@ -109,7 +109,12 @@ pub fn plan_row_insert(target: SaveTarget<'_>, values: &[(usize, String)]) -> Re
             .columns
             .get(*column)
             .ok_or(CellSaveError::UnknownColumn(*column))?;
-        let value = parse_input_for_column(text, Some(info)).map_err(|error| CellSaveError::InvalidValue {
+        let parsed = if target.driver_id == "duckdb" && info.data_type.eq_ignore_ascii_case("bit") {
+            parse_bit_string(text.trim())
+        } else {
+            parse_input_for_column(text, Some(info))
+        };
+        let value = parsed.map_err(|error| CellSaveError::InvalidValue {
             column: info.name.clone(),
             reason: readable(&error),
         })?;
@@ -464,6 +469,25 @@ mod tests {
         );
         assert_eq!(values, &vec![Value::Text("zed".into()), Value::Float(4.5)]);
         assert!(plan.expect_one.is_empty(), "an insert has no existing row to check");
+    }
+
+    #[test]
+    fn duckdb_insert_keeps_bit_strings_as_text() {
+        let mut columns = insertable();
+        columns[1].data_type = "BIT".into();
+        let target = SaveTarget {
+            driver_id: "duckdb",
+            ..target(&columns)
+        };
+        let plan = plan_row_insert(target, &[(1, "0".into())]).unwrap();
+        assert_eq!(plan.statements[0].1[0], Value::Text("0".into()));
+        assert!(plan_row_insert(target, &[(1, "2".into())]).is_err());
+        let mssql = SaveTarget {
+            driver_id: "mssql",
+            ..target
+        };
+        let plan = plan_row_insert(mssql, &[(1, "0".into())]).unwrap();
+        assert_eq!(plan.statements[0].1[0], Value::Bool(false));
     }
 
     #[test]
