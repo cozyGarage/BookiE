@@ -255,7 +255,10 @@ fn unsupported_subscription_sampling_does_not_supersede_an_independent_query() {
 fn reading_the_data_dictionary_does_not_supersede_an_independent_query() {
     let session = LiveSession::open(&fixture()).unwrap();
     let query_epoch = session.next_epoch();
-    let capabilities = drivers_registry::default_registry().get("sqlite").unwrap().capabilities();
+    let capabilities = drivers_registry::default_registry()
+        .get("sqlite")
+        .unwrap()
+        .capabilities();
     let dictionary = session
         .data_dictionary_controlled(capabilities, &CancellationToken::new())
         .unwrap();
