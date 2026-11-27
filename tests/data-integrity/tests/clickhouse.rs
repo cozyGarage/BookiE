@@ -9,6 +9,11 @@ async fn clickhouse_float32_imports_preserve_server_values() {
     corpus.cases.retain(|case| case.id == "float32");
     assert_eq!(corpus.cases.len(), 1);
     let server = clickhouse::start("clickhouse-24.8", None).await;
+    use bookie_core::Connection;
+    let governed = bookie_data_integrity::governed::open_writable("clickhouse", server.options.clone()).await;
+    let result = governed.guard.query_params_controlled("SELECT toFloat32(3.4028233e38)", &[], &bookie_data_integrity::governed::control()).await.unwrap();
+    println!("float32 source {:?}", result.rows);
+    governed.close().await;
     let results = routes::run_routes(&server, &corpus, false).await;
     judge_and_report(&corpus, &results).assert_clean();
 }
