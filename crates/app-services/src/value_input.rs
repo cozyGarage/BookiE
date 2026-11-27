@@ -66,6 +66,12 @@ pub fn parse_input_for_column(text: &str, col: Option<&ColumnInfo>) -> Result<Va
     }
     let dt = col.data_type.to_ascii_lowercase();
     let trimmed = text.trim();
+    if bookie_core::import::is_year_type(&dt) {
+        return parse_int_value(trimmed);
+    }
+    if dt.trim() == "json" {
+        return parse_json_text(text);
+    }
     if let Some(width) = mysql_bit_width(&dt) {
         return parse_mysql_bit_value(trimmed, width);
     }
@@ -259,22 +265,36 @@ fn unchanged_empty_value(col: Option<&ColumnInfo>, current_value: Option<&Value>
     }
 }
 
+fn unchanged_value(text: &str, current_value: Option<&Value>) -> Option<Value> {
+    current_value
+        .filter(|current| !matches!(current, Value::Null | Value::Undecodable(_)))
+        .filter(|current| crate::value_display::edit_text(current) == text)
+        .cloned()
+}
+
+fn is_dynamic_column(col: Option<&ColumnInfo>, hooks: &ParseHooks) -> bool {
+    hooks.capabilities.heterogeneous_cell_values
+        && col.is_some_and(|column| {
+            let data_type = column.data_type.trim();
+            data_type.is_empty() || data_type.eq_ignore_ascii_case("any")
+        })
+}
+
 pub fn parse_input_for_grid_cell_with_style(
     text: &str,
     col: Option<&ColumnInfo>,
     hooks: &ParseHooks,
     current_value: Option<&Value>,
 ) -> Result<Value, ValueInputError> {
+    if let Some(unchanged) = unchanged_value(text, current_value) {
+        return Ok(unchanged);
+    }
     if text.is_empty()
         && let Some(unchanged) = unchanged_empty_value(col, current_value)
     {
         return Ok(unchanged);
     }
-    if text.is_empty()
-        && hooks.capabilities.heterogeneous_cell_values
-        && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
-        && matches!(current_value, Some(Value::Text(_)))
-    {
+    if text.is_empty() && is_dynamic_column(col, hooks) && matches!(current_value, Some(Value::Text(_))) {
         return Ok(Value::Text(String::new()));
     }
     if !text.is_empty()
@@ -282,10 +302,7 @@ pub fn parse_input_for_grid_cell_with_style(
     {
         return result;
     }
-    if !text.is_empty()
-        && hooks.capabilities.heterogeneous_cell_values
-        && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("any"))
-    {
+    if !text.is_empty() && is_dynamic_column(col, hooks) {
         match current_value {
             Some(Value::Int(_)) => return parse_int_value(text.trim()),
             Some(Value::Float(_)) => return parse_float_value(text.trim()),
@@ -314,6 +331,9 @@ pub fn parse_pasted_cell_with_style(
     match text {
         None if col.is_none_or(|column| column.nullable) => Ok(Value::Null),
         None => Err(ValueInputError::FieldRequired),
+        Some("") if col.is_some_and(holds_an_empty_member) => {
+            parse_enum_input("''", col, hooks.enum_input_style).unwrap_or_else(|| Ok(Value::Text(String::new())))
+        }
         Some("")
             if col.is_none_or(|column| {
                 column.enum_type.is_none() && is_character_type(&column.data_type.to_ascii_lowercase())
@@ -328,6 +348,18 @@ pub fn parse_pasted_cell_with_style(
         }
         Some(text) => parse_grid_cell_input_with_style(text, col, hooks, current_value),
     }
+}
+
+fn holds_an_empty_member(column: &ColumnInfo) -> bool {
+    let data_type = column.data_type.trim().to_ascii_lowercase();
+    if data_type.ends_with("[]") {
+        return false;
+    }
+    column.enum_type.is_some()
+        || mysql_enum_set_labels(&data_type).is_some()
+        || matches!(data_type.as_str(), "varbit" | "bit varying")
+        || data_type.starts_with("varbit(")
+        || data_type.starts_with("bit varying(")
 }
 
 fn parse_extended_calendar_temporals_input(
@@ -834,6 +866,12 @@ pub fn parse_uuid_value(text: &str) -> Result<Value, ValueInputError> {
     uuid::Uuid::parse_str(text)
         .map(Value::Uuid)
         .map_err(|_| ValueInputError::InvalidUuid)
+}
+
+fn parse_json_text(text: &str) -> Result<Value, ValueInputError> {
+    serde_json::from_str::<serde::de::IgnoredAny>(text)
+        .map(|_| Value::JsonText(text.to_owned()))
+        .map_err(|e| ValueInputError::InvalidJson(e.to_string()))
 }
 
 pub fn parse_json_value(text: &str) -> Result<Value, ValueInputError> {

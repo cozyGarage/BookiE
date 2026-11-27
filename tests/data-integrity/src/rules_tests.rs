@@ -166,3 +166,10 @@ fn float32_compares_at_single_precision() {
         .is_err()
     );
 }
+
+#[test]
+fn nanosecond_epochs_become_exact_seconds() {
+    assert_eq!(nanos_to_seconds("1500000000"), "1.5");
+    assert_eq!(nanos_to_seconds("-1"), "-0.000000001");
+    assert_eq!(nanos_to_seconds("0"), "0");
+}

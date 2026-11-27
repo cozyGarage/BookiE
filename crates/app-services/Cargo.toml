@@ -62,6 +62,8 @@ bookie-app-services = { path = ".", features = ["test-support"] }
 [features]
 # Constructors for frontends' tests: an isolated service with a temporary audit journal.
 test-support = []
+# Test builds keep secrets in memory and state files in a temporary directory until use_user_state is called.
+isolated-test-state = ["bookie-storage/isolated-test-state"]
 
 [lints]
 workspace = true
