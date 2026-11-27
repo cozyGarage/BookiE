@@ -1,1 +1,1 @@
-GPUI reports connection import results in notifications, including when the connection list cannot refresh.
+GPUI reports connection import results in notifications, including when the connection list cannot refresh, and reports partial table exports accurately.

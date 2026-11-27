@@ -50,7 +50,11 @@ pub(crate) fn export_report(results: &[TableResult]) -> Vec<(MessageKind, String
 }
 
 fn export_summary(results: &[TableResult]) -> String {
-    format!("Exported {} table(s); see Messages", results.len())
+    let written = results
+        .iter()
+        .filter(|result| matches!(result.outcome, TableOutcome::Written { .. }))
+        .count();
+    format!("Exported {written} of {} table(s); see Messages", results.len())
 }
 
 #[derive(Default)]
@@ -166,6 +170,15 @@ impl GridView {
                         this.panel.view = ResultView::Messages;
                         this.panel.open = true;
                         this.status = export_summary(&results);
+                        let kind = if results
+                            .iter()
+                            .all(|result| matches!(result.outcome, TableOutcome::Written { .. }))
+                        {
+                            crate::notifications::NoticeKind::Success
+                        } else {
+                            crate::notifications::NoticeKind::Error
+                        };
+                        this.notices.push(this.status.clone(), kind);
                     }
                     Err(message) => this.report_failure("export the tables", &message),
                 }
