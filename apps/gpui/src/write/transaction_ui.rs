@@ -142,6 +142,7 @@ impl GridView {
         self.status = "Running in the transaction…".into();
         self.invalidate_background();
         let owner = shared.clone();
+        let submitted = sql.clone();
         cx.spawn(async move |this, cx| {
             let (ran, ended, cleanup) = cx
                 .background_executor()
@@ -155,7 +156,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                this.finish_transaction_statement(&owner, ran, ended.then_some(cleanup));
+                this.finish_transaction_statement(&owner, &submitted, ran, ended.then_some(cleanup));
                 cx.notify();
             })
             .ok();
@@ -167,6 +168,7 @@ impl GridView {
     fn finish_transaction_statement(
         &mut self,
         owner: &SharedSession,
+        sql: &str,
         ran: Result<bookie_gpui::live::LiveTable, String>,
         ended: Option<Option<String>>,
     ) {
@@ -176,13 +178,19 @@ impl GridView {
         let cancelled = transaction
             .running
             .take()
-            .is_some_and(|statement| statement.cancel.is_cancelled());
+            .filter(|statement| statement.cancel.is_cancelled() && ran.is_err())
+            .map(|statement| statement.started.elapsed());
+        if let Some(elapsed) = cancelled {
+            self.add_cancelled_transaction_run(sql, elapsed);
+        }
         if let Some(cleanup) = ended {
             self.transaction = None;
             self.status = ended_status(ran.as_ref().err().map(String::as_str), cleanup);
             return;
         }
-        if ran.is_ok() {
+        if ran.is_ok()
+            && let Some(transaction) = self.transaction.as_mut()
+        {
             transaction.statements += 1;
             transaction.last_activity = Instant::now();
         }
@@ -191,10 +199,16 @@ impl GridView {
                 self.add_run(Some(Arc::new(table)));
                 self.status = "Ran in the transaction (not committed yet)".into();
             }
-            Err(message) if cancelled => {
+            Err(message) if cancelled.is_some() => {
                 self.status = format!("The transaction statement was cancelled: {message}");
             }
             Err(message) => self.status = format!("The statement failed inside the transaction: {message}"),
+        }
+    }
+
+    fn add_cancelled_transaction_run(&mut self, sql: &str, elapsed: std::time::Duration) {
+        if self.add_cancelled_run(sql, elapsed) && self.grid_is_query {
+            self.activate_run(self.run_tabs.slots.len() - 1);
         }
     }
 

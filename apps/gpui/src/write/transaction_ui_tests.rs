@@ -262,6 +262,42 @@ fn stop_cancels_the_running_transaction_statement(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn a_cancelled_transaction_statement_gets_a_cancelled_run_and_message(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    open_transaction(&view, cx, &path);
+    let messages = view.read_with(cx, |view, _| view.panel.messages.entries().len());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.run_in_transaction(
+                "WITH RECURSIVE n(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM n WHERE x < 500000000) \
+                 SELECT count(*) FROM n"
+                    .into(),
+                cx,
+            );
+            view.stop_query();
+        })
+    });
+    until(&view, cx, "the transaction step finishes", |view| {
+        !view.transaction_statement_running()
+    });
+    view.read_with(cx, |view, _| {
+        let transaction = view.transaction.as_ref().expect("still open");
+        assert_eq!(transaction.statements, 0, "{}", view.status);
+        let slot = view.run_tabs.slots.last().expect("the stopped run has a tab");
+        assert!(slot.cancelled, "{}", view.status);
+        assert!(slot.failure.is_none(), "a stop is not a failure");
+        let entries = view.panel.messages.entries();
+        assert_eq!(entries.len(), messages + 1);
+        assert_eq!(entries[messages].kind, bookie_gpui::messages::MessageKind::Info);
+    });
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    until(&view, cx, "the transaction is rolled back", |view| {
+        view.transaction.is_none()
+    });
+}
+
+#[gpui::test]
 fn grid_save_requests_are_refused_inside_a_manual_transaction(cx: &mut TestAppContext) {
     let path = orders();
     let original = saved_customer(&path, 1);
