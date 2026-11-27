@@ -353,3 +353,10 @@ fn malformed_bit_payloads_are_not_exposed_as_values() {
     }
     assert_eq!(duck_bit_ref_to_value(ValueRef::Null), Value::Null);
 }
+
+#[test]
+fn bit_budget_counts_decoded_bits_instead_of_storage_bytes() {
+    assert_eq!(cell_payload_bytes(&ValueRef::Blob(&[7, 254]), true), 1);
+    assert_eq!(cell_payload_bytes(&ValueRef::Blob(&[0, 255]), true), 8);
+    assert_eq!(cell_payload_bytes(&ValueRef::Blob(&[7, 254]), false), 2);
+}

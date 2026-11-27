@@ -781,8 +781,7 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
             break;
         }
         let payload_bytes = (0..column_count).fold(0usize, |total, i| {
-            let bytes = cell_payload_bytes(&row.get_ref_unwrap(i));
-            total.saturating_add(if bit_columns[i] { bytes.saturating_mul(8) } else { bytes })
+            total.saturating_add(cell_payload_bytes(&row.get_ref_unwrap(i), bit_columns[i]))
         });
         let admitted = budget.decode_and_admit_row_into::<std::convert::Infallible>(
             column_count,
@@ -871,8 +870,13 @@ fn run_query(conn: &DuckdbSession, sql: &str, params: &[Value], limit: usize) ->
     })
 }
 
-fn cell_payload_bytes(value: &ValueRef<'_>) -> usize {
+fn cell_payload_bytes(value: &ValueRef<'_>, bit_column: bool) -> usize {
     match value {
+        ValueRef::Blob(bytes) if bit_column => bytes
+            .len()
+            .saturating_sub(1)
+            .saturating_mul(8)
+            .saturating_sub(usize::from(bytes.first().copied().unwrap_or(0))),
         ValueRef::Text(bytes) | ValueRef::Blob(bytes) | ValueRef::Geometry(bytes) => bytes.len(),
         _ => 0,
     }
