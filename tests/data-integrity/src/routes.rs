@@ -322,7 +322,7 @@ async fn import_statements(
         null_marker,
     };
     plan_csv_import(target, governed.capabilities, path, IMPORT_ROW_CAP, &choices)
-        .map(|plan| { println!("DIAGNOSTIC {route:?} {:?}", plan.statements); plan.statements })
+        .map(|plan| plan.statements)
         .map_err(|error| format!("{REFUSED}import plan: {error}"))
 }
 
