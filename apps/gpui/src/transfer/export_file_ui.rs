@@ -3,6 +3,7 @@ use std::{ops::Range, path::PathBuf, sync::Arc};
 use bookie_core::TableInfo;
 use bookie_core::export::ExportError;
 use bookie_core::export::{ResultExport, ResultFormat, SqlTarget, offered_formats, write_paged_file_no_replace};
+use bookie_gpui::messages::plural;
 use tokio_util::sync::CancellationToken;
 
 use crate::connection_form::{field, labelled_row};
@@ -216,9 +217,9 @@ impl GridView {
         let cut = count < full_count;
         let end = range.start.saturating_add(count).min(range.end);
         self.status = if cut {
-            format!("Writing the first {count} of {full_count} row(s)…")
+            format!("Writing the first {count} of {}…", plural(full_count, "row", "rows"))
         } else {
-            format!("Writing {count} row(s)…")
+            format!("Writing {}…", plural(count, "row", "rows"))
         };
         let shown = path.display().to_string();
         cx.spawn(async move |this, cx| {
@@ -254,9 +255,12 @@ impl GridView {
                     Ok(()) => {
                         this.export.file.open = false;
                         this.status = if cut {
-                            format!("Wrote the first {count} of {full_count} row(s) to {shown}")
+                            format!(
+                                "Wrote the first {count} of {} to {shown}",
+                                plural(full_count, "row", "rows")
+                            )
                         } else {
-                            format!("Wrote {count} row(s) to {shown}")
+                            format!("Wrote {} to {shown}", plural(count, "row", "rows"))
                         };
                         this.push_notice(this.status.clone(), crate::notifications::NoticeKind::Success, cx);
                     }
@@ -338,7 +342,13 @@ impl GridView {
             format!("table {}", table_label(&self.catalog.grid_table))
         };
         let rows = self.export_count(self.export.file.scope);
-        let info = format!("{} row(s) · {} column(s)", thousands(rows), self.source.columns().len());
+        let columns = self.source.columns().len();
+        let info = format!(
+            "{} {} · {}",
+            thousands(rows),
+            bookie_gpui::messages::noun(rows, "row", "rows"),
+            plural(columns, "column", "columns")
+        );
         let scope_segments = scope_options.iter().cloned().map(|(scope, label)| {
             segment(
                 ("export-scope", scope as usize),

@@ -103,7 +103,7 @@ impl GridView {
 
     pub(crate) fn backup_actions(&self) -> Vec<Action> {
         let supported = self.backup_supported();
-        let restorable = supported && self.live.as_ref().is_some_and(|session| session.writable.is_some());
+        let restorable = supported && self.is_writable();
         vec![
             Action {
                 id: "backup-database",
@@ -139,7 +139,7 @@ impl GridView {
     }
 
     pub(crate) fn open_backup_bar(&mut self, restore: bool, cx: &mut Context<Self>) {
-        let writable = self.live.as_ref().is_some_and(|session| session.writable.is_some());
+        let writable = self.is_writable();
         if !self.backup_supported() || (restore && !writable) {
             self.status =
                 "Backups are available for PostgreSQL connections; a restore also needs a writable one".into();
@@ -239,7 +239,7 @@ impl GridView {
         )
         .child(div().flex_1().min_w_0().child(path));
         if restore {
-            bar = bar.child(div().w(px(size::FORM_CONTROL * 5.0)).child(confirm));
+            bar = bar.child(div().w(px(size::CONFIRM_INPUT_WIDTH)).child(confirm));
         }
         Some(
             bar.child(

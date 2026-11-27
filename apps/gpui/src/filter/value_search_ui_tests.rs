@@ -41,7 +41,7 @@ fn a_table_with_hits_gets_a_success_line_and_its_first_match() {
     );
     assert_eq!(lines[0].0, MessageKind::Success);
     assert!(
-        lines[0].1.starts_with("public.people: 2 matching row(s) in name"),
+        lines[0].1.starts_with("public.people: 2 matching rows in name"),
         "{}",
         lines[0].1
     );

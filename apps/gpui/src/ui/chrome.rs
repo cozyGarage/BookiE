@@ -15,20 +15,13 @@ use gpui_kit::TestSupportExt as _;
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, toggle_icon_button};
+use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, tip, toggle_icon_button};
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::theme::{Theme, size};
 
 pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
 pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
-
-pub(crate) fn tip(
-    label: impl Into<gpui::SharedString>,
-) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
-    let label = label.into();
-    move |window, cx| gpui_component::tooltip::Tooltip::new(label.clone()).build(window, cx)
-}
 
 fn expand_sidebar_button(tooltip: String, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
     icon_button("sidebar-open-top-left", "chevrons-right", tooltip, theme).on_click(cx.listener(|this, _, _, cx| {
@@ -94,11 +87,7 @@ pub(crate) fn mix(base: u32, color: u32, amount: f32) -> u32 {
 
 impl GridView {
     pub(crate) fn live_color(&self) -> Option<u32> {
-        let saved = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref())
-            .map(|(id, _)| *id);
+        let saved = self.saved_connection_id();
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -114,11 +103,7 @@ impl GridView {
     }
 
     pub(crate) fn live_environment(&self) -> Environment {
-        let saved = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref())
-            .map(|(id, _)| *id);
+        let saved = self.saved_connection_id();
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -778,14 +763,6 @@ impl GridView {
     }
 }
 
-pub(crate) fn one_line(sql: &str) -> String {
-    let flat: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-    match flat.char_indices().nth(120) {
-        Some((end, _)) => format!("{}…", &flat[..end]),
-        None => flat,
-    }
-}
-
 fn tab_icon_name(tab: &Tab) -> &'static str {
     match tab {
         Tab::Home => "house",
@@ -955,18 +932,13 @@ impl GridView {
                     .text_color(rgb(theme.border)),
             )
             .child(
-                div()
+                crate::surfaces::card(theme)
                     .relative()
                     .debug_selector(|| "settings-card".into())
                     .w_full()
                     .max_w(px(size::HOME_WIDTH))
                     .h_full()
                     .min_h_0()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(size::SURFACE_RADIUS))
-                    .border_1()
-                    .border_color(rgb(theme.border))
                     .bg(rgb(theme.popover))
                     .child(
                         div()

@@ -10,24 +10,13 @@ use crate::*;
 pub(crate) struct FavoritesState {
     pub list: Vec<Favorite>,
     pub path: Option<PathBuf>,
-    issued: u64,
-}
-
-impl FavoritesState {
-    fn next_ticket(&mut self) -> u64 {
-        self.issued += 1;
-        self.issued
-    }
-
-    fn is_latest(&self, ticket: u64) -> bool {
-        self.issued == ticket
-    }
+    requests: Ticket,
 }
 
 impl GridView {
     pub(crate) fn refresh_favorites(&mut self, cx: &mut Context<Self>) {
         let path = self.favorites.path.clone();
-        let ticket = self.favorites.next_ticket();
+        let ticket = self.favorites.requests.next();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -35,7 +24,7 @@ impl GridView {
                 .await;
             this.update(cx, |this, cx| {
                 match result {
-                    Ok(list) if this.favorites.is_latest(ticket) => this.favorites.list = list,
+                    Ok(list) if this.favorites.requests.is_current(ticket) => this.favorites.list = list,
                     Ok(_) => {}
                     Err(message) if this.favorites.is_latest(ticket) => this.report_failure("read favorites", &message),
                     Err(_) => {}
@@ -62,7 +51,7 @@ impl GridView {
             self.live.as_ref().map(|s| s.driver_id.clone()),
         );
         let name = favorites::default_name(&sql);
-        let ticket = self.favorites.next_ticket();
+        let ticket = self.favorites.requests.next();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -71,7 +60,7 @@ impl GridView {
             this.update(cx, |this, cx| {
                 match result {
                     Ok(list) => {
-                        if this.favorites.is_latest(ticket) {
+                        if this.favorites.requests.is_current(ticket) {
                             this.favorites.list = list;
                         }
                         this.status = format!("Saved favorite \u{201c}{name}\u{201d}");
@@ -96,7 +85,7 @@ impl GridView {
 
     pub(crate) fn delete_favorite(&mut self, id: Uuid, name: String, cx: &mut Context<Self>) {
         let path = self.favorites.path.clone();
-        let ticket = self.favorites.next_ticket();
+        let ticket = self.favorites.requests.next();
         cx.spawn(async move |this, cx| {
             let result = cx
                 .background_executor()
@@ -105,7 +94,7 @@ impl GridView {
             this.update(cx, |this, cx| {
                 match result {
                     Ok(list) => {
-                        if this.favorites.is_latest(ticket) {
+                        if this.favorites.requests.is_current(ticket) {
                             this.favorites.list = list;
                         }
                         this.status = format!("Deleted favorite \u{201c}{name}\u{201d}");
@@ -129,9 +118,9 @@ mod tests {
     #[test]
     fn only_the_latest_favorites_request_may_replace_the_list() {
         let mut state = FavoritesState::default();
-        let first = state.next_ticket();
-        let second = state.next_ticket();
-        assert!(!state.is_latest(first));
-        assert!(state.is_latest(second));
+        let first = state.requests.next();
+        let second = state.requests.next();
+        assert!(!state.requests.is_current(first));
+        assert!(state.requests.is_current(second));
     }
 }

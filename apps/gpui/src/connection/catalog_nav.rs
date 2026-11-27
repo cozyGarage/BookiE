@@ -277,6 +277,28 @@ impl GridView {
         self.live.as_ref().is_some_and(|live| Arc::ptr_eq(live, session))
     }
 
+    pub(crate) fn shows_live_table(&self) -> bool {
+        self.live.is_some() && !self.grid_is_query
+    }
+
+    pub(crate) fn is_writable(&self) -> bool {
+        self.live.as_ref().is_some_and(|live| live.writable.is_some())
+    }
+
+    pub(crate) fn saved_connection(&self) -> Option<&(uuid::Uuid, String)> {
+        self.live.as_ref()?.saved.as_ref()
+    }
+
+    pub(crate) fn saved_connection_id(&self) -> Option<uuid::Uuid> {
+        self.saved_connection().map(|(id, _)| *id)
+    }
+
+    pub(crate) fn supports_schema_context(&self) -> bool {
+        self.live
+            .as_ref()
+            .is_some_and(|live| bookie_app_services::schema_context::supports_schema_context(&live.driver_id))
+    }
+
     fn attach_session(&mut self, session: Arc<LiveSession>, table: TableInfo) {
         self.clear_fk_peek();
         self.row_inspector.reset();

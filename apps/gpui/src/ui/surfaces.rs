@@ -78,10 +78,28 @@ impl Bar {
     }
 }
 
-pub(crate) fn tooltip_view(
-    text: SharedString,
+pub(crate) fn tip(
+    text: impl Into<SharedString>,
 ) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
+    let text = text.into();
     move |window, cx| gpui_component::tooltip::Tooltip::new(text.clone()).build(window, cx)
+}
+
+fn truncation_tooltip(text: &SharedString) -> Option<SharedString> {
+    (!text.trim().is_empty()).then(|| text.clone())
+}
+
+pub(crate) fn truncated(id: impl Into<ElementId>, text: impl Into<SharedString>) -> Stateful<Div> {
+    let id = id.into();
+    let selector = id.to_string();
+    let text = text.into();
+    div()
+        .id(id)
+        .debug_selector(move || selector)
+        .min_w_0()
+        .truncate()
+        .when_some(truncation_tooltip(&text), |label, full| label.tooltip(tip(full)))
+        .child(text)
 }
 
 pub(crate) fn icon_selector(id: &str, tooltip: &str) -> String {
@@ -123,7 +141,7 @@ pub(crate) fn toggle_icon_button(
         .debug_selector(move || selector)
         .role(Role::Button)
         .aria_label(tooltip.clone())
-        .tooltip(tooltip_view(tooltip))
+        .tooltip(tip(tooltip))
         .flex()
         .items_center()
         .justify_center()
@@ -291,7 +309,7 @@ pub(crate) fn unavailable_button(
 ) -> Stateful<Div> {
     button_frame(id, label.into(), kind.unavailable_colors(theme), Bar::Small, theme)
         .cursor_default()
-        .tooltip(tooltip_view(reason.into()))
+        .tooltip(tip(reason))
 }
 
 fn button_frame(
@@ -557,6 +575,7 @@ pub(crate) fn badge(text: impl Into<SharedString>, colour: u32) -> Div {
         .flex()
         .flex_none()
         .items_center()
+        .min_w_0()
         .h(px(size::BADGE))
         .px_2()
         .rounded_full()
@@ -565,7 +584,108 @@ pub(crate) fn badge(text: impl Into<SharedString>, colour: u32) -> Div {
         .text_size(px(size::TEXT_SMALL))
         .font_weight(gpui::FontWeight::SEMIBOLD)
         .text_color(rgb(colour))
-        .child(text.into())
+        .child(div().min_w_0().truncate().child(text.into()))
+}
+
+pub(crate) fn picker_chip(
+    id: impl Into<ElementId>,
+    leading: Option<&'static str>,
+    label: impl Into<SharedString>,
+    tooltip: impl Into<SharedString>,
+    theme: Theme,
+) -> Stateful<Div> {
+    let id = id.into();
+    let selector = id.to_string();
+    let tooltip = tooltip.into();
+    div()
+        .id(id)
+        .debug_selector(move || selector)
+        .role(Role::Button)
+        .aria_label(tooltip.clone())
+        .tooltip(tip(tooltip))
+        .flex()
+        .items_center()
+        .gap_1()
+        .min_w_0()
+        .overflow_hidden()
+        .h(px(size::SMALL_CONTROL))
+        .px_2()
+        .rounded(px(theme.radius))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .cursor_pointer()
+        .text_color(rgb(theme.muted_foreground))
+        .hover(move |style| style.bg(rgb(theme.accent)))
+        .children(leading.map(|name| div().flex_none().child(icon(name, theme.muted_foreground))))
+        .child(div().min_w_0().truncate().child(label.into()))
+}
+
+pub(crate) fn list_row(id: impl Into<ElementId>, selected: bool, theme: Theme) -> Stateful<Div> {
+    div()
+        .id(id)
+        .flex()
+        .items_center()
+        .gap_2()
+        .px_2()
+        .py_1()
+        .rounded(px(theme.radius))
+        .when(selected, |row| {
+            row.bg(rgb(theme.accent)).text_color(rgb(theme.foreground))
+        })
+        .when(!selected, |row| row.hover(move |style| style.bg(rgb(theme.accent))))
+}
+
+pub(crate) fn shortcut(keys: Option<String>, theme: Theme) -> Option<Div> {
+    let keys = keys.filter(|keys| !keys.is_empty())?;
+    let selector = format!("shortcut-keycap-{keys}");
+    Some(
+        div()
+            .debug_selector(move || selector)
+            .flex()
+            .flex_none()
+            .justify_center()
+            .px_1()
+            .py(px(size::OPTICAL))
+            .rounded(px(size::CONTROL_RADIUS))
+            .border_1()
+            .border_color(rgb(theme.border))
+            .bg(rgb(theme.chrome))
+            .whitespace_nowrap()
+            .text_size(px(size::TEXT_SMALL))
+            .text_color(rgb(theme.muted_foreground))
+            .child(keys),
+    )
+}
+
+pub(crate) fn card(theme: Theme) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .rounded(px(size::SURFACE_RADIUS))
+        .border_1()
+        .border_color(rgb(theme.border))
+        .bg(rgb(theme.background))
+}
+
+pub(crate) fn group_rows(rows: Vec<Div>, theme: Theme) -> Div {
+    let last = rows.len().saturating_sub(1);
+    card(theme).children(rows.into_iter().enumerate().map(|(index, row)| {
+        let row = row.px_3().py_2();
+        if index < last {
+            row.border_b_1().border_color(rgb(theme.border))
+        } else {
+            row
+        }
+    }))
+}
+
+pub(crate) fn group(caption: impl Into<SharedString>, rows: Vec<Div>, theme: Theme) -> Div {
+    div()
+        .flex()
+        .flex_col()
+        .gap_1()
+        .child(section_header(caption, theme))
+        .child(group_rows(rows, theme))
 }
 
 #[cfg(test)]

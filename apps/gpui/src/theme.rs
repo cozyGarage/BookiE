@@ -60,6 +60,10 @@ pub mod size {
     pub const HOME_TOP: f32 = 96.0;
     pub const NOTIFICATIONS_WIDTH: f32 = 380.0;
     pub const NOTIFICATIONS_MAX_HEIGHT: f32 = 420.0;
+    pub const CONNECTION_DIALOG_WIDTH: f32 = 1_470.0;
+    pub const CONNECTION_COLUMN_WIDTH: f32 = 490.0;
+    pub const FORM_LABEL_WIDTH: f32 = 150.0;
+    pub const CONFIRM_INPUT_WIDTH: f32 = 160.0;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

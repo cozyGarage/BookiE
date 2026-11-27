@@ -431,14 +431,11 @@ impl TableDelegate for GridDelegate {
                             .id(("column-sort-direction", col_ix))
                             .debug_selector(move || format!("column-sort-direction-{col_ix}"))
                             .flex_none()
-                            .tooltip(crate::surfaces::tooltip_view(
-                                if ascending {
-                                    "Sorted ascending"
-                                } else {
-                                    "Sorted descending"
-                                }
-                                .into(),
-                            ))
+                            .tooltip(crate::surfaces::tip(if ascending {
+                                "Sorted ascending"
+                            } else {
+                                "Sorted descending"
+                            }))
                             .child(crate::assets::icon(
                                 if ascending { "chevron-up" } else { "chevron-down" },
                                 theme.foreground,
@@ -446,22 +443,10 @@ impl TableDelegate for GridDelegate {
                     }))
                     .children(key.then(|| crate::assets::icon("key-round", theme.warning)))
                     .child(
-                        div()
-                            .id(("column-header-name", col_ix))
-                            .debug_selector(move || format!("column-header-name-{col_ix}"))
-                            .tooltip({
-                                let full_name = name.clone();
-                                move |window, cx| {
-                                    gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
-                                }
-                            })
+                        crate::surfaces::truncated(("column-header-name", col_ix), name)
                             .flex_none()
                             .max_w_full()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .text_color(gpui::rgb(theme.foreground))
-                            .child(name),
+                            .text_color(gpui::rgb(theme.foreground)),
                     )
                     .when(!kind.is_empty(), |el| {
                         el.child(
@@ -654,11 +639,8 @@ impl GridView {
         if self.grid_is_query || self.compare.is_some() {
             return saved_widths;
         }
-        let (Some(scope), Some((id, _)), Some(store)) = (
-            scope,
-            self.live.as_ref().and_then(|session| session.saved.as_ref()),
-            self.column_widths.as_ref(),
-        ) else {
+        let (Some(scope), Some((id, _)), Some(store)) = (scope, self.saved_connection(), self.column_widths.as_ref())
+        else {
             return saved_widths;
         };
         let unique_columns = unique_column_indices(columns);
@@ -703,7 +685,7 @@ impl GridView {
             return;
         };
         if let WidthScope::Table(scope) = &scope
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(store) = &self.column_widths
             && let Err(error) = store.forget_widths(*id, &scope.width_key())
         {
@@ -741,7 +723,7 @@ impl GridView {
         if !self.grid_is_query
             && self.compare.is_none()
             && let WidthScope::Table(table_scope) = &scope
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(store) = &self.column_widths
         {
             for (name, width) in &changes {
@@ -908,11 +890,9 @@ impl GridView {
         pin_scope: &Option<PinScope>,
     ) -> (HashSet<usize>, ColumnProjection) {
         let persisted = self
-            .live
-            .as_ref()
+            .saved_connection_id()
             .filter(|_| !self.grid_is_query && self.compare.is_none())
-            .and_then(|session| session.saved.as_ref().map(|(id, _)| (*id, session)))
-            .and_then(|(id, _)| {
+            .and_then(|id| {
                 let scope = pin_scope.as_ref()?.width_key();
                 self.column_widths
                     .as_ref()
@@ -1206,7 +1186,7 @@ impl GridView {
         let unique_name = columns.iter().filter(|(column, _)| column == name).count() == 1;
         if !self.grid_is_query
             && self.compare.is_none()
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
             && unique_name
@@ -1257,7 +1237,7 @@ impl GridView {
         }
         if !self.grid_is_query
             && self.compare.is_none()
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
         {

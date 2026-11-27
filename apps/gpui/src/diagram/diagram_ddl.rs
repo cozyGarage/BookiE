@@ -91,12 +91,13 @@ fn plan_ddl(driver: &str, table: &TableInfo, columns: Vec<DraftColumn>, create: 
 
 impl GridView {
     pub(crate) fn diagram_can_draft(&self) -> bool {
-        self.live.as_ref().is_some_and(|live| {
-            live.writable.is_some()
-                && drivers_registry::default_registry()
+        self.is_writable()
+            && self.live.as_ref().is_some_and(|live| {
+                drivers_registry::default_registry()
                     .get(&live.driver_id)
                     .is_some_and(|driver| driver.capabilities().ddl_is_transactional)
-        }) && !self.transaction_open()
+            })
+            && !self.transaction_open()
             && !self.save.busy
             && self.save.pending.is_none()
     }
@@ -197,7 +198,8 @@ impl GridView {
                     form.child(draft.schema.clone()).child(draft.name.clone())
                 })
                 .children(draft.table.as_ref().map(|table| {
-                    div().truncate().child(
+                    crate::surfaces::truncated(
+                        "diagram-ddl-table",
                         table
                             .schema
                             .as_ref()

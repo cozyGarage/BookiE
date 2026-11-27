@@ -425,10 +425,9 @@ impl GridView {
         let warning = self.transaction_idle_warning();
         let clock = format!("{}:{:02}", elapsed / 60, elapsed % 60);
         let idle = if warning.is_some() { " · idle" } else { "" };
+        let runs = bookie_gpui::messages::plural(transaction.statements, "run", "runs");
         let detail = format!(
-            "Transaction · {clock} · {} run{}{}",
-            transaction.statements,
-            if transaction.statements == 1 { "" } else { "s" },
+            "Transaction · {clock} · {runs}{}",
             warning
                 .as_ref()
                 .map_or_else(String::new, |warning| format!(" · {warning}")),
@@ -436,31 +435,18 @@ impl GridView {
         let label = if compact {
             format!("Tx · {clock}{idle}")
         } else {
-            format!(
-                "Transaction · {clock} · {} run{}{idle}",
-                transaction.statements,
-                if transaction.statements == 1 { "" } else { "s" },
-            )
+            format!("Transaction · {clock} · {runs}{idle}")
         };
         let color = if warning.is_some() {
             theme.destructive
         } else {
             theme.warning
         };
-        div()
+        crate::surfaces::badge(label, color)
             .id("transaction-badge")
             .debug_selector(|| "transaction-badge".into())
-            .px_2()
-            .min_w_0()
-            .whitespace_nowrap()
-            .overflow_hidden()
-            .text_ellipsis()
-            .rounded(px(theme.radius))
-            .border_1()
-            .border_color(rgb(color))
-            .text_color(rgb(color))
-            .tooltip(move |window, cx| gpui_component::tooltip::Tooltip::new(detail.clone()).build(window, cx))
-            .child(label)
+            .flex_shrink(1.0)
+            .tooltip(crate::surfaces::tip(detail))
     }
 }
 
