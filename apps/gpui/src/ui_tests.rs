@@ -16,6 +16,7 @@ mod full_value_editor;
 pub(crate) mod icon_tooltip_tests;
 pub(crate) mod live_ui_tests;
 pub(crate) mod overlay_ui_tests;
+mod state_isolation_tests;
 pub(crate) mod status_bar_tests;
 pub(crate) mod test_config;
 pub(crate) mod test_kit;

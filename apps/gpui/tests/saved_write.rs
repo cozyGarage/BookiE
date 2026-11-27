@@ -14,8 +14,6 @@ fn saved_sqlite_write_uses_isolated_profile_and_audit() {
         .arg("--exact")
         .arg("saved_sqlite_write_uses_isolated_profile_and_audit")
         .env("BOOKIE_SAVED_WRITE_CHILD", "1")
-        .env("XDG_CONFIG_HOME", root.join("config"))
-        .env("XDG_DATA_HOME", root.join("data"))
         .env("BOOKIE_SAVED_WRITE_ROOT", &root)
         .status()
         .unwrap();
@@ -45,7 +43,8 @@ fn run_saved_write() {
     } else {
         "bookie"
     };
-    let config = root.join("config").join(profile);
+    let state = bookie_app_services::isolated_test_state_dir().unwrap();
+    let config = state.join("config").join(profile);
     std::fs::create_dir_all(&config).unwrap();
     std::fs::write(
         config.join("connections.json"),
@@ -96,7 +95,7 @@ fn run_saved_write() {
     let result = reader.run_query("SELECT customer FROM orders WHERE id = 1", 1).unwrap();
     assert_eq!(result.row(0)[0].display(), "saved test");
 
-    let audit = root.join("data").join(profile).join("audit.jsonl");
+    let audit = state.join("data").join(profile).join("audit.jsonl");
     let records: Vec<serde_json::Value> = std::fs::read_to_string(audit)
         .unwrap()
         .lines()
