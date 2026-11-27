@@ -171,10 +171,10 @@ fn database_error_diagnostic_carries_the_token_and_clears_after_edit(cx: &mut Te
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
-            view.sql_input
-                .update(cx, |editor, cx| editor.set_value("SELECT 1", window, cx));
+            view.sql_input.update(cx, |editor, cx| editor.focus(window, cx))
         });
     });
+    cx.simulate_input(" ");
     cx.run_until_parked();
     view.read_with(cx, |view, cx| {
         assert!(view.sql_input.read(cx).diagnostics().unwrap().is_empty())
