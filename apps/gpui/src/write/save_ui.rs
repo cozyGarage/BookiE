@@ -513,7 +513,10 @@ impl GridView {
             }
         };
         if self.save.busy || pending.generation != self.save.generation || !target_current {
-            self.status = "The table or the edits changed since the review; press Ctrl+S to review again".into();
+            self.status = format!(
+                "The table or the edits changed since the review; {}",
+                self.save_hint("review again")
+            );
             cx.notify();
             return;
         }

@@ -32,11 +32,16 @@ fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &m
     assert_tooltips(
         cx,
         &[
-            ("new-connection", "new-connection tooltip: New connection"),
-            ("new-query", "new-query tooltip: New query"),
+            ("new-connection", "new-connection tooltip: New connection…"),
+            ("new-query", "new-query tooltip: New query · Ctrl+T"),
+            ("more", "more tooltip: More"),
+            (
+                "import-export-menu",
+                "import-export-menu tooltip: Import or export connections",
+            ),
             ("palette", "palette tooltip: Command palette · Ctrl+Shift+P"),
             ("header-collapse-all", "header-collapse-all tooltip: Collapse all"),
-            ("collapse-sidebar", "collapse-sidebar tooltip: Collapse sidebar"),
+            ("collapse-sidebar", "collapse-sidebar tooltip: Hide sidebar · Ctrl+B"),
             ("sidebar-locate", "sidebar-locate tooltip: Locate the open table"),
             ("sidebar-filter", "sidebar-filter tooltip: Regular expression"),
             (
@@ -53,7 +58,10 @@ fn every_icon_only_control_in_the_window_and_sidebar_header_has_a_tooltip(cx: &m
     cx.run_until_parked();
     assert_tooltips(
         cx,
-        &[("sidebar-open-top-left", "sidebar-open-top-left tooltip: Show sidebar")],
+        &[(
+            "sidebar-open-top-left",
+            "sidebar-open-top-left tooltip: Show sidebar · Ctrl+B",
+        )],
     );
 }
 
@@ -88,6 +96,12 @@ fn every_icon_only_control_in_the_grid_bar_has_a_tooltip(cx: &mut TestAppContext
             ("find-prev", "find-prev tooltip: Previous match"),
             ("find-next", "find-next tooltip: Next match"),
             ("show", "show tooltip: Show matching rows only"),
+            (
+                "toggle-loaded-filter",
+                "toggle-loaded-filter tooltip: Filter rows · Ctrl+F",
+            ),
+            ("grid-columns-menu", "grid-columns-menu tooltip: Columns"),
+            ("grid-export", "grid-export tooltip: Export"),
         ],
     );
 }

@@ -29,13 +29,11 @@ pub(crate) fn tip(
     move |window, cx| gpui_component::tooltip::Tooltip::new(label.clone()).build(window, cx)
 }
 
-fn expand_sidebar_button(theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
-    icon_button("sidebar-open-top-left", "chevrons-right", "Show sidebar", theme).on_click(cx.listener(
-        |this, _, _, cx| {
-            this.sidebar.open = true;
-            cx.notify();
-        },
-    ))
+fn expand_sidebar_button(tooltip: String, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
+    icon_button("sidebar-open-top-left", "chevrons-right", tooltip, theme).on_click(cx.listener(|this, _, _, cx| {
+        this.sidebar.open = true;
+        cx.notify();
+    }))
 }
 
 fn sidebar_toggle(
@@ -162,7 +160,6 @@ mod environment_tests {
 
 impl GridView {
     pub fn toolbar(&self, theme: Theme, window: &Window, cx: &mut Context<Self>) -> Div {
-        let labelled = f32::from(window.viewport_size().width) >= size::TOOLBAR_LABELS_MIN_WIDTH;
         div()
             .debug_selector(|| "main-toolbar".into())
             .flex()
@@ -180,51 +177,36 @@ impl GridView {
                     .items_center()
                     .gap_1()
                     .child(self.home_button(theme, cx))
-                    .children((!self.sidebar.open).then(|| expand_sidebar_button(theme, cx)))
+                    .children((!self.sidebar.open).then(|| {
+                        expand_sidebar_button(self.labelled_tip("Show sidebar", Command::ToggleSidebar), theme, cx)
+                    }))
                     .children(environment_chip(self.live_environment(), theme))
-                    .child(
-                        (if labelled {
-                            crate::surfaces::icon_label_button(
-                                "new-connection",
-                                "database",
-                                "New connection",
-                                "New connection",
-                                theme,
-                            )
-                        } else {
-                            icon_button("new-connection", "database", "New connection", theme)
-                        })
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.connection_form.editing = None;
-                            this.open_connection_dialog(cx);
-                        })),
-                    )
-                    .child(
-                        (if labelled {
-                            crate::surfaces::icon_label_button(
-                                "new-query",
-                                "file-plus",
-                                "New query",
-                                "New query",
-                                theme,
-                            )
-                        } else {
-                            icon_button("new-query", "file-plus", "New query", theme)
-                        })
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.tabs.open_query();
-                            this.sync_grid_owner();
-                            if this.live.is_some() {
-                                this.focus_editor = true;
-                            } else {
-                                window.focus(&this.focus, cx);
-                            }
-                            cx.notify();
-                        })),
-                    )
-                    .child(self.toolbar_import_export_menu(labelled, theme, cx)),
+                    .child(self.toolbar_command_button("new-connection", "database", theme, cx))
+                    .child(self.toolbar_command_button("query", "file-plus", theme, cx))
+                    .child(self.toolbar_import_export_menu(theme, cx)),
             )
             .child(self.toolbar_right(theme, window, cx))
+    }
+
+    pub(crate) fn labelled_tip(&self, label: &str, command: Command) -> String {
+        bookie_gpui::keymap::with_shortcut(label, self.keymap.binding(command))
+    }
+
+    fn toolbar_command_button(
+        &self,
+        id: &'static str,
+        name: &'static str,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let label = bookie_gpui::palette::menu_label(id).unwrap_or(id);
+        let tooltip =
+            Command::for_action(id).map_or_else(|| label.to_string(), |command| self.labelled_tip(label, command));
+        let control = if id == "query" { "new-query" } else { id };
+        icon_button(control, name, tooltip, theme).on_click(cx.listener(move |this, _, window, cx| {
+            this.run_palette_id(id, window, cx);
+            cx.notify();
+        }))
     }
 
     fn overflow_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
@@ -232,13 +214,9 @@ impl GridView {
         let groups = crate::menus::command_groups(self, crate::menus::OVERFLOW_GROUPS);
         crate::surfaces::menu_button(
             "more",
-            None,
-            Some(icon("ellipsis", theme.muted_foreground).into_any_element()),
-            "More",
-            "More",
-            true,
+            crate::surfaces::MenuTrigger::new("More", Bar::Small).icon("ellipsis"),
+            theme,
         )
-        .dropdown_caret(false)
         .dropdown_menu(crate::menus::command_menu(cx.entity().downgrade(), groups))
     }
 
@@ -493,24 +471,15 @@ impl GridView {
         div().flex().flex_col().flex_1().min_h_0().child(list).children(empty)
     }
 
-    fn toolbar_import_export_menu(&self, labelled: bool, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
+    fn toolbar_import_export_menu(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::DropdownMenu as _;
-
         let owner = cx.entity().downgrade();
         let groups = crate::menus::command_groups(self, crate::menus::IMPORT_EXPORT_GROUPS);
         crate::surfaces::menu_button(
             "import-export-menu",
-            if labelled {
-                Some(div().whitespace_nowrap().child("Import / Export").into_any_element())
-            } else {
-                None
-            },
-            Some(icon("arrow-down-up", theme.muted_foreground).into_any_element()),
-            "Import / Export",
-            "Import and export connections",
-            true,
+            crate::surfaces::MenuTrigger::new("Import or export connections", Bar::Small).icon("arrow-down-up"),
+            theme,
         )
-        .dropdown_caret(labelled)
         .dropdown_menu(crate::menus::command_menu(owner, groups))
     }
 
@@ -529,12 +498,16 @@ impl GridView {
                 ),
             )
             .child(
-                compact_icon_button("collapse-sidebar", "chevrons-left", "Collapse sidebar", theme).on_click(
-                    cx.listener(|this, _, _, cx| {
-                        this.sidebar.open = false;
-                        cx.notify();
-                    }),
-                ),
+                compact_icon_button(
+                    "collapse-sidebar",
+                    "chevrons-left",
+                    self.labelled_tip("Hide sidebar", Command::ToggleSidebar),
+                    theme,
+                )
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.sidebar.open = false;
+                    cx.notify();
+                })),
             )
     }
 
@@ -559,23 +532,16 @@ impl GridView {
             .iter()
             .map(|saved| (saved.id, saved.driver_id == "sqlite", saved.name.clone()))
             .collect();
+        let new_connection = bookie_gpui::palette::menu_label("new-connection").unwrap_or_default();
 
         crate::surfaces::menu_button(
             "sidebar-connection-switcher",
-            Some(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .child(name.to_owned())
-                    .into_any_element(),
-            ),
-            Some(connection_status_dot(connected, theme).into_any_element()),
-            format!("{name}, {status}. Choose connection"),
-            format!("{full_name} · {status}"),
-            true,
+            crate::surfaces::MenuTrigger::new(format!("{full_name} · {status}"), Bar::Compact)
+                .leading(connection_status_dot(connected, theme))
+                .label(name)
+                .accessible_name(format!("{full_name}, {status}. Choose connection")),
+            theme,
         )
-        .debug_selector(|| "sidebar-connection-switcher".into())
         .w_full()
         .dropdown_menu(move |mut menu, _, _| {
             for (id, is_sqlite, full_name) in &entries {
@@ -589,6 +555,7 @@ impl GridView {
                         div()
                             .id(format!("sidebar-connection-entry-{id}"))
                             .debug_selector(|| "sidebar-connection-entry".into())
+                            .aria_label(label.clone())
                             .tooltip(tip(full_name.clone()))
                             .flex()
                             .items_center()
@@ -610,9 +577,11 @@ impl GridView {
                 menu = menu.separator();
             }
             let owner = owner.clone();
-            menu.item(PopupMenuItem::new("New connection").on_click(move |_, window, cx| {
-                let _ = owner.update(cx, |this, cx| this.run_palette_id("new-connection", window, cx));
-            }))
+            menu.item(
+                crate::menus::item(new_connection, Some("database"), None, false).on_click(move |_, window, cx| {
+                    let _ = owner.update(cx, |this, cx| this.run_palette_id("new-connection", window, cx));
+                }),
+            )
         })
     }
 

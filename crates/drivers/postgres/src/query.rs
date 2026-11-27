@@ -588,9 +588,7 @@ fn decode_and_admit_pg_row(
     values: &mut Vec<Value>,
 ) -> Result<bool, DriverError> {
     values.clear();
-    if decoders.len() != row.len() {
-        return Ok(false);
-    }
+    ensure_plan_width(row.len(), decoders.len())?;
     let mut payload_bytes = 0usize;
     for (index, decoder) in decoders.iter().enumerate() {
         let raw = row.try_get_raw(index).map_err(map_sqlx_error)?;
@@ -613,6 +611,15 @@ fn decode_and_admit_pg_row(
         values.clear();
         Ok(false)
     }
+}
+
+fn ensure_plan_width(row_width: usize, plan_width: usize) -> Result<(), DriverError> {
+    if row_width == plan_width {
+        return Ok(());
+    }
+    Err(DriverError::Internal(format!(
+        "postgres row has {row_width} columns but its result set metadata has {plan_width}"
+    )))
 }
 
 struct PgColumnMetadata {
@@ -804,5 +811,15 @@ mod tests {
             "ARRAY[1,NULL]::smallint[]"
         );
         assert_eq!(bigint_array(std::iter::empty()), "ARRAY[]::bigint[]");
+    }
+
+    #[test]
+    fn a_row_wider_or_narrower_than_its_decoder_plan_is_an_error() {
+        use super::ensure_plan_width;
+        use bookie_core::DriverError;
+
+        assert!(ensure_plan_width(3, 3).is_ok());
+        assert!(matches!(ensure_plan_width(3, 2), Err(DriverError::Internal(_))));
+        assert!(matches!(ensure_plan_width(2, 3), Err(DriverError::Internal(_))));
     }
 }

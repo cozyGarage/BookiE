@@ -23,13 +23,11 @@ impl Render for MenuProbe {
 
         menu_button(
             "probe-menu",
-            Some(div().child("Open").into_any_element()),
-            None,
-            "Open menu",
-            "Choose an option",
-            true,
+            MenuTrigger::new("Choose an option", Bar::Compact)
+                .label("Open")
+                .accessible_name("Open menu"),
+            Theme::light(),
         )
-        .debug_selector(|| "probe-menu".into())
         .dropdown_menu(|menu, _, _| menu.item(PopupMenuItem::new("Choice")))
     }
 }
@@ -186,4 +184,76 @@ fn a_sql_preview_scrolls_within_its_height() {
         preview.style().max_size.height,
         Some(gpui::Length::Definite(px(size::SAVE_PREVIEW_MAX_HEIGHT).into()))
     );
+}
+
+struct BarMenuProbe;
+
+impl Render for BarMenuProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
+        let theme = Theme::light();
+        let long = "A very long schema name that cannot fit in the trigger";
+        div()
+            .flex()
+            .child(
+                menu_button(
+                    "probe-icon-menu",
+                    MenuTrigger::new("More", Bar::Small).icon("ellipsis"),
+                    theme,
+                )
+                .dropdown_menu(|menu, _, _| menu.item(PopupMenuItem::new("Choice"))),
+            )
+            .child(
+                select_button("probe-select", Some("Contains"), "Operator", Bar::Compact, theme)
+                    .dropdown_menu(|menu, _, _| menu.item(PopupMenuItem::new("Choice"))),
+            )
+            .child(
+                div().w(px(size::BUTTON_MIN_WIDTH)).child(
+                    menu_button(
+                        "probe-long",
+                        MenuTrigger::new("Schema", Bar::Small)
+                            .leading(div().size(px(size::SM)))
+                            .label(long),
+                        theme,
+                    )
+                    .w_full()
+                    .dropdown_menu(|menu, _, _| menu.item(PopupMenuItem::new("Choice"))),
+                ),
+            )
+    }
+}
+
+#[gpui::test]
+fn menu_buttons_take_the_bar_height_and_name_themselves_by_their_tooltip(cx: &mut TestAppContext) {
+    cx.update(|cx| {
+        gpui_kit::init(cx);
+        Theme::light().install(cx);
+    });
+    let (_view, cx) = cx.add_window_view(|_, _| BarMenuProbe);
+    cx.run_until_parked();
+    let icon_menu = cx.debug_bounds("probe-icon-menu").expect("the icon menu is drawn");
+    assert_eq!(icon_menu.size.height, px(size::SMALL_CONTROL));
+    assert_eq!(
+        icon_menu.size.width,
+        px(size::SMALL_CONTROL),
+        "an icon-only trigger is square"
+    );
+    let marker = cx
+        .debug_bounds("probe-icon-menu tooltip: More")
+        .expect("the icon carries the tooltip marker");
+    assert!(icon_menu.contains(&marker.center()));
+    let select = cx.debug_bounds("probe-select").expect("the select button is drawn");
+    assert_eq!(select.size.height, px(size::COMPACT_CONTROL));
+    assert!(cx.update(|window, _| window.try_find_by_label("Operator").is_some()));
+    assert!(cx.update(|window, _| window.try_find_by_label("More").is_some()));
+    let long = cx.debug_bounds("probe-long").expect("the long trigger is drawn");
+    assert_eq!(long.size.height, px(size::SMALL_CONTROL));
+    assert!(
+        long.size.width <= px(size::BUTTON_MIN_WIDTH),
+        "a long label truncates inside the part"
+    );
+    let marker = cx
+        .debug_bounds("probe-long tooltip: Schema")
+        .expect("a leading element carries the tooltip marker");
+    assert!(long.contains(&marker.center()));
 }

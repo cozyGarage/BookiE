@@ -119,9 +119,12 @@ impl GridView {
         );
         let preview_note = truncated.then(|| {
             let message = if self.source.editable() {
-                "Previewing first 512 characters · Copy the selected row for the full value · Alt+Enter opens the editor (1 MiB limit)"
+                format!(
+                    "Previewing first 512 characters · Copy the selected row for the full value · {} opens the editor (1 MiB limit)",
+                    bookie_gpui::keymap::full_value_chord().label()
+                )
             } else {
-                "Previewing first 512 characters · Copy the selected row for the full value"
+                "Previewing first 512 characters · Copy the selected row for the full value".to_string()
             };
             div()
                 .id("cell-detail-preview-note")

@@ -60,6 +60,7 @@ struct MarkKey {
 
 struct MarkSnapshot {
     revision: u64,
+    length: usize,
     driver: String,
     text: String,
     plan: Option<ScriptPlan>,
@@ -70,14 +71,15 @@ impl MarkSnapshot {
         let plan = grammar_for_driver(&driver).map(|grammar| completion_plan(&text, grammar, None));
         Self {
             revision,
+            length: text.len(),
             driver,
             text,
             plan,
         }
     }
 
-    fn matches(&self, revision: u64, driver: &str) -> bool {
-        self.revision == revision && self.driver == driver
+    fn matches(&self, key: &MarkKey) -> bool {
+        self.revision == key.revision && self.length == key.length && self.driver == key.driver
     }
 }
 
@@ -170,7 +172,7 @@ fn observe_marks(view: &GridView, cx: &mut Context<GridView>, state: MarkState) 
         .snapshot
         .borrow()
         .as_ref()
-        .is_some_and(|cached| cached.matches(key.revision, &key.driver));
+        .is_some_and(|cached| cached.matches(&key));
     if !has_snapshot {
         clear_decorations(&state, cx);
     }
@@ -208,7 +210,7 @@ async fn run_mark_worker(this: WeakEntity<GridView>, mut cx: AsyncApp, state: Ma
             .snapshot
             .borrow()
             .as_ref()
-            .filter(|cached| cached.matches(before.revision, &before.driver))
+            .filter(|cached| cached.matches(&before))
             .cloned();
         let delay = if cached.is_some() {
             CURSOR_DEBOUNCE
@@ -237,7 +239,7 @@ async fn run_mark_worker(this: WeakEntity<GridView>, mut cx: AsyncApp, state: Ma
             .snapshot
             .borrow()
             .as_ref()
-            .filter(|cached| cached.matches(key.revision, &key.driver))
+            .filter(|cached| cached.matches(&key))
             .cloned();
         let (text_snapshot, rope) = if let Some(cached) = cached {
             (Some(cached), None)
@@ -363,13 +365,24 @@ mod tests {
         );
     }
 
+    fn key(revision: u64, length: usize, driver: &str) -> MarkKey {
+        MarkKey {
+            revision,
+            length,
+            cursor: 0,
+            selected: 0..0,
+            driver: driver.into(),
+        }
+    }
+
     #[test]
-    fn mark_snapshot_is_reused_by_document_revision_and_driver() {
+    fn mark_snapshot_is_reused_by_document_revision_length_and_driver() {
         let snapshot = MarkSnapshot::new(4, "postgres".into(), "SELECT 1".into());
 
-        assert!(snapshot.matches(4, "postgres"));
-        assert!(!snapshot.matches(5, "postgres"));
-        assert!(!snapshot.matches(4, "mysql"));
+        assert!(snapshot.matches(&key(4, 8, "postgres")));
+        assert!(!snapshot.matches(&key(5, 8, "postgres")));
+        assert!(!snapshot.matches(&key(4, 8, "mysql")));
+        assert!(!snapshot.matches(&key(4, 9, "postgres")));
     }
 
     #[gpui::test]
