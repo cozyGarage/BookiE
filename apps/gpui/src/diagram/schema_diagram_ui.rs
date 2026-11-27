@@ -140,8 +140,10 @@ impl GridView {
                     } else {
                         format!("Wrote the diagram of {tables} table(s) to {shown}")
                     };
+                    this.notices
+                        .push(this.status.clone(), crate::notifications::NoticeKind::Success);
                 }
-                Err(message) => this.status = format!("Could not export the diagram: {message}"),
+                Err(message) => this.report_failure("export the diagram", &message),
             },
         );
     }

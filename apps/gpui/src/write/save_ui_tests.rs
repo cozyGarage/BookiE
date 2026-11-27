@@ -1882,6 +1882,13 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
         "file: {written:?}; status: {status}"
     );
     view.read_with(cx, |view, _| assert!(!view.search.diagram.open, "{}", view.status));
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.notices.items.iter().any(|notice| {
+                notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status
+            })
+        );
+    });
 
     type_path(&view, cx, &target);
     view.read_with(cx, |view, _| {
@@ -1889,6 +1896,18 @@ fn the_schema_diagram_is_written_to_a_new_file_in_the_format_of_its_extension(cx
     });
     type_path(&view, cx, &directory.join("schema.png"));
     view.read_with(cx, |view, _| assert!(view.status.contains(".mmd"), "{}", view.status));
+    type_path(&view, cx, &directory.join("missing").join("schema.mmd"));
+    until(&view, cx, "the diagram export fails", |view| {
+        view.status.starts_with("Could not export the diagram:")
+    });
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.notices
+                .items
+                .iter()
+                .any(|notice| { notice.kind == crate::notifications::NoticeKind::Error && notice.text == view.status })
+        );
+    });
     std::fs::remove_dir_all(&directory).ok();
 }
 

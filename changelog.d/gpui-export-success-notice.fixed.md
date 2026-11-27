@@ -1,1 +1,1 @@
-GPUI result exports now record a completion notice.
+GPUI result and schema diagram exports now record completion or failure notices.
