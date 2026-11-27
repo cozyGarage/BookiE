@@ -486,3 +486,27 @@ async fn value_contract_domain_enum_parameters_resolve_shadowed_schema_type() {
         ]
     );
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn value_contract_a_user_enum_named_void_reads_its_labels() {
+    let (_container, opts) = start_pg().await;
+    let connection = connect(opts).await;
+    connection
+        .execute("CREATE TYPE public.void AS ENUM ('on', 'off')")
+        .await
+        .unwrap();
+
+    let result = connection
+        .query_params(
+            "SELECT 'off'::public.void AS state, $1::text::public.void AS bound",
+            &[Value::Text("on".into())],
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![Value::Text("off".into()), Value::Text("on".into())]]
+    );
+}

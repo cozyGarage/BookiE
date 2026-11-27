@@ -47,6 +47,8 @@ mod mysql_trigger_errors;
 mod result_sets;
 #[path = "support/round_trip_budget.rs"]
 mod round_trip_budget;
+#[path = "support/row_decoder_plan.rs"]
+mod row_decoder_plan;
 #[path = "support/schema_introspection.rs"]
 mod schema_introspection;
 #[path = "support/table_default_collation.rs"]

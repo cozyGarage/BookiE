@@ -212,7 +212,8 @@ impl GridView {
                     let first_new_number = this.run_tabs.next_number;
                     for outcome in outcomes {
                         if outcome.result.as_ref().is_err_and(|error| error.cancelled) {
-                            this.apply_cancelled_outcome(&outcome);
+                            this.add_cancelled_run(&outcome.sql, outcome.elapsed);
+                            this.status = "Query cancelled".into();
                             continue;
                         }
                         this.apply_query_outcome(outcome, &original, cancel_process, activate, cx);
@@ -288,16 +289,15 @@ impl GridView {
         }
     }
 
-    fn apply_cancelled_outcome(&mut self, outcome: &crate::query_execution::Outcome) {
-        self.panel.messages.statement_cancelled(&outcome.sql, outcome.elapsed);
+    pub(crate) fn add_cancelled_run(&mut self, sql: &str, elapsed: Duration) -> bool {
+        self.panel.messages.statement_cancelled(sql, elapsed);
         let mut run = next_run(self.run_tabs.next_number);
         run.rows = 0;
-        run.elapsed_ms = Some(u64::try_from(outcome.elapsed.as_millis()).unwrap_or(u64::MAX));
+        run.elapsed_ms = Some(u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX));
         let source: Source = std::sync::Arc::new(crate::catalog_nav::EmptySource("Cancelled query".into()));
         let mut slot = RunSlot::new(run, Some(source));
         slot.cancelled = true;
-        self.retain_result(slot);
-        self.status = "Query cancelled".into();
+        self.retain_result(slot)
     }
 
     fn query_running(&self) -> bool {

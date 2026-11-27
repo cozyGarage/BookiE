@@ -3,8 +3,7 @@ use std::collections::HashMap;
 use bookie_app_services::query_parameters::{bind_statement, collect_values, statement_names};
 use bookie_core::ParameterKind;
 
-use crate::chrome::tip;
-use crate::surfaces::{ButtonKind, button, task_bar};
+use crate::surfaces::task_bar;
 use crate::*;
 
 pub(crate) struct ParamRow {
@@ -107,13 +106,41 @@ impl GridView {
         self.status = "Fill in the query parameters, then run again".into();
     }
 
-    pub(crate) fn cycle_param_kind(&mut self, index: usize, cx: &mut Context<Self>) {
-        let Some(row) = self.params.rows.get_mut(index) else {
-            return;
-        };
-        let next = (row.kind.index() as usize + 1) % ParameterKind::ALL.len();
-        row.kind = ParameterKind::from_index(next as u32);
-        cx.notify();
+    pub(crate) fn set_param_kind(&mut self, index: usize, kind: ParameterKind) {
+        if let Some(row) = self.params.rows.get_mut(index) {
+            row.kind = kind;
+        }
+    }
+
+    fn param_kind_menu(
+        &self,
+        index: usize,
+        kind: ParameterKind,
+        theme: Theme,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        use gpui_component::menu::DropdownMenu as _;
+        let owner = cx.entity().downgrade();
+        let options: Vec<(gpui::SharedString, ParameterKind)> = ParameterKind::ALL
+            .iter()
+            .map(|kind| (kind.label().into(), *kind))
+            .collect();
+        crate::surfaces::select_button(
+            ("param-kind", index),
+            Some(kind.label()),
+            "Change how this value is typed",
+            crate::surfaces::Bar::Small,
+            theme,
+        )
+        .dropdown_menu(move |menu, _, _| {
+            let owner = owner.clone();
+            crate::menus::select(menu, &options, Some(&kind), move |kind, _, cx| {
+                let _ = owner.update(cx, |this, cx| {
+                    this.set_param_kind(index, kind);
+                    cx.notify();
+                });
+            })
+        })
     }
 
     pub(crate) fn parameters_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
@@ -135,11 +162,7 @@ impl GridView {
                             .text_color(rgb(theme.muted_foreground))
                             .child(format!(":{}", row.name)),
                     )
-                    .child(
-                        button(ButtonKind::Ghost, ("param-kind", index), row.kind.label(), theme)
-                            .tooltip(tip("Change how this value is typed"))
-                            .on_click(cx.listener(move |this, _, _, cx| this.cycle_param_kind(index, cx))),
-                    )
+                    .child(self.param_kind_menu(index, row.kind, theme, cx))
                     .child(div().w(px(size::FORM_CONTROL * 4.0)).child(row.input.clone()))
             })
             .collect();
