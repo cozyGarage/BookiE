@@ -70,6 +70,9 @@
   </keywords>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.2.11" type="stable" date="2026-11-27">
+      <description><p>Data integrity fixes, safer imports, and improvements to the unsupported GPUI preview.</p></description>
+    </release>
     <release version="0.2.10" type="stable" date="2026-11-25">
       <description><p>Release after 0.2.9: table sizes in the sidebar and whole-table scan warnings in query plans, closed query tabs that keep their SQL, PgBouncer transaction pool support for parameterized PostgreSQL queries, a SQLite fix for missing bind values, and a more coherent GPUI preview with dialogs for connections, saving, import and export, a notification centre, Excel import and every bundled color theme.</p></description>
     </release>

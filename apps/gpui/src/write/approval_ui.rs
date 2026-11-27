@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bookie_app_services::approval_prompt::{ApprovalInbox, ApprovalOutcome, PendingApproval, prompt_channel};
 
-use crate::surfaces::tip;
 use crate::surfaces::{ButtonKind, ConfirmDialog, button, confirm_dialog};
 use crate::*;
 
@@ -129,11 +128,11 @@ fn approval_detail(request: &bookie_app_services::approval_prompt::ApprovalReque
     detail.join("\n")
 }
 
-fn approval_actions(theme: Theme, cx: &mut Context<GridView>) -> [Stateful<Div>; 2] {
-    [
+fn approval_actions(theme: Theme, cx: &mut Context<GridView>) -> Vec<crate::surfaces::Button> {
+    vec![
         button(ButtonKind::Primary, "approve-write", "Approve once", theme)
             .debug_selector(|| "approve-write".into())
-            .tooltip(tip("Run this statement once"))
+            .tooltip("Run this statement once")
             .on_click(cx.listener(|this, _, _, cx| this.answer_approval(ApprovalOutcome::AllowOnce, cx))),
         button(ButtonKind::Ghost, "deny-write", "Deny", theme)
             .debug_selector(|| "deny-write".into())

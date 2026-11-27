@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
@@ -27,6 +28,7 @@ use grid::{
 use sidebar::table_menu;
 use sidebar::{favorites_ui, sidebar_catalog, sidebar_state};
 use transfer::{backup_ui, data_compare_ui, export_file_ui, import_ui, tables_export_ui};
+use ui::keys::Surface;
 #[cfg(test)]
 use ui::render;
 use ui::{
@@ -124,6 +126,29 @@ impl Drop for Ticket {
     }
 }
 
+struct SurfaceFocus {
+    handles: HashMap<Surface, FocusHandle>,
+    returns: HashMap<Surface, (Surface, FocusHandle)>,
+    active: Option<Surface>,
+    opener: Option<FocusHandle>,
+    full_value: FocusHandle,
+}
+
+impl SurfaceFocus {
+    fn new(cx: &mut Context<GridView>) -> Self {
+        Self {
+            handles: Surface::ORDER
+                .into_iter()
+                .map(|surface| (surface, cx.focus_handle()))
+                .collect(),
+            returns: HashMap::new(),
+            active: None,
+            opener: None,
+            full_value: cx.focus_handle(),
+        }
+    }
+}
+
 struct GridView {
     table: gpui::Entity<gpui_kit::component::table::TableState<grid_table::GridDelegate>>,
     _table_events: gpui::Subscription,
@@ -216,6 +241,8 @@ struct GridView {
     selection_stats_cache: selection_stats_ui::SelectionStatsCache,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
+    restore_grid_focus: bool,
+    surface_focus: SurfaceFocus,
 }
 
 pub(crate) struct Pace {
@@ -552,6 +579,7 @@ impl GridView {
         let row_detail_filter = Self::init_row_detail_filter(cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
+        let surface_focus = SurfaceFocus::new(cx);
         let font_names = installed_font_names(cx);
         let saved_fonts = font_settings::load();
         let font_inputs = Self::init_font_inputs(&saved_fonts, cx);
@@ -563,6 +591,7 @@ impl GridView {
             column_widths: bookie_app_services::column_widths::ColumnWidthStore::open(),
             binary_modes: Default::default(),
             focus: table_focus,
+            surface_focus,
             table_source: source.clone(),
             source,
             mode: Mode::All,
@@ -602,6 +631,7 @@ impl GridView {
             selection: None,
             selection_stats_cache: selection_stats_ui::SelectionStatsCache::default(),
             focus_editor: false,
+            restore_grid_focus: false,
             continuous: false,
             grid_is_query: false,
             search: panel_state::SearchState::new(find, filter),
@@ -1130,6 +1160,7 @@ fn main() {
     gpui_platform::application()
         .with_assets(assets::Assets)
         .run(move |cx: &mut App| {
+            gpui_kit::init(cx);
             text_input::bind_keys(cx);
             cx.bind_keys([gpui::KeyBinding::new(
                 "ctrl-space",
@@ -1212,7 +1243,7 @@ fn main() {
                     if autoscroll > 0 {
                         view.update(cx, |view, cx| view.start_autoscroll(autoscroll, cx));
                     }
-                    view
+                    cx.new(|cx| gpui_kit::base::Root::new(view, window, cx))
                 },
             );
             if let Err(error) = opened {

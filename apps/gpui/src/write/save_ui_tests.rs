@@ -1,13 +1,23 @@
 use std::time::Instant;
 
-use gpui::TestAppContext;
+use gpui::{KeyDownEvent, KeyUpEvent, Keystroke, TestAppContext};
 use gpui_kit::test::{TestQueryExt, TestWindowExt};
 
 use crate::live_ui_tests::open_live;
 use crate::text_input;
-use crate::ui_tests::test_kit::{Orders, orders, until};
+use crate::ui_tests::test_kit::{Orders, add_rooted_grid, orders, until};
 use crate::{GridView, Work};
 use bookie_core::TableInfo;
+
+fn press_key(cx: &mut gpui::VisualTestContext, key: &str) {
+    let keystroke = cx.update(|_, cx| Keystroke::parse_with_os(key, cx.platform_info().os).unwrap());
+    cx.simulate_event(KeyDownEvent {
+        keystroke: keystroke.clone(),
+        is_held: false,
+        prefer_character_input: false,
+    });
+    cx.simulate_event(KeyUpEvent { keystroke });
+}
 
 #[path = "paste_literal_save_tests.rs"]
 mod paste_literal_save_tests;
@@ -90,7 +100,7 @@ pub(crate) fn saving_view<'a>(
 ) -> (gpui::Entity<GridView>, &'a mut gpui::VisualTestContext) {
     let table = writable_table(path);
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| {
+    let (view, cx) = add_rooted_grid(cx, move |window, cx| {
         let mut view = GridView::with_source(table.clone(), Instant::now(), window, cx);
         view.attach_live(table.clone());
         view
@@ -225,6 +235,18 @@ fn save_in_the_pending_marker_opens_the_review_and_saves_nothing_yet(cx: &mut Te
         saved_customer(&path, 1),
         "Ada",
         "nothing is saved before the user confirms"
+    );
+    cx.update(|window, cx| window.render_frame(cx));
+    cx.simulate_keystrokes("tab");
+    press_key(cx, "enter");
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert!(view.save.pending.is_none(), "keyboard confirmation closes the review")
+    });
+    assert_eq!(
+        saved_customer(&path, 1),
+        "Marker",
+        "Tab and Enter confirm the reviewed save"
     );
 }
 

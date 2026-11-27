@@ -41,7 +41,7 @@ impl GridView {
             body: "Nothing has been saved to the database. The query text is kept for Reopen closed tab.".into(),
             sql: None,
         };
-        let actions = [
+        let actions = vec![
             button(ButtonKind::Destructive, "discard-and-close", "Discard and close", theme)
                 .debug_selector(|| "discard-and-close".into())
                 .on_click(cx.listener(|this, _, window, cx| this.discard_and_close(window, cx))),

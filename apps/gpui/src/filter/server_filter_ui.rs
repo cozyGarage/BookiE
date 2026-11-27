@@ -1,6 +1,6 @@
 use bookie_core::TableInfo;
 
-use crate::surfaces::{ButtonKind, compact_button, tip, truncated};
+use crate::surfaces::{ButtonKind, compact_button, truncated};
 use crate::*;
 
 const PLACEHOLDER: &str = "e.g. created_at > now() - interval '1 day'";
@@ -159,7 +159,7 @@ impl GridView {
             .map(|sort| sort_chip_text(&sort.column, sort.ascending))
     }
 
-    pub(crate) fn where_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+    pub(crate) fn where_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Option<crate::surfaces::Button> {
         if !self.shows_server_filter() {
             return None;
         }
@@ -171,7 +171,7 @@ impl GridView {
                 if applied { "WHERE active" } else { "WHERE" },
                 theme,
             )
-            .tooltip(tip("Filter this table on the server"))
+            .tooltip("Filter this table on the server")
             .on_click(cx.listener(|this, _, window, cx| {
                 if this.search.server.visible {
                     this.search.server.visible = false;

@@ -1,1 +1,0 @@
-A slow INSERT, UPDATE, DELETE or schema change that you run is no longer cancelled by the query timeout; Stop still cancels it, and a statement whose timeout had already passed before it started is still refused.

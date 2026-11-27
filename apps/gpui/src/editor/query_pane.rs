@@ -107,14 +107,14 @@ impl GridView {
             .when(running.is_none() && compact, |bar| {
                 bar.child(
                     button(ButtonKind::Primary, "run-statement", "Run", theme)
-                        .tooltip(tip(if selected {
+                        .tooltip(if selected {
                             bookie_gpui::keymap::with_shortcut(
                                 "Run selection",
                                 self.keymap.binding(Command::RunAtCursor),
                             )
                         } else {
                             self.command_tip(Command::RunAtCursor)
-                        }))
+                        })
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.run_at_cursor(cx);
                             cx.notify();
@@ -130,7 +130,7 @@ impl GridView {
                         if selected { "Run selection" } else { "Run statement" },
                         theme,
                     )
-                    .tooltip(tip(self.command_tip(Command::RunAtCursor)))
+                    .tooltip(self.command_tip(Command::RunAtCursor))
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.run_at_cursor(cx);
                         cx.notify();
@@ -138,7 +138,7 @@ impl GridView {
                 )
                 .child(
                     button(ButtonKind::Ghost, "run-query", "Run all", theme)
-                        .tooltip(tip(self.command_tip(Command::RunQuery)))
+                        .tooltip(self.command_tip(Command::RunQuery))
                         .on_click(cx.listener(|this, _, _, cx| {
                             this.run_query(cx);
                             cx.notify();
@@ -437,7 +437,7 @@ impl GridView {
         active: bool,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> crate::surfaces::Button {
         let tab = segment(("run", index), run.label(), active, theme).flex_none().child(
             compact_icon_button(("close-run", index), "x", "Close result", theme)
                 .size(px(size::LG))
@@ -450,7 +450,7 @@ impl GridView {
                     }),
                 ),
         );
-        let tab = tab.when_some(run.tooltip(), |tab, text| tab.tooltip(tip(text)));
+        let tab = tab.when_some(run.tooltip(), |tab, text| tab.tooltip(text));
         tab.on_click(cx.listener(move |this, _, _, cx| {
             this.select_run(index);
             cx.notify();
@@ -464,7 +464,7 @@ impl GridView {
         view: ResultView,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> crate::surfaces::Button {
         segment(id, label, self.panel.view == view, theme).on_click(cx.listener(move |this, _, _, cx| {
             this.select_result_view(view, cx);
         }))

@@ -14,6 +14,7 @@ const EXPORT_PAGE_ROWS: u64 = 128;
 
 pub(crate) struct ExportFileState {
     pub open: bool,
+    pub focus_input: bool,
     pub input: Option<Entity<TextInput>>,
     pub scope: ExportScope,
     pub format: ResultFormat,
@@ -37,6 +38,7 @@ impl Default for ExportFileState {
     fn default() -> Self {
         Self {
             open: false,
+            focus_input: false,
             input: None,
             scope: ExportScope::default(),
             format: ResultFormat::Csv,
@@ -50,6 +52,15 @@ impl Default for ExportFileState {
 }
 
 impl GridView {
+    pub(crate) fn focus_export_file_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !std::mem::take(&mut self.export.file.focus_input) {
+            return;
+        }
+        if let Some(input) = &self.export.file.input {
+            window.focus(&input.read(cx).focus_handle(cx), cx);
+        }
+    }
+
     pub(crate) fn export_file_enabled(&self) -> bool {
         !self.export.file.open && self.export.file.cancel.is_none() && self.dataset_count() > 0
     }
@@ -60,6 +71,8 @@ impl GridView {
             self.status = "Canceling the export…".into();
         }
         self.export.file.open = false;
+        self.export.file.focus_input = false;
+        self.restore_grid_focus = true;
     }
 
     pub(crate) fn open_export_file_bar(&mut self, cx: &mut Context<Self>) {
@@ -95,6 +108,8 @@ impl GridView {
         };
         self.export.file.format = ResultFormat::Csv;
         self.export.file.open = true;
+        self.export.file.focus_input = true;
+        self.restore_grid_focus = false;
         cx.notify();
     }
 
@@ -253,7 +268,7 @@ impl GridView {
                 this.export.file.cancel = None;
                 match written {
                     Ok(()) => {
-                        this.export.file.open = false;
+                        this.close_export_file_bar();
                         this.status = if cut {
                             format!(
                                 "Wrote the first {count} of {} to {shown}",

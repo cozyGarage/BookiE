@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use bookie_app_services::ssh_prompt::{HostKeyInbox, PendingHostKey, host_key_channel};
 
-use crate::surfaces::tip;
 use crate::surfaces::{ButtonKind, ConfirmDialog, button, confirm_dialog};
 use crate::*;
 
@@ -112,11 +111,11 @@ pub(crate) fn host_key_detail(open: &PendingHostKey) -> String {
     )
 }
 
-fn host_key_actions(theme: Theme, cx: &mut Context<GridView>) -> [Stateful<Div>; 2] {
-    [
+fn host_key_actions(theme: Theme, cx: &mut Context<GridView>) -> Vec<crate::surfaces::Button> {
+    vec![
         button(ButtonKind::Primary, "trust-host-key", "Trust", theme)
             .debug_selector(|| "trust-host-key".into())
-            .tooltip(tip("Record this host key and connect"))
+            .tooltip("Record this host key and connect")
             .on_click(cx.listener(|this, _, _, cx| this.answer_host_key(true, cx))),
         button(ButtonKind::Ghost, "refuse-host-key", "Cancel", theme)
             .debug_selector(|| "refuse-host-key".into())

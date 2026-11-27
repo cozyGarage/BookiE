@@ -1,1 +1,0 @@
-GPUI opens structure changes, Set cells, outcome resolution, backup and restore, SQL files, export of all tables and connection import reviews as centred dialogs instead of bars that push the grid down.

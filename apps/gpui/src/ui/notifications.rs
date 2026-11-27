@@ -2,7 +2,7 @@ use gpui::{Context, Div, FocusHandle, Stateful, Window, div, prelude::*, px, rgb
 
 use crate::GridView;
 use crate::surfaces::{
-    ButtonKind, ListState, compact_button, compact_icon_button, list_row, list_state, section_header,
+    Button, ButtonKind, ListState, compact_button, compact_icon_button, list_row, list_state, section_header,
 };
 use bookie_gpui::theme::{Theme, size};
 
@@ -111,7 +111,7 @@ impl GridView {
         cx.notify();
     }
 
-    pub(crate) fn notifications_indicator(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    pub(crate) fn notifications_indicator(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         let unread = self.notices.unread();
         let tooltip = match unread {
             0 => "Notifications".to_string(),

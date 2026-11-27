@@ -11,8 +11,12 @@ impl GridView {
         let key = event.keystroke.key.as_str();
         let top = self.top_surface();
         if top.is_some_and(Surface::blocks_keys) {
-            self.surface_key(key, cx);
-            cx.stop_propagation();
+            if key == "escape" {
+                self.surface_key(key, cx);
+                cx.stop_propagation();
+            } else if !matches!(key, "tab" | "enter" | "space") {
+                cx.stop_propagation();
+            }
             return;
         }
         if self.record_shortcut_key(&event.keystroke, cx) {
@@ -83,7 +87,7 @@ impl GridView {
             .find(|surface| self.surface_open(*surface))
     }
 
-    fn surface_open(&self, surface: Surface) -> bool {
+    pub(crate) fn surface_open(&self, surface: Surface) -> bool {
         match surface {
             Surface::Approval => self.approval.current.is_some(),
             Surface::HostKey => self.host_key.current.is_some(),
@@ -259,7 +263,9 @@ impl GridView {
 
     pub(crate) fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if self.approval.current.is_some() || self.save.pending.is_some() {
-            cx.stop_propagation();
+            if !matches!(event.keystroke.key.as_str(), "tab" | "enter" | "space") {
+                cx.stop_propagation();
+            }
             return;
         }
         if self.modal_open() {
@@ -444,7 +450,7 @@ impl GridView {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum Surface {
     Approval,
     HostKey,

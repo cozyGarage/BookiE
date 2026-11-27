@@ -6,8 +6,54 @@ use crate::surfaces::{
 };
 use crate::*;
 use gpui::uniform_list;
+use gpui_component::FocusTrapElement as _;
 
 impl GridView {
+    fn sync_surface_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let previous = self.surface_focus.active;
+        let surface = self.top_surface();
+        if surface == previous {
+            return;
+        }
+        match (previous, surface) {
+            (None, Some(surface)) => {
+                self.surface_focus.opener = window.focused(cx);
+                window.focus(&self.surface_focus.handles[&surface], cx);
+            }
+            (Some(previous), Some(surface)) if self.surface_open(previous) => {
+                if let Some(focus) = window.focused(cx) {
+                    self.surface_focus.returns.insert(surface, (previous, focus));
+                }
+                window.focus(&self.surface_focus.handles[&surface], cx);
+            }
+            (Some(previous), Some(surface)) => {
+                let focus_is_inside = self.surface_focus.handles[&previous].contains_focused(window, cx);
+                if let Some((parent, focus)) = self.surface_focus.returns.remove(&previous)
+                    && parent == surface
+                    && focus_is_inside
+                {
+                    window.focus(&focus, cx);
+                } else if focus_is_inside {
+                    window.focus(&self.surface_focus.handles[&surface], cx);
+                }
+            }
+            (Some(_), None) => {
+                let focus_is_inside = self
+                    .surface_focus
+                    .active
+                    .is_some_and(|surface| self.surface_focus.handles[&surface].contains_focused(window, cx));
+                self.surface_focus.returns.clear();
+                if let Some(focus) = self.surface_focus.opener.take()
+                    && focus_is_inside
+                {
+                    window.focus(&focus, cx);
+                }
+            }
+            (None, None) => {}
+        }
+        self.surface_focus.active = surface;
+    }
+
     fn sync_render_state(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tab = self.tabs.current();
         window.set_window_title(&format!("{} — BookiE", tab.title()));
@@ -160,7 +206,7 @@ impl GridView {
         tooltip: impl Into<gpui::SharedString>,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> crate::surfaces::Button {
         compact_icon_button(id, name, tooltip, theme).on_click(cx.listener(move |this, _, window, cx| {
             this.run_palette_id(id, window, cx);
             cx.notify();
@@ -173,7 +219,7 @@ impl GridView {
             .map_or_else(|| label.to_string(), |command| self.labelled_tip(label, command))
     }
 
-    fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
+    fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<crate::surfaces::Button> {
         self.row_change_enabled()
             .then(|| self.grid_icon("insert-row", "plus", self.grid_command_tip("insert-row"), theme, cx))
     }
@@ -276,7 +322,7 @@ impl GridView {
             .when(compact, |actions| actions.child(self.grid_more_menu(hidden, theme, cx)))
     }
 
-    fn loaded_filter_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn loaded_filter_toggle(&self, theme: Theme, cx: &mut Context<Self>) -> crate::surfaces::Button {
         crate::surfaces::toggle_icon_button(
             "toggle-loaded-filter",
             "funnel",
@@ -381,7 +427,7 @@ impl GridView {
                 .pb_2()
                 .child(div().child(format!("COMPARE {summary}{capped}")))
                 .child(segmented(
-                    [
+                    vec![
                         segment("whole", "Whole row", !s.keyed, theme)
                             .on_click(cx.listener(|this, _, _, cx| this.compare(false, cx))),
                         segment("keyed", "Key: value", s.keyed, theme)
@@ -437,7 +483,7 @@ impl GridView {
             .child(div().flex_1().flex().flex_col().min_w_0().child(tab_row).child(content))
     }
 
-    fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<gpui::AnyElement> {
+    fn full_value_editor_overlay(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         let editing = self.cell_edit.active.as_ref().filter(|editing| editing.full_value)?;
         let column = self
             .source
@@ -446,85 +492,168 @@ impl GridView {
             .map_or("value", |column| column.name.as_str())
             .to_string();
         Some(
-            scrim(theme)
-                .id("full-value-editor-overlay")
-                .occlude()
-                .child(
-                    dialog_surface(size::FULL_VALUE_EDITOR_WIDTH, theme)
-                        .id("full-value-editor-dialog")
-                        .debug_selector(|| "full-value-editor-dialog".into())
-                        .max_w(gpui::relative(0.92))
-                        .h(px(size::FULL_VALUE_EDITOR_HEIGHT))
-                        .max_h(gpui::relative(0.9))
-                        .min_h_0()
-                        .p_3()
-                        .gap_2()
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .child(
-                                    div()
-                                        .font_weight(gpui::FontWeight::SEMIBOLD)
-                                        .child(format!("Edit {column}")),
-                                )
-                                .child(div().text_color(rgb(theme.muted_foreground)).child("Full value")),
-                        )
-                        .child(
-                            div()
-                                .id("full-value-editor-input")
-                                .flex_1()
-                                .min_h_0()
-                                .border_1()
-                                .border_color(rgb(theme.border))
-                                .child(
-                                    gpui_kit::component::input::Editor::new(&self.cell_edit.value_editor)
-                                        .h(gpui::relative(1.0)),
-                                ),
-                        )
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .justify_between()
-                                .child(
-                                    div()
-                                        .min_w_0()
-                                        .text_color(rgb(theme.muted_foreground))
-                                        .child(self.status.clone()),
-                                )
-                                .child(
-                                    div()
-                                        .flex()
-                                        .gap_2()
-                                        .debug_selector(|| "full-value-actions".into())
-                                        .child(
-                                            button(ButtonKind::Primary, "apply-full-value", "Apply", theme).on_click(
-                                                cx.listener(|this, _, window, cx| {
-                                                    this.apply_active_cell_edit(window, cx)
-                                                }),
-                                            ),
-                                        )
-                                        .child(
-                                            button(ButtonKind::Ghost, "cancel-full-value", "Cancel", theme).on_click(
-                                                cx.listener(|this, _, window, cx| {
-                                                    this.cancel_active_cell_edit(window, cx)
-                                                }),
-                                            ),
+            scrim(theme).id("full-value-editor-overlay").occlude().child(
+                dialog_surface(size::FULL_VALUE_EDITOR_WIDTH, theme)
+                    .id("full-value-editor-dialog")
+                    .debug_selector(|| "full-value-editor-dialog".into())
+                    .max_w(gpui::relative(0.92))
+                    .h(px(size::FULL_VALUE_EDITOR_HEIGHT))
+                    .max_h(gpui::relative(0.9))
+                    .min_h_0()
+                    .p_3()
+                    .gap_2()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .font_weight(gpui::FontWeight::SEMIBOLD)
+                                    .child(format!("Edit {column}")),
+                            )
+                            .child(div().text_color(rgb(theme.muted_foreground)).child("Full value")),
+                    )
+                    .child(
+                        div()
+                            .id("full-value-editor-input")
+                            .flex_1()
+                            .min_h_0()
+                            .border_1()
+                            .border_color(rgb(theme.border))
+                            .child(
+                                gpui_kit::component::input::Editor::new(&self.cell_edit.value_editor)
+                                    .h(gpui::relative(1.0)),
+                            ),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .justify_between()
+                            .child(
+                                div()
+                                    .min_w_0()
+                                    .text_color(rgb(theme.muted_foreground))
+                                    .child(self.status.clone()),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .gap_2()
+                                    .debug_selector(|| "full-value-actions".into())
+                                    .child(
+                                        button(ButtonKind::Primary, "apply-full-value", "Apply", theme).on_click(
+                                            cx.listener(|this, _, window, cx| this.apply_active_cell_edit(window, cx)),
                                         ),
-                                ),
-                        ),
-                )
-                .into_any_element(),
+                                    )
+                                    .child(
+                                        button(ButtonKind::Ghost, "cancel-full-value", "Cancel", theme).on_click(
+                                            cx.listener(|this, _, window, cx| this.cancel_active_cell_edit(window, cx)),
+                                        ),
+                                    ),
+                            ),
+                    ),
+            ),
         )
+    }
+
+    fn surface_overlays(&mut self, theme: Theme, cx: &mut Context<Self>) -> Vec<gpui::AnyElement> {
+        let full_value = self.full_value_editor_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap("full-value-editor-focus-trap", &self.surface_focus.full_value)
+                .into_any_element()
+        });
+        let bar = self
+            .import_bar(theme, cx)
+            .or_else(|| self.export_file_bar(theme, cx))
+            .or_else(|| self.schema_diagram_bar(theme, cx))
+            .or_else(|| self.save_bar(theme, cx))
+            .or_else(|| self.insert_form(theme, cx))
+            .or_else(|| self.data_compare_bar(theme, cx))
+            .or_else(|| self.one_shot_bar(theme, cx))
+            .map(|bar| {
+                let dialog = bar_dialog(theme, bar);
+                if let Some(surface) = self.top_surface() {
+                    dialog
+                        .focus_trap("bar-dialog-focus-trap", &self.surface_focus.handles[&surface])
+                        .into_any_element()
+                } else {
+                    dialog.into_any_element()
+                }
+            });
+        let notifications = self.notifications_list(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap(
+                    "notifications-focus-trap",
+                    &self.surface_focus.handles[&Surface::Notifications],
+                )
+                .into_any_element()
+        });
+        let connection = self.connection_form.open.then(|| {
+            self.connection_dialog(theme, cx)
+                .focus_trap(
+                    "connection-dialog-focus-trap",
+                    &self.surface_focus.handles[&Surface::ConnectionForm],
+                )
+                .into_any_element()
+        });
+        let delete_connection = self.delete_connection_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap(
+                    "delete-connection-focus-trap",
+                    &self.surface_focus.handles[&Surface::DeleteConnection],
+                )
+                .into_any_element()
+        });
+        let approval = self.approval_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap("approval-focus-trap", &self.surface_focus.handles[&Surface::Approval])
+                .into_any_element()
+        });
+        let host_key = self.host_key_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap("host-key-focus-trap", &self.surface_focus.handles[&Surface::HostKey])
+                .into_any_element()
+        });
+        let close_confirm = self.close_confirm_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap(
+                    "close-confirm-focus-trap",
+                    &self.surface_focus.handles[&Surface::CloseConfirm],
+                )
+                .into_any_element()
+        });
+        let cancel_process = self.cancel_process_overlay(theme, cx).map(|dialog| {
+            dialog
+                .focus_trap(
+                    "cancel-process-focus-trap",
+                    &self.surface_focus.handles[&Surface::CancelProcess],
+                )
+                .into_any_element()
+        });
+        vec![
+            full_value,
+            bar,
+            notifications,
+            connection,
+            delete_connection,
+            approval,
+            host_key,
+            close_confirm,
+            cancel_process,
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
     }
 }
 
 impl Render for GridView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_row_inspector(cx);
+        self.sync_surface_focus(window, cx);
         self.sync_render_state(window, cx);
         if std::mem::take(&mut self.connection_form.focus_on_open) {
             let name = gpui::Focusable::focus_handle(self.connection_form.name.read(cx), cx);
@@ -533,12 +662,12 @@ impl Render for GridView {
         if std::mem::take(&mut self.connection_form.restore_focus) {
             window.focus(&self.focus, cx);
         }
+        if std::mem::take(&mut self.restore_grid_focus) {
+            window.focus(&self.focus, cx);
+        }
         self.restore_notifications_focus(window, cx);
         if let Some(focus) = self.connection_form.focus_validation.take() {
             window.focus(&focus, cx);
-        }
-        if self.approval.current.is_some() && !self.focus.is_focused(window) {
-            window.focus(&self.focus, cx);
         }
         let theme = Theme::current(cx);
         let strip = self.grid_control_strip(theme, cx);
@@ -556,21 +685,7 @@ impl Render for GridView {
         } else {
             None
         };
-        let full_value_editor = self.full_value_editor_overlay(theme, cx);
-        let approval = self.approval_overlay(theme, cx);
-        let host_key = self.host_key_overlay(theme, cx);
-        let close_confirm = self.close_confirm_overlay(theme, cx);
-        let cancel_process = self.cancel_process_overlay(theme, cx);
-        let connection_dialog = self.connection_form.open.then(|| self.connection_dialog(theme, cx));
-        let bar_dialog = self
-            .import_bar(theme, cx)
-            .or_else(|| self.export_file_bar(theme, cx))
-            .or_else(|| self.schema_diagram_bar(theme, cx))
-            .or_else(|| self.save_bar(theme, cx))
-            .or_else(|| self.insert_form(theme, cx))
-            .or_else(|| self.data_compare_bar(theme, cx))
-            .or_else(|| self.one_shot_bar(theme, cx))
-            .map(|bar| bar_dialog(theme, bar));
+        let surface_overlays = self.surface_overlays(theme, cx);
         let insert_form = self
             .structure_info_panel(theme, cx)
             .or_else(|| self.late_bars(theme, cx));
@@ -606,6 +721,7 @@ impl Render for GridView {
                 root.font_family(self.fonts.settings.ui_family.clone())
             })
             .track_focus(&self.focus)
+            .tab_group()
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_move(cx.listener(Self::drag_resize))
             .on_mouse_up(
@@ -624,15 +740,7 @@ impl Render for GridView {
             .children(self.row_menu_overlay())
             .child(self.status_bar(theme, f32::from(window.viewport_size().width), cx))
             .children(palette)
-            .children(full_value_editor)
-            .children(bar_dialog)
-            .children(self.notifications_list(theme, cx))
-            .children(connection_dialog)
-            .children(self.delete_connection_overlay(theme, cx))
-            .children(approval)
-            .children(host_key)
-            .children(close_confirm)
-            .children(cancel_process)
+            .children(surface_overlays)
     }
 }
 

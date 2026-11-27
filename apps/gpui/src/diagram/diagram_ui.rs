@@ -375,6 +375,9 @@ impl GridView {
     }
 
     pub(crate) fn prepare_tools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.focus_import_input(window, cx);
+        self.focus_export_file_input(window, cx);
+        self.focus_insert_form_input(window, cx);
         self.focus_set_cells_input(window, cx);
         self.focus_value_search_input(window, cx);
         self.focus_schema_diagram_input(window, cx);
@@ -580,7 +583,7 @@ impl GridView {
             let title = format!("{label} {}", diagram_table_name(table));
             Some(
                 compact_button(ButtonKind::Ghost, ("diagram-link", other), title, theme)
-                    .tooltip(crate::surfaces::tip(relation.name.clone()))
+                    .tooltip(relation.name.clone())
                     .on_click(cx.listener(move |this, _, _, cx| this.select_diagram_card(other, true, cx))),
             )
         });

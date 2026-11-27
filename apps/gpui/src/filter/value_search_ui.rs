@@ -171,7 +171,7 @@ impl GridView {
             }))
         };
         let modes = segmented(
-            [
+            vec![
                 mode("value-search-exact", "Exact match", true),
                 mode("value-search-contains", "Contains", false),
             ],

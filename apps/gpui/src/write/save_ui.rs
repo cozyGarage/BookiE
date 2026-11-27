@@ -723,7 +723,7 @@ impl GridView {
                     marker.child(
                         compact_button(ButtonKind::Ghost, "save-pending-edits", "Save", theme)
                             .debug_selector(|| "save-pending-edits".into())
-                            .tooltip(tip("Review the statements, then save or cancel"))
+                            .tooltip("Review the statements, then save or cancel")
                             .on_click(cx.listener(|this, _, _, cx| this.request_save(cx))),
                     )
                 })
@@ -758,7 +758,7 @@ impl GridView {
                                 pending.confirm,
                                 theme,
                             )
-                            .tooltip(tip("Run these statements in one transaction"))
+                            .tooltip("Run these statements in one transaction")
                             .on_click(cx.listener(|this, _, _, cx| this.confirm_save(cx))),
                         )
                         .child(

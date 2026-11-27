@@ -1,1 +1,0 @@
-GPUI menus show each command's shortcut, a check for the current choice and destructive commands in red at the end; toolbars use icons with tooltips, one name per command, and narrow grids keep Add row, Compare and Show hidden columns in the More menu.
