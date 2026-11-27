@@ -2,6 +2,25 @@
 
 use bookie_data_integrity::{judge_and_report, load_corpus, postgres, routes, runner};
 
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn postgres_workbook_null_is_refused_instead_of_written_as_empty_text() {
+    let mut corpus = load_corpus("postgres");
+    corpus.cases.retain(|case| case.id == "bpchar");
+    assert_eq!(corpus.cases.len(), 1);
+    let server = postgres::start("16-alpine", "pg16").await;
+    let results = routes::run_routes(&server, &corpus, true).await;
+    let import = results
+        .iter()
+        .find(|result| result.route == bookie_data_integrity::corpus::Route::ImportXlsx)
+        .unwrap();
+    assert!(
+        matches!(&import.outcome, bookie_data_integrity::report::Outcome::Refused(errors) if errors.iter().any(|error| error.contains("ambiguous"))),
+        "{import:?}"
+    );
+    judge_and_report(&corpus, &results).assert_clean();
+}
+
 async fn read_corpus_on(tag: &str, label: &str) {
     let corpus = load_corpus("postgres");
     let server = postgres::start(tag, label).await;

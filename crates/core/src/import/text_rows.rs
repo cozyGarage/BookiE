@@ -7,6 +7,7 @@ pub struct TextRows {
     wide_ends: Vec<u32>,
     row_ends: Vec<RowEnd>,
     workbook_cells: Vec<WorkbookCell>,
+    workbook: bool,
     width: usize,
 }
 
@@ -52,6 +53,7 @@ pub struct TextRow<'a> {
     text: &'a str,
     cell_ends: CellEnds<'a>,
     workbook_cells: &'a [WorkbookCell],
+    workbook: bool,
     width: usize,
 }
 
@@ -87,6 +89,7 @@ impl TextRows {
         &mut self,
         fields: impl IntoIterator<Item = (&'a str, Option<WorkbookValue>)>,
     ) -> Result<(), ImportError> {
+        self.workbook = true;
         let row = self.len();
         let mut cells = std::mem::take(&mut self.workbook_cells);
         let result = self.push(fields.into_iter().enumerate().map(|(column, (text, native))| {
@@ -148,6 +151,7 @@ impl TextRows {
             cell_ends,
             workbook_cells: &self.workbook_cells[self.workbook_cells.partition_point(|cell| cell.row < index)
                 ..self.workbook_cells.partition_point(|cell| cell.row <= index)],
+            workbook: self.workbook,
             width: self.width,
         }
     }
@@ -167,6 +171,9 @@ impl TextRows {
 }
 
 impl<'a> TextRow<'a> {
+    pub(super) fn is_workbook(self) -> bool {
+        self.workbook
+    }
     pub fn len(self) -> usize {
         self.width
     }
