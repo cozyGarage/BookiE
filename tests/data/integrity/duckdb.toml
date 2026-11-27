@@ -153,11 +153,11 @@ literals = ["'00:00:00'", "'13:45:30.123456'", "'23:59:59.999999'"]
 carrier = "Time"
 rule = "temporal"
 known_failing = [
-    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
 ]
 
 [[case]]
@@ -182,16 +182,17 @@ literals = ["'2024-02-29 13:45:30.123456+05:30'", "'1970-01-01 00:00:00+00'", "'
 carrier = "TimestampTz"
 rule = "instant"
 known_failing = [
-    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
 ]
 
 [[case]]
 id = "interval"
 type = "INTERVAL"
+note = "BookiE spells intervals as months, days and microseconds; the server casts that text back to compare it with its own rendering."
 literals = ["INTERVAL '1 year 2 months 3 days 04:05:06.789'", "INTERVAL '-1 day'", "INTERVAL '0 seconds'", "INTERVAL '1 month -1 day'"]
 carrier = "Text"
 rule = "server_cast"
@@ -207,17 +208,23 @@ rule = "exact"
 id = "json"
 type = "JSON"
 literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'[1, 2.50, 1e400]'", "'null'"]
-carrier = "Text"
+carrier = "JsonText"
 rule = "exact"
-note = "DuckDB JSON keeps its source text exactly; BookiE carries it as plain text, not JsonText."
+note = "DuckDB JSON keeps its source text exactly."
 known_failing = [
-    { route = "import_csv", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "import_xlsx", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "paste", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "set_cells", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "insert_row", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "noop_edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
+    { route = "query", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
+    { route = "browse", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
+    { route = "param_where", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
+    { route = "param_select", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
+    { route = "import_csv", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "import_xlsx", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "paste", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "set_cells", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "insert_row", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "noop_edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "export_json", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
+    { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
 ]
 
 [[case]]
@@ -226,7 +233,7 @@ type = "INTEGER[]"
 literals = ["[1, 2, 3]", "[]", "[NULL, 1]", "NULL"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
 
 [[case]]
 id = "nested-list"
@@ -234,7 +241,7 @@ type = "INTEGER[][]"
 literals = ["[[1, 2], [3], []]"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
 
 [[case]]
 id = "struct"
@@ -242,7 +249,7 @@ type = "STRUCT(a INTEGER, b VARCHAR)"
 literals = ["{'a': 1, 'b': 'x y'}", "{'a': NULL, 'b': ''}"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+expect_error = [{ route = "param_select", expect = "policy denied", reason = "an undecodable cell cannot be bound back as a parameter" }]
 
 [[case]]
 id = "map"
@@ -250,7 +257,7 @@ type = "MAP(VARCHAR, INTEGER)"
 literals = ["MAP {'k': 1, 'z': 2}", "MAP {}"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
 
 [[case]]
 id = "union"
@@ -258,12 +265,10 @@ type = "UNION(num INTEGER, str VARCHAR)"
 literals = ["union_value(num := 2)", "union_value(str := 'x')"]
 carrier = "Undecodable"
 rule = "refusal"
-skip = [
-    { route = "param_select", reason = "a refused cell cannot be bound back as a parameter" },
-]
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
 known_failing = [
-    { route = "import_csv", issue = 4219, reason = "import stores the undecodable export marker as a value" },
-    { route = "import_xlsx", issue = 4219, reason = "import stores the undecodable export marker as a value" },
+    { route = "import_csv", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
+    { route = "import_xlsx", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
 ]
 
 [[case]]
@@ -280,13 +285,121 @@ literals = ["'101010'", "'0'"]
 carrier = "Text"
 rule = "exact"
 known_failing = [
-    { route = "query", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "browse", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_where", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_select", issue = 4214, reason = "binding the internal bytes back stores a different bit string" },
-    { route = "copy_tsv", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_csv", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json_lines", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_sql", issue = 4214, reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "query", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "browse", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "param_where", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "param_select", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "binding the internal bytes back stores a different bit string" },
+    { route = "copy_tsv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_csv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json_lines", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_sql", issue = 4214, expect = "server stored", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+]
+
+[[case]]
+id = "smallint"
+type = "SMALLINT"
+literals = ["-32768", "32767"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "integer"
+type = "INTEGER"
+literals = ["-2147483648", "2147483647"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "usmallint"
+type = "USMALLINT"
+literals = ["0", "65535"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "utinyint"
+type = "UTINYINT"
+literals = ["0", "255"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "decimal-4-2"
+type = "DECIMAL(4,2)"
+literals = ["12.34", "-99.99", "0.00", "0.10"]
+carrier = "Decimal"
+rule = "exact"
+note = "DECIMAL(4,2) is stored as a 16-bit integer."
+
+[[case]]
+id = "decimal-9-3"
+type = "DECIMAL(9,3)"
+literals = ["123456.789", "-0.001", "0"]
+carrier = "Decimal"
+rule = "exact"
+note = "DECIMAL(9,3) is stored as a 32-bit integer."
+
+[[case]]
+id = "timestamp-s"
+type = "TIMESTAMP_S"
+literals = ["'2024-02-29 13:45:30'", "'1970-01-01 00:00:00'"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "timestamp-ms"
+type = "TIMESTAMP_MS"
+literals = ["'2024-02-29 13:45:30.123'", "'1969-12-31 23:59:59.999'"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "timestamp-infinity"
+type = "TIMESTAMP"
+literals = ["'infinity'", "'-infinity'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "timetz"
+type = "TIMETZ"
+literals = ["'13:45:30+05:30'", "'00:00:00-12'"]
+carrier = "Text"
+rule = "exact"
+known_failing = [
+    { route = "query", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
+    { route = "browse", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
+    { route = "param_where", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
+    { route = "param_select", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
+    { route = "copy_tsv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_csv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_json", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_json_lines", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_sql", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
+    { route = "import_xlsx", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
+]
+
+[[case]]
+id = "fixed-array"
+type = "INTEGER[3]"
+literals = ["[1, 2, 3]", "[NULL, 0, -1]"]
+carrier = "Undecodable"
+rule = "refusal"
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
+
+[[case]]
+id = "timestamptz-session-zone"
+type = "TIMESTAMPTZ"
+bookie_session = ["TimeZone = 'America/New_York'"]
+literals = ["'2024-02-29 13:45:30.123456+05:30'", "'2024-11-03 05:30:00+00'"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "BookiE's session sets TimeZone first, as a user would in the editor; the stored instants must not move."
+known_failing = [
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
 ]

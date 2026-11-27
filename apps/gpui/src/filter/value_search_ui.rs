@@ -3,7 +3,7 @@ use bookie_app_services::value_search::{SearchOptions, SearchReport, TableOutcom
 use bookie_core::SearchMode;
 use bookie_gpui::messages::MessageKind;
 
-use crate::surfaces::{ButtonKind, button, task_bar};
+use crate::surfaces::{ButtonKind, button, segment, segmented, task_bar};
 use crate::*;
 
 fn first_match(outcome: &TableOutcome) -> Option<String> {
@@ -162,22 +162,24 @@ impl GridView {
         if !self.search.values.open {
             return None;
         }
-        let mode = if self.search.values.exact {
-            "Exact match"
-        } else {
-            "Contains"
+        let exact = self.search.values.exact;
+        let mode = |id: &'static str, label: &'static str, on: bool| {
+            segment(id, label, on == exact, theme).on_click(cx.listener(move |this, _, _, cx| {
+                this.search.values.exact = on;
+                cx.notify();
+            }))
         };
+        let modes = segmented(
+            [
+                mode("value-search-exact", "Exact match", true),
+                mode("value-search-contains", "Contains", false),
+            ],
+            theme,
+        );
         Some(
             task_bar("Search database values", theme)
                 .child(div().flex_1().min_w_0().child(input))
-                .child(
-                    button(ButtonKind::Ghost, "value-search-mode", mode, theme).on_click(cx.listener(
-                        |this, _, _, cx| {
-                            this.search.values.exact = !this.search.values.exact;
-                            cx.notify();
-                        },
-                    )),
-                )
+                .child(modes)
                 .child(
                     button(ButtonKind::Primary, "run-value-search", "Search", theme)
                         .on_click(cx.listener(|this, _, _, cx| this.run_value_search(cx))),

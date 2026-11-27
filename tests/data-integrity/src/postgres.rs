@@ -5,7 +5,7 @@ use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 
-use crate::server::{Cli, ContainerCli, Dialect, Server, exec, labelled};
+use crate::server::{Cli, ContainerCli, Dialect, Server, SessionVariant, SettingCheck, exec, labelled, setting_parts};
 
 pub const DATABASE: &str = "integrity";
 
@@ -24,7 +24,49 @@ pub static DIALECT: Dialect = Dialect {
     drop_table: "DROP TABLE IF EXISTS {table} CASCADE",
     schema: Some("public"),
     epoch_in_nanos: false,
+    session_variant,
+    cast_query,
 };
+
+const ROLE_PASSWORD: &str = "integrity";
+
+fn session_variant(role: &str, settings: &[String]) -> SessionVariant {
+    let mut setup = vec![
+        format!("CREATE ROLE {role} LOGIN PASSWORD '{ROLE_PASSWORD}'"),
+        format!("GRANT pg_read_all_data TO {role}"),
+    ];
+    setup.extend(
+        settings
+            .iter()
+            .map(|setting| format!("ALTER ROLE {role} SET {setting}")),
+    );
+    let checks = settings
+        .iter()
+        .map(|setting| {
+            let (name, expected) = setting_parts(setting);
+            SettingCheck {
+                sql: format!("SELECT current_setting('{name}')"),
+                expected,
+                through_bookie: true,
+            }
+        })
+        .collect();
+    SessionVariant {
+        setup,
+        teardown: Vec::new(),
+        login: Some((role.to_string(), ROLE_PASSWORD.to_string())),
+        bookie_setup: Vec::new(),
+        checks,
+    }
+}
+
+fn cast_query(settings: &[String], cast: &str, render: &str) -> String {
+    if settings.is_empty() {
+        return format!("SELECT {render} FROM (SELECT {cast} AS v) AS cast_back");
+    }
+    let set: String = settings.iter().map(|setting| format!("SET {setting}; ")).collect();
+    format!("{set}CREATE TEMP TABLE cast_back AS SELECT {cast} AS v; RESET ALL; SELECT {render} FROM cast_back")
+}
 
 pub fn quote_text(text: &str) -> String {
     format!("'{}'", text.replace('\'', "''"))

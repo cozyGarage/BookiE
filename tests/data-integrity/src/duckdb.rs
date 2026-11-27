@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use bookie_core::ConnectOptions;
 
-use crate::server::{Dialect, Referee, Server, SqlFuture};
+use crate::server::{Dialect, Referee, Server, SessionVariant, SettingCheck, SqlFuture, setting_parts};
 
 pub static DIALECT: Dialect = Dialect {
     driver_id: "duckdb",
@@ -19,7 +19,34 @@ pub static DIALECT: Dialect = Dialect {
     drop_table: "DROP TABLE IF EXISTS {table}",
     schema: None,
     epoch_in_nanos: true,
+    session_variant,
+    cast_query,
 };
+
+fn session_variant(_table: &str, settings: &[String]) -> SessionVariant {
+    SessionVariant {
+        setup: Vec::new(),
+        teardown: Vec::new(),
+        login: None,
+        bookie_setup: settings.iter().map(|setting| format!("SET {setting}")).collect(),
+        checks: settings
+            .iter()
+            .map(|setting| {
+                let (name, expected) = setting_parts(setting);
+                SettingCheck {
+                    sql: format!("SELECT current_setting('{name}')"),
+                    expected,
+                    through_bookie: true,
+                }
+            })
+            .collect(),
+    }
+}
+
+fn cast_query(settings: &[String], cast: &str, render: &str) -> String {
+    let set: String = settings.iter().map(|setting| format!("SET {setting}; ")).collect();
+    format!("{set}SELECT {render} FROM (SELECT {cast} AS v) AS cast_back")
+}
 
 pub fn quote_text(text: &str) -> String {
     format!("'{}'", text.replace('\'', "''"))
@@ -47,11 +74,18 @@ impl Referee for DuckdbReferee {
 
 fn run(path: &Path, sql: &str) -> Result<String, String> {
     let connection = duckdb::Connection::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
-    if !sql.trim_start().to_ascii_uppercase().starts_with("SELECT") {
-        connection.execute_batch(sql).map_err(|error| error.to_string())?;
+    let (prefix, last) = match sql.rfind("; SELECT ") {
+        Some(at) => (&sql[..at], &sql[at + 2..]),
+        None => ("", sql),
+    };
+    if !prefix.is_empty() {
+        connection.execute_batch(prefix).map_err(|error| error.to_string())?;
+    }
+    if !last.trim_start().to_ascii_uppercase().starts_with("SELECT") {
+        connection.execute_batch(last).map_err(|error| error.to_string())?;
         return Ok(String::new());
     }
-    let mut statement = connection.prepare(sql).map_err(|error| error.to_string())?;
+    let mut statement = connection.prepare(last).map_err(|error| error.to_string())?;
     let lines = statement
         .query_map([], |row| row.get::<_, String>(0))
         .map_err(|error| error.to_string())?

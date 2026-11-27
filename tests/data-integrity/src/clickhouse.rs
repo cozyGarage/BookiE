@@ -6,7 +6,7 @@ use testcontainers::core::{IntoContainerPort, WaitFor};
 use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, ImageExt};
 
-use crate::server::{Cli, ContainerCli, Dialect, Server, labelled};
+use crate::server::{Cli, ContainerCli, Dialect, Server, SessionVariant, SettingCheck, labelled, setting_parts};
 
 const PASSWORD: &str = "bookie";
 
@@ -25,7 +25,44 @@ pub static DIALECT: Dialect = Dialect {
     drop_table: "DROP TABLE IF EXISTS {table}",
     schema: Some("default"),
     epoch_in_nanos: true,
+    session_variant,
+    cast_query,
 };
+
+const ROLE_PASSWORD: &str = "integrity";
+
+fn session_variant(role: &str, settings: &[String]) -> SessionVariant {
+    let profile = settings.join(", ");
+    SessionVariant {
+        setup: vec![
+            format!("DROP USER IF EXISTS {role}"),
+            format!("CREATE USER {role} IDENTIFIED WITH plaintext_password BY '{ROLE_PASSWORD}' SETTINGS {profile}"),
+            format!("GRANT SELECT ON default.* TO {role}"),
+        ],
+        teardown: vec![format!("DROP USER IF EXISTS {role}")],
+        login: Some((role.to_string(), ROLE_PASSWORD.to_string())),
+        bookie_setup: Vec::new(),
+        checks: settings
+            .iter()
+            .map(|setting| {
+                let (name, expected) = setting_parts(setting);
+                SettingCheck {
+                    sql: format!("SELECT getSetting('{name}')"),
+                    expected,
+                    through_bookie: true,
+                }
+            })
+            .collect(),
+    }
+}
+
+fn cast_query(settings: &[String], cast: &str, render: &str) -> String {
+    let query = format!("SELECT {render} FROM (SELECT {cast} AS v)");
+    if settings.is_empty() {
+        return query;
+    }
+    format!("{query} SETTINGS {}", settings.join(", "))
+}
 
 pub fn quote_text(text: &str) -> String {
     let escaped = text.replace('\\', "\\\\").replace('\'', "\\'").replace('\0', "\\0");
@@ -49,6 +86,7 @@ impl Cli for ClickhouseClient {
             "--password",
             PASSWORD,
             "--multiquery",
+            "--output_format_json_quote_64bit_integers=0",
             "--format",
             "TSVRaw",
             "-q",
@@ -59,7 +97,7 @@ impl Cli for ClickhouseClient {
     }
 }
 
-pub async fn start(label: &str) -> Server {
+pub async fn start(label: &str, time_zone: Option<&str>) -> Server {
     let image = GenericImage::new("clickhouse/clickhouse-server", "24.8")
         .with_exposed_port(8123.tcp())
         .with_wait_for(WaitFor::http(
@@ -70,7 +108,8 @@ pub async fn start(label: &str) -> Server {
         .with_env_var("CLICKHOUSE_USER", "default")
         .with_env_var("CLICKHOUSE_PASSWORD", PASSWORD)
         .with_env_var("CLICKHOUSE_DB", "default")
-        .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1");
+        .with_env_var("CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT", "1")
+        .with_env_var("TZ", time_zone.unwrap_or("UTC"));
     let container = labelled(image)
         .with_startup_timeout(Duration::from_secs(180))
         .start()
@@ -95,6 +134,8 @@ pub async fn start(label: &str) -> Server {
         }),
     };
     wait_until_queryable(&server).await;
+    let zone = server.run_sql("SELECT timezone()").await.expect("server time zone");
+    assert_eq!(zone.trim(), time_zone.unwrap_or("UTC"), "clickhouse server time zone");
     server
 }
 

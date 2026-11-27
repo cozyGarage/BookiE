@@ -29,9 +29,12 @@ sqlx = { workspace = true, features = ["sqlite-unbundled"] }
 tempfile.workspace = true
 testcontainers = { workspace = true, features = ["http_wait_plain"] }
 testcontainers-modules = { workspace = true, features = ["postgres", "mysql", "redis"] }
-tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+tokio.workspace = true
 toml.workspace = true
 uuid.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 
 [lints.clippy]
 unwrap_used = "allow"

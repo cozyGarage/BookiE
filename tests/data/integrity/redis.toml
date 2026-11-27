@@ -75,17 +75,20 @@ note = "Order and duplicates are part of a list."
 id = "set"
 setup = [["SADD", "{key}", "a", "b", "", "é"]]
 read = ["SMEMBERS", "{key}"]
+unordered = true
 
 [[case]]
 id = "zset"
 setup = [["ZADD", "{key}", "1.5", "a", "-0", "b", "0.1", "c", "1e-320", "d", "inf", "e", "-inf", "f", "9007199254740993", "g"]]
 read = ["ZRANGE", "{key}", "0", "-1", "WITHSCORES"]
+scores = "with_scores"
 note = "Scores are doubles: 0.1, a subnormal, infinities and an integer past 2^53."
 
 [[case]]
 id = "zscore"
 setup = [["ZADD", "{key}", "0.30000000000000004", "m"]]
 read = ["ZSCORE", "{key}", "m"]
+scores = "single"
 
 [[case]]
 id = "stream"
@@ -98,3 +101,38 @@ setup = [["DEL", "{key}"]]
 read = ["GET", "{key}"]
 skip = [{ route = "browse", reason = "a missing key has no browse row" }]
 note = "A missing key reads as nil, distinct from the empty string."
+
+[[case]]
+id = "integer-past-2-53"
+setup = [["SET", "{key}", "v"], ["PEXPIREAT", "{key}", "9007199254740993"]]
+read = ["PEXPIRETIME", "{key}"]
+note = "An integer reply past 2^53; the referee reads it as text, never through a double."
+
+[[case]]
+id = "string-past-2-53"
+setup = [["SET", "{key}", "9007199254740992"], ["INCR", "{key}"]]
+read = ["GET", "{key}"]
+
+[[case]]
+id = "large-set"
+setup = [["SADD", "{key}", "seq:1000:m"]]
+read = ["SMEMBERS", "{key}"]
+unordered = true
+note = "1000 members use the hashtable encoding, whose order is not insertion order; SMEMBERS is unordered."
+
+[[case]]
+id = "large-hash"
+setup = [["HSET", "{key}", "pairs:600:f"]]
+read = ["HGETALL", "{key}"]
+unordered = true
+
+[[case]]
+id = "large-list"
+setup = [["RPUSH", "{key}", "seq:5000:e"]]
+read = ["LRANGE", "{key}", "0", "-1"]
+
+[[case]]
+id = "zset-insert-order"
+setup = [["ZADD", "{key}", "1", "a", "2.5", "b"], ["ZADD", "{key}", "0.1", "c"]]
+read = ["ZRANGE", "{key}", "0", "-1", "WITHSCORES"]
+scores = "with_scores"

@@ -34,7 +34,7 @@ carrier = "Text"
 rule = "exact"
 note = "SQLite TEXT keeps NUL; the referee hex-encodes the stored bytes."
 known_failing = [
-    { route = "copy_tsv", issue = 4221, reason = "pasting a quoted TSV cell keeps the formula guard" },
+    { route = "copy_tsv", issue = 4221, expect = "BookiE \"'", reason = "pasting a quoted TSV cell keeps the formula guard" },
 ]
 
 [[case]]
@@ -60,8 +60,8 @@ rule = "exact"
 by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
 note = "NUMERIC affinity converts some text to numbers; the storage class the engine chose (typeof) decides the expected carrier."
 known_failing = [
-    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "import_xlsx", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_xlsx", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
 ]
 
 [[case]]
@@ -78,9 +78,9 @@ skip = [
     { route = "insert_row", reason = "value contract: a new or NULL SQLite cell with no declared type stores entered text as TEXT; noop_edit covers existing cells" },
 ]
 known_failing = [
-    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "import_xlsx", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "noop_edit", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_xlsx", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "noop_edit", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
 ]
 
 [[case]]
@@ -151,12 +151,12 @@ rule = "temporal"
 param_carrier = "Text"
 note = "SELECT ? has no declared type, so the bound time comes back as text; the bind spells fractions with three digits, so only trailing zeros may differ."
 known_failing = [
-    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "export_sql", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
-    { route = "import_csv", issue = 4220, reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "export_sql", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
 ]
 
 [[case]]
@@ -184,3 +184,25 @@ literals = ["'1.50'", "'12345678.90'", "'0.10'"]
 carrier = "Float"
 rule = "float"
 note = "DECIMAL has NUMERIC affinity, so the engine stores a REAL; the stored double is the value, not the declared scale."
+
+[[case]]
+id = "text-invalid-utf8"
+type = "TEXT"
+literals = ["CAST(X'FF' AS TEXT)", "CAST(X'61C3' AS TEXT)", "CAST(X'C328' AS TEXT)"]
+carrier = "Bytes"
+rule = "bytes"
+note = "SQLite TEXT can hold bytes that are not UTF-8; they must stay exact bytes, never replacement characters."
+known_failing = [
+    { route = "export_sql", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_csv", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+    { route = "import_xlsx", issue = 4220, expect = "server stored", reason = "SQLite writes change the storage class or stored spelling" },
+]
+
+[[case]]
+id = "integer-overflow-to-real"
+type = "INTEGER"
+literals = ["9223372036854775808", "-9223372036854775809", "1"]
+carrier = "Float"
+rule = "float"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" } }
+note = "A literal past i64 is stored as REAL even in an INTEGER column; the storage class decides the carrier."

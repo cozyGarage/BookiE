@@ -180,7 +180,7 @@ fn the_query_toolbar_keeps_its_tools_in_place_while_a_query_runs(cx: &mut TestAp
     let (view, cx) = crate::ui_tests::open(cx);
     cx.simulate_keystrokes("ctrl-t");
     cx.run_until_parked();
-    for (width, tools) in [(NARROW, "Editor tools"), (WIDE, "Tools")] {
+    for (width, tools) in [(NARROW, "SQL editor tools"), (WIDE, "SQL editor tools")] {
         cx.simulate_resize(gpui::size(gpui::px(width), gpui::px(800.0)));
         let mut positions = Vec::new();
         for (running, selected) in [(false, false), (true, false), (false, true)] {

@@ -39,13 +39,13 @@ literals = ["0", "-0.0", "0.00", "0.000", "1.50", "0.000000000000000000000000000
 carrier = "Decimal"
 rule = "exact"
 known_failing = [
-    { route = "param_select", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "import_csv", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "import_xlsx", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "edit", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "paste", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "set_cells", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
-    { route = "insert_row", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "param_select", issue = 4206, ids = [2, 3, 4], expect = "BookiE \"0\"", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "import_csv", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "import_xlsx", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "edit", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "paste", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "set_cells", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
+    { route = "insert_row", issue = 4206, expect = "server stored", reason = "a bound zero Decimal is encoded with scale 0" },
 ]
 
 [[case]]
@@ -124,7 +124,7 @@ carrier = "Text"
 rule = "exact"
 note = "char(n) output keeps the blank padding; the referee uses the type output function, not a text cast that strips it."
 known_failing = [
-    { route = "import_xlsx", issue = 4222, reason = "XLSX export then import turns NULL into empty text" },
+    { route = "import_xlsx", issue = 4222, expect = "server stored", reason = "XLSX export then import turns NULL into empty text" },
 ]
 
 [[case]]
@@ -134,7 +134,7 @@ literals = ["'é'", "'Z'", "'a'"]
 carrier = "Text"
 rule = "exact"
 param = "SELECT $1::text"
-note = "The policy parser does not parse COLLATE after a cast and a read-only session refuses an unparsed statement, so the bound value is selected as plain text."
+note = "The policy parser does not parse COLLATE after a cast (#4229) and a read-only session refuses an unparsed statement, so the bound value is selected as plain text."
 
 [[case]]
 id = "name"
@@ -195,11 +195,11 @@ literals = ["'00:00:00'", "'13:45:30'", "'13:45:30.5'", "'23:59:59.999999'", "NU
 carrier = "Time"
 rule = "temporal"
 known_failing = [
-    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
 ]
 
 [[case]]
@@ -252,11 +252,11 @@ carrier = "TimestampTz"
 rule = "instant"
 note = "DST gap and fold literals are resolved by the server; the referee is the stored instant, not a guess."
 known_failing = [
-    { route = "edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "paste", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "set_cells", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "insert_row", issue = 4217, reason = "edit and copy text drop fractional seconds" },
-    { route = "noop_edit", issue = 4217, reason = "edit and copy text drop fractional seconds" },
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
 ]
 
 [[case]]
@@ -288,13 +288,13 @@ carrier = "JsonText"
 rule = "exact"
 note = "json keeps its source text exactly: key order, duplicate keys, number spelling and whitespace."
 known_failing = [
-    { route = "edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "paste", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "set_cells", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "insert_row", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "noop_edit", issue = 4218, reason = "the write binds a re-serialized JSON document" },
-    { route = "export_json", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
-    { route = "export_json_lines", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+    { route = "edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "paste", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "set_cells", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "insert_row", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "noop_edit", issue = 4218, expect = "server stored", reason = "the write binds a re-serialized JSON document" },
+    { route = "export_json", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+    { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
 ]
 
 [[case]]
@@ -305,8 +305,8 @@ carrier = "Json"
 rule = "json"
 note = "jsonb is normalized by the server (key order, duplicate keys); the referee is that normalized document."
 known_failing = [
-    { route = "export_json", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
-    { route = "export_json_lines", issue = 4223, reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+    { route = "export_json", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
+    { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export cannot tell a JSON null document or json text from SQL NULL or text" },
 ]
 
 [[case]]
@@ -315,6 +315,7 @@ type = "integer[]"
 literals = ["'{1,2,3}'", "'{}'", "'{NULL,1}'", "'{{1,2},{3,4}}'", "'[0:1]={5,6}'", "NULL"]
 carrier = "Text"
 rule = "server_cast"
+note = "Arrays are an exact text fallback. server_cast lets the server parse BookiE's text back to integer[], so any spelling of the same array, bounds and NULL elements included, compares equal."
 
 [[case]]
 id = "text-array"
@@ -322,6 +323,7 @@ type = "text[]"
 literals = ["'{\"a,b\",\"NULL\",NULL,\"\"}'", "'{\"quote\\\"d\",\"back\\\\slash\"}'", "ARRAY['é', '😀']"]
 carrier = "Text"
 rule = "server_cast"
+note = "The server parses BookiE's array text back, so quoting choices compare equal while the string 'NULL', a NULL element and an empty string stay distinct."
 
 [[case]]
 id = "numeric-array"
@@ -329,6 +331,7 @@ type = "numeric[]"
 literals = ["'{1.50,-0.001,123456789012345678901234567890.1}'"]
 carrier = "Text"
 rule = "server_cast"
+note = "Unconstrained numeric[] keeps each element's scale; the cast back has no typmod, so 1.50 must come back as 1.50."
 
 [[case]]
 id = "enum"
@@ -338,7 +341,7 @@ literals = ["'sad'", "'with space'", "''", "NULL"]
 carrier = "Text"
 rule = "exact"
 known_failing = [
-    { route = "paste", issue = 4224, reason = "pasting an empty value stores NULL" },
+    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
 ]
 
 [[case]]
@@ -432,7 +435,7 @@ literals = ["B'1'", "B''", "B'01010101010101010101010101010101010101010101010101
 carrier = "Text"
 rule = "exact"
 known_failing = [
-    { route = "paste", issue = 4224, reason = "pasting an empty value stores NULL" },
+    { route = "paste", issue = 4224, expect = "server stored", reason = "pasting an empty value stores NULL" },
 ]
 
 [[case]]
@@ -469,3 +472,205 @@ type = "oid"
 literals = ["4294967295", "0"]
 carrier = "Text"
 rule = "exact"
+
+[[case]]
+id = "numeric-negative-scale"
+type = "numeric(5,-2)"
+literals = ["12345", "-9999949", "49", "NULL"]
+carrier = "Decimal"
+rule = "exact"
+note = "PostgreSQL 15 and later accept a negative scale: the server rounds to hundreds, and the stored value has scale 0."
+
+[[case]]
+id = "timestamp-precision-0"
+type = "timestamp(0)"
+literals = ["'2024-02-29 13:45:30.5'", "'1970-01-01 00:00:00.4'", "NULL"]
+carrier = "DateTime"
+rule = "temporal"
+note = "The server rounds to the declared precision on insert; the stored, rounded value is the referee."
+
+[[case]]
+id = "timestamp-precision-3"
+type = "timestamp(3)"
+literals = ["'2024-02-29 13:45:30.1235'", "'1999-12-31 23:59:59.9995'"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "timestamptz-precision-3"
+type = "timestamptz(3)"
+literals = ["'2024-02-29 13:45:30.1235+05:30'", "'1969-12-31 23:59:59.9995+00'"]
+carrier = "TimestampTz"
+rule = "instant"
+known_failing = [
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+]
+
+[[case]]
+id = "time-precision-0"
+type = "time(0)"
+literals = ["'13:45:30.4'", "'23:59:59.4'"]
+carrier = "Time"
+rule = "temporal"
+
+[[case]]
+id = "time-precision-3"
+type = "time(3)"
+literals = ["'13:45:30.1235'", "'00:00:00.0004'"]
+carrier = "Time"
+rule = "temporal"
+known_failing = [
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+]
+
+[[case]]
+id = "int8range"
+type = "int8range"
+literals = ["'[-9223372036854775808,9223372036854775807)'", "'empty'", "'(,5]'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "numrange"
+type = "numrange"
+literals = ["'[1.50,2.500)'", "'(,)'", "'[0.0000000001,1e20]'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+note = "BookiE refuses this range type explicitly, as it does tstzrange; integer ranges are exact text."
+
+[[case]]
+id = "daterange"
+type = "daterange"
+literals = ["'[2024-02-29,2024-03-01]'", "'[infinity,infinity]'", "'(,2024-01-01)'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+note = "BookiE refuses this range type explicitly, as it does tstzrange; integer ranges are exact text."
+
+[[case]]
+id = "tsrange"
+type = "tsrange"
+literals = ["'[2024-02-29 13:45:30.123456,2024-03-01 00:00:00)'", "'empty'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+note = "BookiE refuses this range type explicitly, as it does tstzrange; integer ranges are exact text."
+
+[[case]]
+id = "uuid-array"
+type = "uuid[]"
+literals = ["'{12345678-9abc-def0-1122-334455667788,NULL}'", "'{}'"]
+carrier = "Text"
+rule = "server_cast"
+note = "uuid[] is an exact text fallback; server_cast accepts any spelling the server parses to the same array."
+
+[[case]]
+id = "jsonb-array"
+type = "jsonb[]"
+literals = ["ARRAY['{\"b\":1,\"a\":2}'::jsonb, 'null'::jsonb, NULL]", "ARRAY['\"é \\\\u0000\"'::jsonb]"]
+carrier = "Text"
+rule = "server_cast"
+note = "jsonb[] is an exact text fallback; the server re-parses BookiE's text, so element quoting may differ but each document must be the same."
+
+[[case]]
+id = "timestamptz-array"
+type = "timestamptz[]"
+literals = ["'{\"2024-02-29 13:45:30.123456+05:30\",infinity,NULL}'", "ARRAY['4713-01-01 00:00:00+00 BC'::timestamptz]"]
+carrier = "Text"
+rule = "server_cast"
+note = "timestamptz[] is exact text in BookiE's session time zone; server_cast parses it back to the same instants."
+
+[[case]]
+id = "bytea-array"
+type = "bytea[]"
+literals = ["ARRAY['\\xdeadbeef'::bytea, '\\x'::bytea, NULL]", "ARRAY[decode('00ff', 'hex')]"]
+carrier = "Text"
+rule = "server_cast"
+note = "bytea[] is exact text in the session's bytea_output format; server_cast parses it back to the same bytes."
+
+[[case]]
+id = "bool-array"
+type = "boolean[]"
+literals = ["'{t,f,NULL}'", "'{}'"]
+carrier = "Text"
+rule = "server_cast"
+note = "boolean[] is an exact text fallback; server_cast accepts t, true and the other spellings the server parses."
+
+[[case]]
+id = "enum-array"
+type = "{table}_mood[]"
+setup = ["CREATE TYPE {table}_mood AS ENUM ('sad', 'with space', '', 'NULL')"]
+literals = ["'{sad,\"with space\",\"\",\"NULL\",NULL}'"]
+carrier = "Text"
+rule = "server_cast"
+note = "An enum array is an exact text fallback; server_cast keeps the label 'NULL', a NULL element and the empty label distinct."
+
+[[case]]
+id = "session-timezone-chatham"
+type = "timestamptz"
+bookie_session = ["TimeZone = 'Pacific/Chatham'"]
+literals = ["'2024-02-29 13:45:30.123456+00'", "'2024-04-07 02:44:59+13:45'", "'0001-01-01 00:00:00+00'", "NULL"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "BookiE's session runs in a +13:45 zone with DST; the instant must not move."
+known_failing = [
+    { route = "edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "paste", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "set_cells", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "insert_row", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+    { route = "noop_edit", issue = 4217, expect = "server stored", reason = "edit and copy text drop fractional seconds" },
+]
+
+[[case]]
+id = "session-timezone-st-johns-text"
+type = "timestamptz[]"
+bookie_session = ["TimeZone = 'America/St_Johns'"]
+literals = ["'{\"2024-03-10 05:30:00+00\",\"2024-11-03 03:30:00+00\"}'"]
+carrier = "Text"
+rule = "server_cast"
+note = "Text fallbacks are rendered in BookiE's -03:30 session zone; the cast back runs with the same TimeZone so the instants must match."
+
+[[case]]
+id = "session-intervalstyle-verbose"
+type = "interval"
+bookie_session = ["IntervalStyle = 'postgres_verbose'"]
+literals = ["'1 year 2 mons 3 days 04:05:06.789'", "'-1 day'", "'1 mon -1 day'"]
+carrier = "Text"
+rule = "server_cast"
+note = "interval is exact text in BookiE's IntervalStyle; the server parses it back to the same months, days and microseconds."
+
+[[case]]
+id = "session-intervalstyle-iso"
+type = "interval"
+bookie_session = ["IntervalStyle = 'iso_8601'"]
+literals = ["'1 year 2 mons 3 days 04:05:06.789'", "'-00:00:00.000001'"]
+carrier = "Text"
+rule = "server_cast"
+note = "interval is exact text in BookiE's IntervalStyle; the server parses it back to the same months, days and microseconds."
+
+[[case]]
+id = "session-bytea-escape"
+type = "bytea"
+bookie_session = ["bytea_output = 'escape'"]
+literals = ["'\\xdeadbeef00'", "'\\x'", "'abc'::bytea"]
+carrier = "Bytes"
+rule = "bytes"
+note = "bytea_output changes the text form only; the bytes must be the same."
+
+[[case]]
+id = "session-bytea-escape-text"
+type = "bytea[]"
+bookie_session = ["bytea_output = 'escape'"]
+literals = ["ARRAY['\\xdeadbeef00'::bytea, '\\x5c'::bytea]"]
+carrier = "Text"
+rule = "server_cast"
+note = "A bytea[] text fallback uses BookiE's escape bytea_output; the cast back runs with the same setting and must give the same bytes."

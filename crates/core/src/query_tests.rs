@@ -170,6 +170,19 @@ fn result_budget_precheck_rejects_partial_payload_before_decoding() {
 }
 
 #[test]
+fn result_budget_precheck_admits_a_row_that_fills_the_byte_budget_exactly() {
+    let fixed_row_bytes = std::mem::size_of::<Value>() + std::mem::size_of::<usize>();
+    let payload = 64;
+    let budget = QueryResultBudget {
+        bytes: MAX_QUERY_RESULT_BYTES - fixed_row_bytes - payload,
+        ..QueryResultBudget::default()
+    };
+
+    assert!(budget.can_admit_row_payload(1, payload));
+    assert!(!budget.can_admit_row_payload(1, payload + 1));
+}
+
+#[test]
 fn result_budget_caps_cells_and_dynamic_value_storage() {
     assert_eq!(MAX_QUERY_RESULT_BYTES, 67_108_864);
     let row = vec![Value::Text("x".into())];

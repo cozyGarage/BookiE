@@ -2,34 +2,6 @@ use crate::palette_state::PaletteMode;
 use crate::*;
 use bookie_app_services::structure_change_plan::StructureChangeKind;
 
-fn is_edit_palette_action(id: &str) -> bool {
-    matches!(
-        id,
-        "save-changes"
-            | "undo-edit"
-            | "redo-edit"
-            | "delete-rows"
-            | "insert-row"
-            | "import-csv"
-            | "add-column"
-            | "rename-column"
-            | "drop-column"
-            | "add-index"
-            | "drop-index"
-            | "show-structure"
-            | "go-to-reference"
-            | "peek-foreign-key"
-            | "show-referencing"
-            | "show-create-table"
-            | "empty-table"
-            | "drop-table"
-            | "resolve-outcome"
-            | "add-foreign-key"
-            | "rename-table"
-            | "drop-foreign-key"
-    )
-}
-
 impl GridView {
     pub(crate) fn palette_actions(&self) -> Vec<Action> {
         if self.palette.fonts {
@@ -174,15 +146,20 @@ impl GridView {
                 !self.source.columns().is_empty(),
             ),
             action("find", "Find in loaded rows", !filtering),
-            action("filter", "Filter loaded rows", true),
+            action("filter", "Filter rows", true),
             action("clear-filter", "Clear filter", filtering),
             action("compare", "Compare results", true),
             action(
+                "show-hidden-columns",
+                "Show hidden columns",
+                !self.source.columns().is_empty(),
+            ),
+            action(
                 "detail",
                 if self.detail_open {
-                    "Hide cell details"
+                    "Hide detail panel"
                 } else {
-                    "Show cell details"
+                    "Show detail panel"
                 },
                 true,
             ),
@@ -316,11 +293,6 @@ impl GridView {
                 has(bookie_core::ActivityQuery::ServerStatus),
             ),
             action(
-                "activity-console",
-                "Show activity console",
-                has(bookie_core::ActivityQuery::Sessions),
-            ),
-            action(
                 "cancel-process",
                 "Cancel selected server process",
                 self.live
@@ -353,24 +325,24 @@ impl GridView {
             enabled,
         };
         vec![
-            action("quick-switcher", "Go to table", !self.catalog.tables.is_empty()),
+            action("quick-switcher", "Go to table…", !self.catalog.tables.is_empty()),
             action(
                 "jump-column",
-                "Jump to column",
+                "Jump to column…",
                 self.tabs.shows_grid_for(&self.catalog.grid_table),
             ),
-            action("shortcuts", "Keyboard shortcuts", true),
+            action("shortcuts", "Keyboard shortcuts…", true),
             action(
                 "save-favorite",
-                "Save query as favorite",
+                "Save as favorite",
                 matches!(self.tabs.current(), Tab::Query),
             ),
-            action("favorites", "Open a favorite", true),
+            action("favorites", "Open favorite…", true),
             action("undo-edit", "Undo edit", self.can_undo_edit()),
             action("redo-edit", "Redo edit", self.can_redo_edit()),
             action(
                 "save-changes",
-                "Save changes",
+                "Save changes…",
                 self.can_save_edits() && !self.cell_edit.edits.is_empty(),
             ),
             action(
@@ -385,18 +357,18 @@ impl GridView {
             ),
             action(
                 "insert-row",
-                "Add a row",
+                "Add row…",
                 self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
             ),
             action(
                 "delete-rows",
-                "Delete selected rows",
+                "Delete rows…",
                 self.can_save_edits()
                     && (self.selection.is_some() || self.cell_cursor.is_some())
                     && self.cell_edit.edits.is_empty()
                     && self.compare.is_none(),
             ),
-            action("delete-favorite", "Delete a favorite", true),
+            action("delete-favorite", "Delete a favorite…", true),
             action(
                 "reveal-sidebar",
                 "Reveal table in sidebar",
@@ -427,8 +399,8 @@ impl GridView {
         };
         vec![
             action("save-filter", "Save the current filter…"),
-            action("saved-filters", "Apply a saved filter"),
-            action("delete-saved-filter", "Delete a saved filter"),
+            action("saved-filters", "Apply a saved filter…"),
+            action("delete-saved-filter", "Delete a saved filter…"),
         ]
     }
 
@@ -439,13 +411,17 @@ impl GridView {
             enabled,
         };
         vec![
-            action("show-create-table", "Show CREATE TABLE", self.structure_info_enabled()),
-            action("empty-table", "Empty the table…", self.structure_change_enabled()),
-            action("drop-table", "Drop the table…", self.structure_change_enabled()),
+            action(
+                "show-create-table",
+                "Show CREATE statement",
+                self.structure_info_enabled(),
+            ),
+            action("empty-table", "Empty table…", self.structure_change_enabled()),
+            action("drop-table", "Drop table…", self.structure_change_enabled()),
             action("go-to-reference", "Go to the referenced row", self.fk_nav_enabled()),
             action("peek-foreign-key", "Peek referenced row", self.fk_nav_enabled()),
             action("show-referencing", "Show referencing rows", self.fk_nav_enabled()),
-            action("show-structure", "Show table structure", self.structure_info_enabled()),
+            action("show-structure", "Structure", self.structure_info_enabled()),
             action("add-column", "Add a column…", self.structure_change_enabled()),
             action("rename-column", "Rename a column…", self.structure_change_enabled()),
             action("drop-column", "Drop a column…", self.structure_change_enabled()),
@@ -473,15 +449,15 @@ impl GridView {
         };
         let schema_context = self.schema_context.as_ref().map_or_else(
             || "Choose schema or database…".to_owned(),
-            |schema| format!("Schema context: {schema}"),
+            |schema| format!("Schema context: {schema}…"),
         );
         let mut actions = vec![
             action("query", "New query", true),
-            action("run", "Run all statements", matches!(self.tabs.current(), Tab::Query)),
+            action("run", "Run all", matches!(self.tabs.current(), Tab::Query)),
             action("stop-query", "Stop query", self.can_stop_query()),
             action(
                 "explain",
-                "Explain the query",
+                "Explain",
                 matches!(self.tabs.current(), Tab::Query) && self.live.is_some(),
             ),
             action("data-dictionary", "Show the data dictionary", self.live.is_some()),
@@ -512,7 +488,7 @@ impl GridView {
                 matches!(self.tabs.current(), Tab::Query),
             ),
             action("home", "Open home", true),
-            action("new-connection", "New connection", true),
+            action("new-connection", "New connection…", true),
             action("import-connections", "Import connections…", true),
             action("export-connections", "Export connections…", true),
             action("history", "Open history", true),
@@ -544,9 +520,9 @@ impl GridView {
             action(
                 "sidebar",
                 if self.sidebar.open {
-                    "Hide the sidebar"
+                    "Hide sidebar"
                 } else {
-                    "Show the sidebar"
+                    "Show sidebar"
                 },
                 true,
             ),
@@ -627,6 +603,16 @@ impl GridView {
             || self.execute_workspace_palette_action(id, window, cx)
     }
 
+    fn open_query_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tabs.open_query();
+        self.sync_grid_owner();
+        if self.live.is_some() {
+            self.focus_editor = true;
+        } else {
+            window.focus(&self.focus, cx);
+        }
+    }
+
     fn open_font_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.open_palette(window, cx);
         self.palette.fonts = true;
@@ -686,7 +672,7 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> bool {
         match id {
-            "sessions" | "activity-console" => self.show_sessions(window, cx),
+            "sessions" => self.show_sessions(window, cx),
             "cancel-process" => {
                 self.cancel_selected_process(cx);
             }
@@ -722,7 +708,7 @@ impl GridView {
         true
     }
 
-    pub(crate) fn execute_edit_palette_action(&mut self, id: &'static str, cx: &mut Context<Self>) {
+    pub(crate) fn execute_edit_palette_action(&mut self, id: &str, cx: &mut Context<Self>) -> bool {
         match id {
             "save-changes" => self.request_save(cx),
             "undo-edit" => self.undo_edit(cx),
@@ -745,8 +731,10 @@ impl GridView {
             "rename-table" => self.open_structure_bar(StructureChangeKind::RenameTable, cx),
             "add-foreign-key" => self.open_structure_bar(StructureChangeKind::AddForeignKey, cx),
             "drop-foreign-key" => self.open_structure_bar(StructureChangeKind::DropForeignKey, cx),
-            _ => self.open_insert_form(cx),
+            "insert-row" => self.open_insert_form(cx),
+            _ => return false,
         }
+        true
     }
 
     fn execute_workspace_palette_action(
@@ -768,7 +756,7 @@ impl GridView {
             "schema-context" => self.open_picker(PaletteMode::SchemaContext, window, cx),
             "saved-filters" => self.open_picker(PaletteMode::SavedFilters, window, cx),
             "delete-saved-filter" => self.open_picker(PaletteMode::DeleteSavedFilter, window, cx),
-            _ if is_edit_palette_action(id) => self.execute_edit_palette_action(id, cx),
+            _ if self.execute_edit_palette_action(id, cx) => {}
             "delete-favorite" => self.open_picker(PaletteMode::DeleteFavorite, window, cx),
             "reveal-sidebar" => self.reveal_in_sidebar(cx),
             "collapse-sidebar-sections" => self.collapse_sidebar_sections(),
@@ -783,6 +771,7 @@ impl GridView {
                 self.open_connection_dialog(cx);
                 self.sync_grid_owner();
             }
+            "show-hidden-columns" => self.show_all_hidden_columns(window, cx),
             "audit" => {
                 self.tabs.open_audit_log();
                 self.reload_audit_page(cx);
@@ -802,11 +791,7 @@ impl GridView {
                 self.reload_history(cx);
                 self.sync_grid_owner();
             }
-            "query" => {
-                self.tabs.open_query();
-                self.sync_grid_owner();
-                window.focus(&self.focus, cx);
-            }
+            "query" => self.open_query_tab(window, cx),
             "run" => self.run_query(cx),
             "stop-query" => self.stop_query(),
             "explain" => self.explain_query(cx),

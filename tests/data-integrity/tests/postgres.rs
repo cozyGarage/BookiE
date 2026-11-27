@@ -29,3 +29,12 @@ async fn postgres_16_copy_export_import_and_edits_match_the_server() {
     let results = routes::run_routes(&server, &corpus, true).await;
     judge_and_report(&corpus, &results).assert_clean();
 }
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn postgres_18_copy_export_import_and_edits_match_the_server() {
+    let corpus = load_corpus("postgres");
+    let server = postgres::start("18-alpine", "pg18").await;
+    let results = routes::run_routes(&server, &corpus, true).await;
+    judge_and_report(&corpus, &results).assert_clean();
+}

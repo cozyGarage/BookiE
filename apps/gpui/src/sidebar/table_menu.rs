@@ -1,14 +1,11 @@
 use bookie_core::TableInfo;
 use bookie_core::sql_dialect::qualified_table;
 use bookie_gpui::shell::table_label;
-use gpui::{ClipboardItem, Context, DismissEvent, IntoElement, ParentElement, Styled, WeakEntity, Window, div, rgb};
+use gpui::{ClipboardItem, Context, WeakEntity, Window};
 use gpui_component::menu::{PopupMenu, PopupMenuItem};
 
 use crate::GridView;
 use crate::catalog_nav::TableOpenAction;
-use crate::menus::RowMenu;
-use crate::ui_theme::ThemeExt;
-use bookie_gpui::theme::Theme;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum TableMenuItem {
@@ -30,9 +27,9 @@ impl TableMenuItem {
             TableMenuItem::CreateScript => "Show CREATE statement",
             TableMenuItem::SelectQuery => "SELECT in the query editor",
             TableMenuItem::CopyName => "Copy name",
-            TableMenuItem::Export => "Export table",
-            TableMenuItem::Empty => "Empty table",
-            TableMenuItem::Drop => "Drop table",
+            TableMenuItem::Export => "Export table…",
+            TableMenuItem::Empty => "Empty table…",
+            TableMenuItem::Drop => "Drop table…",
         }
     }
 
@@ -62,14 +59,9 @@ pub(crate) fn table_menu_groups(connected: bool, writable: bool) -> Vec<Vec<Tabl
 
 fn menu_item(item: TableMenuItem, owner: WeakEntity<GridView>, table: TableInfo) -> PopupMenuItem {
     let entry = if item.destructive() {
-        PopupMenuItem::element(move |_, cx| {
-            div()
-                .text_color(rgb(Theme::current(cx).destructive))
-                .child(item.label())
-                .into_element()
-        })
+        crate::menus::destructive_item(item.label(), None, None)
     } else {
-        PopupMenuItem::new(item.label())
+        crate::menus::item(item.label(), None, None, false)
     };
     entry.on_click(move |_, window, cx| {
         let _ = owner.update(cx, |view, cx| {
@@ -100,13 +92,7 @@ impl GridView {
             }
             menu
         });
-        let dismiss = cx.subscribe(&menu, |this, _, _: &DismissEvent, cx| {
-            this.row_menu = None;
-            cx.notify();
-        });
-        window.focus(&gpui::Focusable::focus_handle(menu.read(cx), cx), cx);
-        self.row_menu = Some(RowMenu::new(window.mouse_position(), menu, dismiss));
-        cx.notify();
+        self.show_row_menu(menu, window, cx);
     }
 
     pub(crate) fn run_table_menu_item(

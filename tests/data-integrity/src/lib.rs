@@ -6,6 +6,7 @@ pub mod governed;
 pub mod mysql;
 pub mod postgres;
 pub mod redis;
+pub mod redis_reply;
 pub mod report;
 pub mod routes;
 pub mod rules;
@@ -30,6 +31,6 @@ pub fn load_corpus(engine: &str) -> Corpus {
 
 pub fn judge_and_report(corpus: &Corpus, results: &[CaseResult]) -> Verdict {
     let verdict = report::judge(corpus, results);
-    eprintln!("{}", verdict.summary());
+    println!("{}", verdict.summary());
     verdict
 }
