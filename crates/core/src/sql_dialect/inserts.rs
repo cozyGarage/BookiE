@@ -1,4 +1,4 @@
-use super::{BuildSqlError, placeholder_for, quote_ident, text_cast_placeholder};
+use super::{BuildSqlError, placeholder_for, quote_ident, text_cast_placeholder, validate_write_value};
 use crate::{ColumnInfo, Value};
 
 pub fn build_insert_from_draft(
@@ -37,6 +37,7 @@ pub fn build_insert_from_draft_touched(
         if value_is_null && !typed && col.default_value.is_some() {
             continue;
         }
+        validate_write_value(driver_id, col, &values[i])?;
         col_idents.push(quote_ident(driver_id, &col.name));
         let placeholder = placeholder_for(driver_id, params.len());
         let value_sql = if driver_id == "postgres" {

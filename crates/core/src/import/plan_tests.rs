@@ -56,6 +56,32 @@ fn every_row_binds_to_the_same_statement() {
 }
 
 #[test]
+fn clickhouse_date_import_refuses_out_of_range_in_csv_and_xlsx() {
+    let options = CsvImportOptions::default();
+    let csv = crate::import::read_csv(b"day\n2024-01-01\n1900-01-01\n", &options, None).unwrap();
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let worksheet = workbook.add_worksheet();
+    worksheet.write_string(0, 0, "day").unwrap();
+    worksheet.write_string(1, 0, "2024-01-01").unwrap();
+    worksheet.write_string(2, 0, "1900-01-01").unwrap();
+    let xlsx = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 10).unwrap();
+    for data_type in ["Date", "Nullable(Date)", "LowCardinality(Nullable(Date))"] {
+        let columns = [column("day", data_type)];
+        let target = ImportTarget {
+            driver_id: "clickhouse",
+            ..target(&columns, &[Some(0)])
+        };
+        for sheet in [&csv, &xlsx] {
+            let PlanError::Rows { first, .. } = build_insert_plan(&target, sheet, &options).unwrap_err() else {
+                panic!("expected a row error")
+            };
+            assert_eq!(first[0].line, 3);
+            assert_eq!(first[0].column, "day");
+        }
+    }
+}
+
+#[test]
 fn csv_and_workbook_refuse_the_whole_plan_for_an_undecodable_marker() {
     let options = CsvImportOptions::default();
     let csv = crate::import::read_csv(b"value\ngood\n<undecodable UNION>\n", &options, None).unwrap();

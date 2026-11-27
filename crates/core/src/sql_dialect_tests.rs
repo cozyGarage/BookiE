@@ -17,6 +17,81 @@ fn col(name: &str, pk: bool) -> ColumnInfo {
 }
 
 #[test]
+fn clickhouse_date_writes_refuse_narrow_destination_overflow() {
+    let mut date = col("day", false);
+    let id = col("id", true);
+    let invalid = Value::Date(chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
+    let original = [Value::Int(1), Value::Null];
+    for data_type in ["Date", "Nullable(Date)", "LowCardinality(Nullable(Date))"] {
+        date.data_type = data_type.into();
+        let columns = [id.clone(), date.clone()];
+        assert!(build_insert_from_draft("clickhouse", None, "t", &columns, &[Value::Int(1), invalid.clone()]).is_err());
+        assert!(
+            build_keyed_update(
+                "clickhouse",
+                None,
+                "t",
+                &columns,
+                &[(1, invalid.clone())],
+                &[Value::Int(1)]
+            )
+            .is_err()
+        );
+        assert!(
+            build_optimistic_keyed_update(
+                "clickhouse",
+                None,
+                "t",
+                &columns,
+                &[(1, Value::Null, invalid.clone())],
+                &[Value::Int(1)]
+            )
+            .is_err()
+        );
+        assert!(build_single_cell_update("clickhouse", "t", &columns, &original, 1, invalid.clone()).is_err());
+    }
+    date.data_type = "Date32".into();
+    assert!(build_insert_from_draft("clickhouse", None, "t", &[id, date], &[Value::Int(1), invalid]).is_ok());
+}
+
+#[test]
+fn clickhouse_date_write_validation_preserves_boundaries_and_other_types() {
+    let mut date = col("day", false);
+    for data_type in [" Date ", "Nullable(Date)", "LowCardinality(Nullable(Date))"] {
+        date.data_type = data_type.into();
+        for input in ["1970-01-01", "2149-06-06"] {
+            for value in [
+                Value::Text(input.into()),
+                Value::Date(chrono::NaiveDate::parse_from_str(input, "%Y-%m-%d").unwrap()),
+            ] {
+                assert!(build_insert_from_draft("clickhouse", None, "t", &[date.clone()], &[value]).is_ok());
+            }
+        }
+        for input in ["1969-12-31", "2149-06-07", "not-a-date"] {
+            assert!(
+                build_insert_from_draft("clickhouse", None, "t", &[date.clone()], &[Value::Text(input.into())])
+                    .is_err()
+            );
+        }
+    }
+    for data_type in ["Date32", "Nullable(Date32)", "DateTime"] {
+        date.data_type = data_type.into();
+        assert!(
+            build_insert_from_draft(
+                "clickhouse",
+                None,
+                "t",
+                &[date.clone()],
+                &[Value::Text("1900-01-01".into())]
+            )
+            .is_ok()
+        );
+    }
+    date.data_type = "Date".into();
+    assert!(build_insert_from_draft("postgres", None, "t", &[date], &[Value::Text("1900-01-01".into())]).is_ok());
+}
+
+#[test]
 fn validate_ident_accepts_ordinary_and_quoted_names() {
     for name in ["users", "Order Details", "naïve", "a\"b", "a`b", "a]b"] {
         assert_eq!(validate_ident(name), Ok(()), "{name}");

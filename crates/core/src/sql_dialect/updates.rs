@@ -5,7 +5,7 @@ use exact_original::exact_original_predicate;
 
 use super::{
     BuildSqlError, build_update, checked_pk_indexes, keyed_where_clause, placeholder_for, postgres_text_cast_type,
-    qualified_table, quote_ident, text_cast_placeholder,
+    qualified_table, quote_ident, text_cast_placeholder, validate_write_value,
 };
 use crate::{ColumnInfo, Value};
 
@@ -80,6 +80,9 @@ pub fn build_keyed_update(
     }
     if edits.iter().any(|(col_idx, _)| *col_idx >= columns.len()) {
         return Err(BuildSqlError::StaleColumns);
+    }
+    for (index, value) in edits {
+        validate_write_value(driver_id, &columns[*index], value)?;
     }
     let mut params: Vec<Value> = Vec::with_capacity(edits.len() + pk_values.len());
     let set_clauses: Vec<String> = edits
@@ -156,6 +159,9 @@ pub fn build_optimistic_keyed_update(
     }
     if edits.iter().any(|(col_idx, _, _)| *col_idx >= columns.len()) {
         return Err(BuildSqlError::StaleColumns);
+    }
+    for (index, _, value) in edits {
+        validate_write_value(driver_id, &columns[*index], value)?;
     }
     let mut params = Vec::with_capacity(edits.len() * 3 + pk_values.len());
     let assignments = optimistic_assignments(driver_id, columns, edits, &mut params);

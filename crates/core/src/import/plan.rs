@@ -211,7 +211,9 @@ fn insert_statement(
     let shape_values = shape_columns
         .iter()
         .map(|column| {
-            if column.enum_type.is_some()
+            if crate::sql_dialect::is_clickhouse_date_type(target.driver_id, &column.data_type) {
+                Value::Null
+            } else if column.enum_type.is_some()
                 || postgres_array_cast_type(&column.data_type).is_some()
                 || postgres_numeric_cast_type(&column.data_type).is_some()
                 || postgres_temporal_cast_type(&column.data_type).is_some()

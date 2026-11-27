@@ -8,6 +8,8 @@ mod postgres_enum_tests;
 
 mod error;
 mod inserts;
+mod write_validation;
+pub(crate) use write_validation::{is_clickhouse_date_type, validate_write_value};
 mod pg_native_text;
 #[path = "sql_dialect/updates.rs"]
 mod updates;
@@ -187,6 +189,7 @@ pub fn build_single_cell_update(
     if col_index >= columns.len() {
         return Err(BuildSqlError::StaleColumns);
     }
+    validate_write_value(driver_id, &columns[col_index], &new_value)?;
 
     let mut params: Vec<Value> = Vec::with_capacity(1 + pk_indexes.len());
     let mut placeholder_idx = 0;
@@ -244,6 +247,7 @@ pub fn build_full_row_update(
         if col.primary_key {
             continue;
         }
+        validate_write_value(driver_id, col, &new_values[i])?;
         set_clauses.push(format!(
             "{} = {}",
             quote_ident(driver_id, &col.name),
