@@ -679,14 +679,26 @@ impl GridView {
             )
     }
 
-    pub fn sidebar(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+    pub(crate) fn displayed_sidebar_width(&self, window_width: f32) -> f32 {
+        if !self.sidebar.open {
+            return 0.0;
+        }
+        if matches!(self.tabs.current(), Tab::Table(_) | Tab::Query)
+            && (self.detail_open || self.row_detail_open || self.fk_peek.is_some())
+        {
+            return self.sidebar.width.min((window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - 320.0).max(260.0));
+        }
+        self.sidebar.width
+    }
+
+    pub fn sidebar(&self, width: f32, theme: Theme, cx: &mut Context<Self>) -> Div {
         let search = self.sidebar.search.read(cx).content().to_string();
         div()
             .relative()
             .flex()
             .flex_col()
             .flex_none()
-            .w(px(self.sidebar.width))
+            .w(px(width))
             .h_full()
             .bg(rgb(theme.sidebar))
             .border_r_1()
