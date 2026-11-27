@@ -1745,6 +1745,29 @@ fn the_palette_stop_command_cancels_the_run_and_marks_it_cancelled_not_failed(cx
 }
 
 #[gpui::test]
+fn diagram_palette_prefers_opening_the_diagram_to_exporting_it(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("diagram");
+    view.read_with(cx, |view, cx| {
+        let actions = view.palette_actions();
+        let ids: Vec<_> = view.palette_shown(cx).into_iter().map(|index| actions[index].id).collect();
+        let show = ids.iter().position(|id| *id == "show-schema-diagram").expect("show action");
+        let export = ids.iter().position(|id| *id == "export-schema-diagram").expect("export action");
+        assert!(show < export, "{ids:?}");
+    });
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette.input.clone();
+        input.update(cx, |input, cx| input.set_content("export diagram", cx));
+    });
+    view.read_with(cx, |view, cx| {
+        let actions = view.palette_actions();
+        let first = view.palette_shown(cx).into_iter().next().expect("an export action");
+        assert_eq!(actions[first].id, "export-schema-diagram");
+    });
+}
+
+#[gpui::test]
 fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
