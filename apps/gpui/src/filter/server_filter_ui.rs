@@ -25,7 +25,7 @@ impl GridView {
     }
 
     fn shows_server_filter(&self) -> bool {
-        self.live.is_some() && !self.grid_is_query && matches!(self.tabs.current(), Tab::Table(_))
+        self.shows_live_table() && matches!(self.tabs.current(), Tab::Table(_))
     }
 
     pub(crate) fn server_filter_actions(&self) -> Vec<Action> {

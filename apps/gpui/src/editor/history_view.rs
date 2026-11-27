@@ -7,10 +7,10 @@ use gpui::{Context, Div, Entity, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::one_line;
 use crate::connection_form::choice_row;
 use crate::surfaces::{Bar, ListState, icon_button, list_state, segment, toggle_icon_button};
 use crate::text_input::{InputEvent, TextInput};
+use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
 static PRUNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -22,7 +22,7 @@ pub(crate) struct HistoryPage {
     pub window: TimeWindow,
     pub rows: Vec<HistoryRow>,
     pub load: HistoryLoad,
-    generation: u64,
+    requests: crate::Ticket,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -57,7 +57,7 @@ impl HistoryPage {
             window: TimeWindow::Any,
             rows: Vec::new(),
             load: HistoryLoad::Loading,
-            generation: 0,
+            requests: crate::Ticket::new(),
         }
     }
 }
@@ -109,8 +109,7 @@ impl GridView {
     }
 
     pub(crate) fn reload_history_page(&mut self, cx: &mut Context<Self>) {
-        self.history_page.generation += 1;
-        let generation = self.history_page.generation;
+        let generation = self.history_page.requests.next();
         let query = HistoryQuery {
             text: self.history_page.search.read(cx).content().to_string(),
             status: self.history_page.status,
@@ -124,7 +123,7 @@ impl GridView {
                 .spawn(async move { block_on(statement_history::search(query)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if this.history_page.generation != generation {
+                if !this.history_page.requests.is_current(generation) {
                     return;
                 }
                 match rows {
@@ -240,7 +239,7 @@ impl GridView {
                             .overflow_hidden()
                             .text_size(px(size::TEXT_SMALL))
                             .font_family("monospace")
-                            .child(one_line(&row.query)),
+                            .child(one_line_sql(&row.query, MAX_STATEMENT_CHARS)),
                     )
                     .child(
                         div()

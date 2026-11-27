@@ -5,7 +5,7 @@ impl GridView {
         vec![Action {
             id: "refresh-table",
             label: "Refresh the table from the database".to_string(),
-            enabled: self.live.is_some() && !self.grid_is_query,
+            enabled: self.shows_live_table(),
         }]
     }
 
@@ -32,7 +32,7 @@ impl GridView {
     }
 
     pub(crate) fn refresh_table(&mut self, cx: &mut Context<Self>) {
-        if self.live.is_none() || self.grid_is_query {
+        if !self.shows_live_table() {
             self.status = "Open a table from a connection to refresh it".into();
             return;
         }

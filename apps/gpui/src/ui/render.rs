@@ -181,7 +181,7 @@ impl GridView {
     }
 
     fn add_row_button(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
-        (self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open())
+        self.row_change_enabled()
             .then(|| self.grid_icon("insert-row", "plus", self.grid_command_tip("insert-row"), theme, cx))
     }
 
@@ -217,7 +217,7 @@ impl GridView {
             .items_center()
             .gap_1()
             .children(
-                (self.live.is_some() && !self.grid_is_query)
+                self.shows_live_table()
                     .then(|| self.grid_icon("refresh-table", "refresh-cw", "Refresh from the database", theme, cx)),
             )
             .children(

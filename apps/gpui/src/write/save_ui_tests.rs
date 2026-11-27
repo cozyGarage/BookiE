@@ -321,7 +321,7 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
             .pending
             .as_ref()
             .unwrap_or_else(|| panic!("no review: {}", view.status));
-        assert_eq!(pending.title, "Delete 1 row(s) from orders?");
+        assert_eq!(pending.title, "Delete 1 row from orders?");
         assert_eq!(pending.confirm, "Delete", "the button says what it will do");
         assert_eq!(
             crate::save_ui::confirm_kind(pending.destructive),
@@ -339,7 +339,7 @@ fn selected_rows_are_reviewed_then_deleted_and_the_table_reloads_without_them(cx
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle_saving(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(view.save.banner, Some(("Deleted 1 row(s)".to_string(), false)));
+        assert_eq!(view.save.banner, Some(("Deleted 1 row".to_string(), false)));
         assert_eq!(view.source.total(), 5, "the grid reloaded without the deleted row");
         assert!(!view.save.busy);
     });
@@ -372,7 +372,7 @@ fn deleting_needs_a_selection_and_no_pending_edits(cx: &mut TestAppContext) {
             .pending
             .as_ref()
             .expect("the cursor row is offered for deletion");
-        assert_eq!(pending.title, "Delete 1 row(s) from orders?");
+        assert_eq!(pending.title, "Delete 1 row from orders?");
     });
     cx.update(|_, cx| view.update(cx, |view, cx| view.cancel_save(cx)));
 
@@ -526,7 +526,7 @@ fn an_edited_cell_is_reviewed_then_saved_and_the_table_shows_the_saved_value(cx:
     cx.update(|_, cx| view.update(cx, |view, cx| view.confirm_save(cx)));
     settle(cx);
     view.read_with(cx, |view, _| {
-        assert_eq!(view.save.banner, Some(("Saved 2 change(s)".to_string(), false)));
+        assert_eq!(view.save.banner, Some(("Saved 2 changes".to_string(), false)));
         assert!(view.source.origin().contains("editable"), "{}", view.source.origin());
         assert!(view.cell_edit.edits.is_empty());
         assert!(view.save.pending.is_none());
@@ -1461,7 +1461,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     let value: serde_json::Value = serde_json::from_str(written.lines().next().unwrap()).unwrap();
     assert!(value["id"].is_number(), "JSON keeps the database number type: {value}");
     view.read_with(cx, |view, _| {
-        assert!(!view.export.file.open && view.status.starts_with("Wrote 1 row(s)"))
+        assert!(!view.export.file.open && view.status.starts_with("Wrote 1 row "))
     });
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
@@ -1479,7 +1479,7 @@ fn export_uses_the_selected_scope_and_format_and_never_overwrites_a_file(cx: &mu
     assert_eq!(written.lines().count(), 6, "{written}");
     assert!(written.lines().next().unwrap().starts_with('{'), "{written}");
     view.read_with(cx, |view, _| {
-        assert!(!view.export.file.open && view.status.starts_with("Wrote 6 row(s)"))
+        assert!(!view.export.file.open && view.status.starts_with("Wrote 6 rows"))
     });
 
     cx.update(|_, cx| view.update(cx, |view, cx| view.open_export_file_bar(cx)));
@@ -1844,7 +1844,7 @@ fn searching_every_table_for_a_value_reports_the_matching_rows_in_messages(cx: &
         assert!(
             lines
                 .iter()
-                .any(|line| line.contains("orders") && line.contains("matching row(s)")),
+                .any(|line| line.contains("orders") && line.contains("matching row")),
             "{lines:?}"
         );
         assert!(!view.search.values.open);

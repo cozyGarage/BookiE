@@ -119,7 +119,11 @@ impl GridView {
     pub(crate) fn pending_edit_status(&self) -> String {
         let count = self.cell_edit.edits.len();
         if self.can_save_edits() {
-            format!("{count} change(s) pending; {}", self.save_hint("save"))
+            format!(
+                "{} pending; {}",
+                bookie_gpui::messages::plural(count, "change", "changes"),
+                self.save_hint("save")
+            )
         } else if let Some(refusal) = self.view_edit_refusal() {
             format!("{refusal}; {count} edited here only, nothing is saved")
         } else {

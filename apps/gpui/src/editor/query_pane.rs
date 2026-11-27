@@ -307,10 +307,9 @@ impl GridView {
         } else {
             format!("Connection: {}", self.catalog.connection)
         };
-        let schema = self.live.as_ref().and_then(|session| {
-            bookie_app_services::schema_context::supports_schema_context(&session.driver_id)
-                .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()))
-        });
+        let schema = self
+            .supports_schema_context()
+            .then(|| self.schema_context.clone().unwrap_or_else(|| "schema".to_owned()));
         crate::surfaces::menu_button(
             "query-context-menu",
             crate::surfaces::MenuTrigger::new("Connection and database context", Bar::Small).icon("database"),
@@ -344,8 +343,7 @@ impl GridView {
     }
 
     fn schema_context_chip(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
-        let session = self.live.as_ref()?;
-        if !bookie_app_services::schema_context::supports_schema_context(&session.driver_id) {
+        if !self.supports_schema_context() {
             return None;
         }
         let label = self.schema_context.clone().unwrap_or_else(|| "schema".to_owned());

@@ -224,7 +224,7 @@ impl GridView {
                         Pick::Favorite(favorite.sql.clone())
                     };
                     let subtitle = if label.is_empty() {
-                        preview(&favorite.sql)
+                        bookie_gpui::messages::one_line_sql(&favorite.sql, FAVORITE_PREVIEW_CHARS)
                     } else {
                         label.to_owned()
                     };
@@ -353,14 +353,7 @@ mod schema_context_tests {
     }
 }
 
-fn preview(sql: &str) -> String {
-    let one_line = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut text: String = one_line.chars().take(40).collect();
-    if one_line.chars().count() > 40 {
-        text.push('…');
-    }
-    text
-}
+const FAVORITE_PREVIEW_CHARS: usize = 40;
 
 pub(crate) const BUILT_IN_LIGHT: &str = "BookiE Light";
 pub(crate) const BUILT_IN_DARK: &str = "BookiE Dark";

@@ -5,9 +5,9 @@ use gpui::{Context, Div, Entity, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::one_line;
 use crate::surfaces::{ListState, list_state};
 use crate::text_input::{InputEvent, TextInput};
+use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 
 const RECENT_RECORDS: usize = 1_000;
 
@@ -16,7 +16,7 @@ pub(crate) struct AuditPage {
     pub rows: Vec<OperationRow>,
     pub loading: bool,
     pub error: Option<String>,
-    generation: u64,
+    requests: crate::Ticket,
 }
 
 impl AuditPage {
@@ -33,7 +33,7 @@ impl AuditPage {
             rows: Vec::new(),
             loading: false,
             error: None,
-            generation: 0,
+            requests: crate::Ticket::new(),
         }
     }
 }
@@ -70,16 +70,15 @@ fn shown<'a>(rows: &'a [OperationRow], query: &str) -> Vec<&'a OperationRow> {
 
 impl GridView {
     pub(crate) fn reload_audit_page(&mut self, cx: &mut Context<Self>) {
-        self.audit_page.generation += 1;
+        let generation = self.audit_page.requests.next();
         self.audit_page.loading = true;
-        let generation = self.audit_page.generation;
         cx.spawn(async move |this, cx| {
             let rows = cx
                 .background_executor()
                 .spawn(async move { block_on(audit_view::recent_operations(RECENT_RECORDS)) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                if this.audit_page.generation != generation {
+                if !this.audit_page.requests.is_current(generation) {
                     return;
                 }
                 this.audit_page.loading = false;
@@ -128,7 +127,7 @@ impl GridView {
                             .overflow_hidden()
                             .text_size(px(size::TEXT_SMALL))
                             .font_family("monospace")
-                            .child(one_line(&row.sql)),
+                            .child(one_line_sql(&row.sql, MAX_STATEMENT_CHARS)),
                     )
                     .child(
                         div()
@@ -143,7 +142,7 @@ impl GridView {
                         div()
                             .text_size(px(size::TEXT_SMALL))
                             .text_color(rgb(theme.destructive))
-                            .child(one_line(error))
+                            .child(one_line_sql(error, MAX_STATEMENT_CHARS))
                     })),
             )
     }

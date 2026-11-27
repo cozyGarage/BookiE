@@ -24,8 +24,9 @@ pub(crate) fn summarize(report: &SearchReport, term: &str) -> Vec<(MessageKind, 
         lines.push((
             MessageKind::Success,
             format!(
-                "{}: {more}{count} matching row(s) in {}",
+                "{}: {more}{} in {}",
                 outcome.target.label(),
+                bookie_gpui::messages::plural(count, "matching row", "matching rows"),
                 outcome.matched_columns.join(", ")
             ),
         ));

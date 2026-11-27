@@ -11,7 +11,7 @@ enum Direction {
 
 impl GridView {
     pub(crate) fn fk_nav_enabled(&self) -> bool {
-        self.live.is_some() && !self.grid_is_query && self.compare.is_none() && self.cell_cursor.is_some()
+        self.shows_live_table() && self.compare.is_none() && self.cell_cursor.is_some()
     }
 
     pub(crate) fn go_to_referenced_row(&mut self, cx: &mut Context<Self>) {
@@ -104,7 +104,7 @@ impl GridView {
         session: &std::sync::Arc<bookie_gpui::live::LiveSession>,
         table: &TableInfo,
     ) -> bool {
-        self.fk_peek_work.generation == generation
+        self.fk_peek_work.is_current(generation)
             && self.is_current_session(session)
             && self.catalog.grid_table == *table
             && matches!(self.tabs.current(), Tab::Table(active) if active == table)

@@ -425,10 +425,9 @@ impl GridView {
         let warning = self.transaction_idle_warning();
         let clock = format!("{}:{:02}", elapsed / 60, elapsed % 60);
         let idle = if warning.is_some() { " · idle" } else { "" };
+        let runs = bookie_gpui::messages::plural(transaction.statements, "run", "runs");
         let detail = format!(
-            "Transaction · {clock} · {} run{}{}",
-            transaction.statements,
-            if transaction.statements == 1 { "" } else { "s" },
+            "Transaction · {clock} · {runs}{}",
             warning
                 .as_ref()
                 .map_or_else(String::new, |warning| format!(" · {warning}")),
@@ -436,11 +435,7 @@ impl GridView {
         let label = if compact {
             format!("Tx · {clock}{idle}")
         } else {
-            format!(
-                "Transaction · {clock} · {} run{}{idle}",
-                transaction.statements,
-                if transaction.statements == 1 { "" } else { "s" },
-            )
+            format!("Transaction · {clock} · {runs}{idle}")
         };
         let color = if warning.is_some() {
             theme.destructive

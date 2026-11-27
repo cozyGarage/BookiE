@@ -33,7 +33,11 @@ impl GridView {
         let count = self.pending_edit_count().max(1);
         let dialog = ConfirmDialog {
             id: "close-confirm",
-            title: format!("Close the window and discard {count} pending change(s)?").into(),
+            title: format!(
+                "Close the window and discard {}?",
+                bookie_gpui::messages::plural(count, "pending change", "pending changes")
+            )
+            .into(),
             body: "Nothing has been saved to the database. The query text is kept for Reopen closed tab.".into(),
             sql: None,
         };

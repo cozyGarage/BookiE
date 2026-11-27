@@ -94,11 +94,7 @@ pub(crate) fn mix(base: u32, color: u32, amount: f32) -> u32 {
 
 impl GridView {
     pub(crate) fn live_color(&self) -> Option<u32> {
-        let saved = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref())
-            .map(|(id, _)| *id);
+        let saved = self.saved_connection_id();
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -114,11 +110,7 @@ impl GridView {
     }
 
     pub(crate) fn live_environment(&self) -> Environment {
-        let saved = self
-            .live
-            .as_ref()
-            .and_then(|live| live.saved.as_ref())
-            .map(|(id, _)| *id);
+        let saved = self.saved_connection_id();
         self.connections
             .iter()
             .find(|connection| Some(connection.id) == saved)
@@ -775,14 +767,6 @@ impl GridView {
             .border_b_1()
             .border_color(rgb(theme.border))
             .children(tabs)
-    }
-}
-
-pub(crate) fn one_line(sql: &str) -> String {
-    let flat: String = sql.split_whitespace().collect::<Vec<_>>().join(" ");
-    match flat.char_indices().nth(120) {
-        Some((end, _)) => format!("{}…", &flat[..end]),
-        None => flat,
     }
 }
 

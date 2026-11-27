@@ -654,11 +654,8 @@ impl GridView {
         if self.grid_is_query || self.compare.is_some() {
             return saved_widths;
         }
-        let (Some(scope), Some((id, _)), Some(store)) = (
-            scope,
-            self.live.as_ref().and_then(|session| session.saved.as_ref()),
-            self.column_widths.as_ref(),
-        ) else {
+        let (Some(scope), Some((id, _)), Some(store)) = (scope, self.saved_connection(), self.column_widths.as_ref())
+        else {
             return saved_widths;
         };
         let unique_columns = unique_column_indices(columns);
@@ -703,7 +700,7 @@ impl GridView {
             return;
         };
         if let WidthScope::Table(scope) = &scope
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(store) = &self.column_widths
             && let Err(error) = store.forget_widths(*id, &scope.width_key())
         {
@@ -741,7 +738,7 @@ impl GridView {
         if !self.grid_is_query
             && self.compare.is_none()
             && let WidthScope::Table(table_scope) = &scope
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(store) = &self.column_widths
         {
             for (name, width) in &changes {
@@ -908,11 +905,9 @@ impl GridView {
         pin_scope: &Option<PinScope>,
     ) -> (HashSet<usize>, ColumnProjection) {
         let persisted = self
-            .live
-            .as_ref()
+            .saved_connection_id()
             .filter(|_| !self.grid_is_query && self.compare.is_none())
-            .and_then(|session| session.saved.as_ref().map(|(id, _)| (*id, session)))
-            .and_then(|(id, _)| {
+            .and_then(|id| {
                 let scope = pin_scope.as_ref()?.width_key();
                 self.column_widths
                     .as_ref()
@@ -1206,7 +1201,7 @@ impl GridView {
         let unique_name = columns.iter().filter(|(column, _)| column == name).count() == 1;
         if !self.grid_is_query
             && self.compare.is_none()
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
             && unique_name
@@ -1257,7 +1252,7 @@ impl GridView {
         }
         if !self.grid_is_query
             && self.compare.is_none()
-            && let Some((id, _)) = self.live.as_ref().and_then(|session| session.saved.as_ref())
+            && let Some((id, _)) = self.saved_connection()
             && let Some(scope_key) = &scope_key
             && let Some(store) = &self.column_widths
         {
