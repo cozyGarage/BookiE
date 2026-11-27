@@ -27,7 +27,10 @@ fn a_network_connection_names_its_address_database_tunnel_and_tls_without_secret
         "Server: PostgreSQL 16.4 on x86_64-pc-linux-gnu\nAddress: db.internal:5432\nDatabase: app\nSSH: 2 hops\nTLS: Verify CA\nRound trip: 12 ms"
     );
     for secret in ["admin", "tunneluser", "bastion", "edge"] {
-        assert!(!tooltip.contains(secret), "{secret} leaked into {tooltip}");
+        assert!(
+            !tooltip.contains(secret),
+            "connection details included a sensitive field"
+        );
     }
 }
 

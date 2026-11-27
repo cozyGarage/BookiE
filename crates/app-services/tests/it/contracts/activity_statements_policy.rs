@@ -36,8 +36,8 @@ fn every_server_activity_read_is_classified_as_a_plain_read() {
         for kind in read_kinds(driver) {
             let sql = activity_sql(driver, kind, None).unwrap();
             let facts = classify(&sql, driver);
-            assert_eq!(facts.class, StatementClass::Select, "{driver} {kind:?}: {sql}");
-            assert!(!facts.writes(), "{driver} {kind:?} must not classify as a write: {sql}");
+            assert_eq!(facts.class, StatementClass::Select, "{driver} {kind:?}");
+            assert!(!facts.writes(), "{driver} {kind:?} must not classify as a write");
         }
     }
 }
