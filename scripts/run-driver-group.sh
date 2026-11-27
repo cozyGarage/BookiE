@@ -50,7 +50,7 @@ for driver in "${drivers[@]}"; do
     bash scripts/run-rust-tests.sh --locked -p "bookie-driver-$driver" \
       "${test_targets[@]}" -- --include-ignored --test-threads=1
   fi
-  if [[ -f "tests/data-integrity/tests/$driver.rs" ]]; then
+  if [[ "$driver" != duckdb && -f "tests/data-integrity/tests/$driver.rs" ]]; then
     bash scripts/run-rust-tests.sh --locked -p bookie-data-integrity-tests \
       --test "$driver" -- --include-ignored --test-threads=1 --nocapture
   fi

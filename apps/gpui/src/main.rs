@@ -1084,6 +1084,7 @@ mod crypto_provider_tests {
 
 fn main() {
     bookie_app_services::initialize_process_crypto();
+    bookie_app_services::use_user_state();
     let started = Instant::now();
     init_logging();
     let total = rows_from(std::env::var("BOOKIE_PROTOTYPE_ROWS").ok().as_deref());

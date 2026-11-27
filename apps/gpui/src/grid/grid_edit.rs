@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use bookie_gpui::edit::{is_editable, parse_edit};
 use bookie_gpui::model::{Cell, CellText};
+use bookie_results::value_exact::exact_equal;
 use gpui::{Context, Focusable, Window};
 
 use crate::GridView;
@@ -93,7 +94,7 @@ impl GridView {
         match parsed {
             Ok(cell) => {
                 let key = (editing.row, editing.column);
-                if self.cell_at(key.0, key.1) == cell {
+                if exact_equal(&self.cell_at(key.0, key.1), &cell) {
                     self.stop_edit(window, cx);
                     return;
                 }

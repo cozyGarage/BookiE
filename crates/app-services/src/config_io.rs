@@ -4,6 +4,13 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 pub fn xdg_config_path(filename: &str) -> Option<PathBuf> {
+    if let Some(dir) = bookie_storage::isolated_test_state_dir() {
+        return Some(
+            dir.join("config")
+                .join(bookie_storage::storage_dir_name())
+                .join(filename),
+        );
+    }
     config_path_in(std::env::var_os("XDG_CONFIG_HOME"), std::env::var_os("HOME"), filename)
 }
 

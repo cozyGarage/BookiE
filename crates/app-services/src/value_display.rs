@@ -91,7 +91,7 @@ fn format_value(value: &Value, prefs: DisplayPrefs, role: TextRole) -> String {
             };
             format_temporal_for_display(value, format).unwrap_or_default()
         }
-        Value::Time(time) => time.format("%H:%M:%S").to_string(),
+        Value::Time(time) => bookie_core::sql_literal::time_text(*time),
         Value::Decimal(number) => number.to_string(),
         Value::Uuid(id) => id.to_string(),
         Value::Json(json) => json.to_string(),
@@ -148,7 +148,7 @@ pub fn format_temporal_for_display(value: &Value, format: DateFormatPref) -> Opt
             Some(pattern) => {
                 format!("{} {}", at.naive_utc().format(pattern), at.format("%:z"))
             }
-            None => at.format("%Y-%m-%d %H:%M:%S%:z").to_string(),
+            None => at.format("%Y-%m-%d %H:%M:%S%.f%:z").to_string(),
         }),
         _ => None,
     }
@@ -156,6 +156,10 @@ pub fn format_temporal_for_display(value: &Value, format: DateFormatPref) -> Opt
 
 pub fn format_temporal_for_edit(value: &Value) -> Option<String> {
     format_temporal_for_display(value, DateFormatPref::Iso)
+}
+
+pub fn edit_text(value: &Value) -> String {
+    format_temporal_for_edit(value).unwrap_or_else(|| copy_text(value).into_string())
 }
 
 #[cfg(test)]
@@ -251,6 +255,23 @@ mod tests {
         assert_eq!(format_temporal_for_edit(&stamp).as_deref(), Some("2024-12-31 23:59:58"));
         assert_ne!(painted_date, format_temporal_for_edit(&date).unwrap());
         assert_ne!(painted_stamp, format_temporal_for_edit(&stamp).unwrap());
+    }
+
+    #[test]
+    fn edit_and_copy_text_keep_every_fractional_digit_of_a_time_and_an_instant() {
+        let time = |text: &str| Value::Time(text.parse().unwrap());
+        assert_eq!(copy_text(&time("13:45:30.5")).as_str(), "13:45:30.5");
+        assert_eq!(copy_text(&time("23:59:59.999999")).as_str(), "23:59:59.999999");
+        assert_eq!(copy_text(&time("00:00:00.000000001")).as_str(), "00:00:00.000000001");
+        assert_eq!(copy_text(&time("00:00:00")).as_str(), "00:00:00");
+        let instant = Value::TimestampTz("2024-02-29T08:15:30.123456Z".parse().unwrap());
+        assert_eq!(
+            format_temporal_for_edit(&instant).as_deref(),
+            Some("2024-02-29 08:15:30.123456+00:00")
+        );
+        assert_eq!(copy_text(&instant).as_str(), "2024-02-29 08:15:30.123456+00:00");
+        let before_epoch = Value::TimestampTz("1969-12-31T23:59:59.5Z".parse().unwrap());
+        assert_eq!(copy_text(&before_epoch).as_str(), "1969-12-31 23:59:59.500+00:00");
     }
 
     #[test]

@@ -111,7 +111,7 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::Text(text) => string_literal(driver_id, text),
         Value::Bytes(bytes) => binary_literal(driver_id, bytes)?,
         Value::Date(date) => string_literal(driver_id, &date.format("%Y-%m-%d").to_string()),
-        Value::Time(time) => string_literal(driver_id, &time.to_string()),
+        Value::Time(time) => string_literal(driver_id, &time_text(*time)),
         Value::DateTime(stamp) if driver_id == "clickhouse" => {
             clickhouse_datetime64_literal(*stamp, None).ok_or(LiteralError::Unsupported)?
         }
@@ -129,6 +129,16 @@ pub fn render_sql_literal(driver_id: &str, value: &Value) -> Result<String, Lite
         Value::JsonText(json) => string_literal(driver_id, json),
         Value::Undecodable(_) => return Err(LiteralError::Undecodable),
     })
+}
+
+pub fn time_text(time: chrono::NaiveTime) -> String {
+    let clock = time.format("%H:%M:%S");
+    let nanos = time.nanosecond() % 1_000_000_000;
+    if nanos == 0 {
+        return clock.to_string();
+    }
+    let fraction = format!("{nanos:09}");
+    format!("{clock}.{}", fraction.trim_end_matches('0'))
 }
 
 pub fn postgres_extended_temporal_text(value: &Value) -> Option<String> {

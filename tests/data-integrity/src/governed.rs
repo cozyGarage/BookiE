@@ -2,11 +2,15 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bookie_core::{ConnectOptions, Connection, Environment, OperationControl};
-use bookie_policy::{AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
+use bookie_policy::{
+    ApprovalSink, AuditState, AutoApproveSink, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
+};
 use bookie_storage::AuditJournal;
 
 pub struct Governed {
     pub guard: PolicyGuard,
+    pub capabilities: bookie_core::DriverCapabilities,
+    pub value_input: bookie_core::DriverValueInputCapabilities,
     _journal: tempfile::TempDir,
 }
 
@@ -15,6 +19,23 @@ pub fn control() -> OperationControl {
 }
 
 pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> Governed {
+    open_with(driver_id, options, read_only, Arc::new(DenyApprovalSink)).await
+}
+
+pub async fn open_confirming(driver_id: &str, options: ConnectOptions) -> Governed {
+    open_with(driver_id, options, false, Arc::new(AutoApproveSink)).await
+}
+
+pub async fn open_writable(driver_id: &str, options: ConnectOptions) -> Governed {
+    open_confirming(driver_id, options).await
+}
+
+async fn open_with(
+    driver_id: &str,
+    options: ConnectOptions,
+    read_only: bool,
+    approval: Arc<dyn ApprovalSink>,
+) -> Governed {
     bookie_transport::install_crypto_provider();
     let registry = drivers_registry::default_registry();
     let driver = registry
@@ -39,13 +60,21 @@ pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> 
             read_only,
             principal: Principal::human_gui(),
             policy: Arc::new(PolicyConfig::default()),
-            approval: Arc::new(DenyApprovalSink),
+            approval,
             audit: Arc::new(journal),
             audit_state: Arc::new(AuditState::new()),
         },
     );
     Governed {
         guard,
+        capabilities: driver.capabilities(),
+        value_input: driver.value_input_capabilities(),
         _journal: journal_dir,
+    }
+}
+
+impl Governed {
+    pub async fn close(self) {
+        let _ = Box::new(self.guard).close().await;
     }
 }

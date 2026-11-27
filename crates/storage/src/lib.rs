@@ -19,6 +19,7 @@ mod legacy_state;
 mod paths;
 pub mod query_history;
 mod secrets;
+mod test_state;
 
 pub use audit_journal::{AuditJournal, AuditJournalRecovery, LegacyJournalRotation, sample_event};
 pub use connection_bundle::{
@@ -66,3 +67,4 @@ pub use secrets::{
     load_ssh_hop_password, load_ssh_passphrase, load_ssh_password, store_mcp_token, store_password,
     store_ssh_hop_passphrase, store_ssh_hop_password, store_ssh_passphrase, store_ssh_password,
 };
+pub use test_state::{isolated_test_state_active, isolated_test_state_dir, use_user_state};
