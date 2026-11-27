@@ -7,8 +7,6 @@ use sqlx::mysql::{MySql, MySqlConnectOptions, MySqlPoolOptions, MySqlRow};
 use sqlx::pool::PoolConnection;
 use sqlx::{Connection as SqlxConnection, Executor, Pool, Row, SqlSafeStr, Statement};
 
-use futures::stream::StreamExt;
-
 mod attributes;
 mod catalog;
 mod decode;
@@ -360,7 +358,9 @@ impl Connection for MysqlConnection {
     ) -> Result<QueryResult, DriverError> {
         let sql = rows_page_sql(schema, table, offset, limit);
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        params_into_result(&mut connection, &sql, &[], limit as usize).await
+        params_into_result(&mut connection, &sql, &[], limit as usize)
+            .await
+            .map(QueryResultBatch::into_first)
     }
 
     async fn fetch_rows_controlled(
@@ -377,12 +377,16 @@ impl Connection for MysqlConnection {
 
     async fn query(&self, sql: &str) -> Result<QueryResult, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        params_into_result(&mut connection, sql, &[], MAX_QUERY_ROWS).await
+        params_into_result(&mut connection, sql, &[], MAX_QUERY_ROWS)
+            .await
+            .map(QueryResultBatch::into_first)
     }
 
     async fn query_params(&self, sql: &str, params: &[Value]) -> Result<QueryResult, DriverError> {
         let mut connection = self.pool.acquire().await.map_err(map_sqlx_error)?;
-        params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS).await
+        params_into_result(&mut connection, sql, params, MAX_QUERY_ROWS)
+            .await
+            .map(QueryResultBatch::into_first)
     }
 
     async fn query_controlled(&self, sql: &str, control: &OperationControl) -> Result<QueryResult, DriverError> {
@@ -462,7 +466,6 @@ impl Connection for MysqlConnection {
                 control,
             )
             .await
-            .map(QueryResultBatch::single)
         };
         if params.is_empty() && result.as_ref().is_err_and(session::needs_text_protocol) {
             result = run_server_cancellable(
@@ -776,7 +779,9 @@ async fn transaction_query(
     params: &[Value],
 ) -> Result<QueryResult, DriverError> {
     let timestamp_is_utc = timezone_is_utc(&mut *connection).await?;
-    let mut result = params_into_result(connection, sql, params, MAX_QUERY_ROWS).await?;
+    let mut result = params_into_result(connection, sql, params, MAX_QUERY_ROWS)
+        .await?
+        .into_first();
     if !timestamp_is_utc {
         refuse_non_utc_timestamps(&mut result);
     }
@@ -973,7 +978,7 @@ async fn params_into_result(
     sql: &str,
     params: &[Value],
     limit: usize,
-) -> Result<QueryResult, DriverError> {
+) -> Result<QueryResultBatch, DriverError> {
     params_into_result_bounded(
         connection,
         sql,
@@ -992,46 +997,42 @@ async fn params_into_result_bounded(
     limit: usize,
     max_bytes: usize,
     retire_on_truncation: bool,
-) -> Result<QueryResult, DriverError> {
+) -> Result<QueryResultBatch, DriverError> {
     let statement = connection
         .prepare(sqlx::AssertSqlSafe(sql).into_sql_str())
         .await
         .map_err(map_sqlx_error)?;
-    let mut columns = statement_columns(statement.columns());
-    let mut decoders = decode::column_decoders(statement.columns());
+    let prepared_columns = statement_columns(statement.columns());
     let query = bind_mysql_params(sqlx::query(sqlx::AssertSqlSafe(sql)), params)?;
-    let mut stream = query.fetch(&mut *connection);
-    let mut rows = QueryRows::with_capacity(limit.min(1024), 0);
-    let mut decoded = Vec::with_capacity(columns.len());
-    let mut budget = QueryResultBudget::with_limits(limit, max_bytes);
-    let mut truncated = false;
-    while let Some(row_result) = stream.next().await {
-        let row = row_result.map_err(map_sqlx_error)?;
-        if rows.len() >= limit {
-            truncated = true;
-            break;
-        }
-        if columns.is_empty() {
-            columns = statement_columns(row.columns());
-            decoders = decode::column_decoders(row.columns());
-        }
-        if !decode::decode_row_into(&row, &decoders, &mut budget, &mut decoded) {
-            truncated = true;
-            break;
-        }
-        rows.push_row(&mut decoded);
-    }
+    let mut stream = Executor::fetch_many(&mut *connection, query);
+    let budget = QueryResultBudget::with_limits(limit, max_bytes);
+    let collected = text_protocol::collect_result_sets(&mut stream, budget, true).await;
     drop(stream);
+    let (result_sets, truncated) = collected?;
     if !truncated || !retire_on_truncation {
         forget_statements_after_use(&mut *connection, sql)
             .await
             .map_err(map_sqlx_error)?;
     }
-    Ok(QueryResult {
-        columns,
-        rows,
+    Ok(text_protocol::result_batch(
+        with_prepared_columns(result_sets, prepared_columns),
         truncated,
-    })
+    ))
+}
+
+fn with_prepared_columns(mut result_sets: Vec<QueryResult>, prepared_columns: Vec<ColumnInfo>) -> Vec<QueryResult> {
+    match result_sets.first_mut() {
+        Some(first) if !prepared_columns.is_empty() && first.columns.len() == prepared_columns.len() => {
+            first.columns = prepared_columns;
+        }
+        Some(_) => {}
+        None => result_sets.push(QueryResult {
+            columns: prepared_columns,
+            rows: QueryRows::new(),
+            truncated: false,
+        }),
+    }
+    result_sets
 }
 
 async fn execute_on<'e, E>(executor: E, sql: &str, params: &[Value]) -> Result<ExecResult, DriverError>

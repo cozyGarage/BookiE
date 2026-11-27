@@ -267,25 +267,38 @@ impl GridView {
                 .await;
             this.update(cx, |this, cx| {
                 this.connection_bundle.busy = false;
-                match (result, saved) {
-                    (Ok(count), Ok(connections)) => {
-                        this.connections = connections;
-                        this.status = format!("Imported {count} connection(s)");
-                    }
-                    (Err(message), Ok(connections)) => {
-                        this.connections = connections;
-                        this.status = message;
-                    }
-                    (Err(message), Err(_)) => this.status = message,
-                    (Ok(_), Err(_)) => {
-                        this.status = "Connections were imported, but the list could not be refreshed".into()
-                    }
-                }
+                this.finish_connection_import(result, saved);
                 cx.notify();
             })
             .ok();
         })
         .detach();
+    }
+
+    fn finish_connection_import(
+        &mut self,
+        result: Result<usize, String>,
+        saved: Result<Vec<bookie_app_services::read_session::ConnectionSummary>, String>,
+    ) {
+        use crate::notifications::NoticeKind;
+        let kind = if result.is_ok() && saved.is_ok() {
+            NoticeKind::Success
+        } else {
+            NoticeKind::Error
+        };
+        match (result, saved) {
+            (Ok(count), Ok(connections)) => {
+                self.connections = connections;
+                self.status = format!("Imported {count} connection(s)");
+            }
+            (Err(message), Ok(connections)) => {
+                self.connections = connections;
+                self.status = message;
+            }
+            (Err(message), Err(_)) => self.status = message,
+            (Ok(_), Err(_)) => self.status = "Connections were imported, but the list could not be refreshed".into(),
+        }
+        self.notices.push(self.status.clone(), kind);
     }
 
     pub(crate) fn pick_connection_export(&mut self, cx: &mut Context<Self>) {
@@ -554,6 +567,30 @@ async fn write_export(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[gpui::test]
+    fn import_outcomes_reach_notifications_with_the_right_severity(cx: &mut gpui::TestAppContext) {
+        use crate::notifications::NoticeKind;
+        let (view, cx) = crate::ui_tests::open(cx);
+        for (result, saved, kind) in [
+            (Ok(2), Ok(vec![]), NoticeKind::Success),
+            (Err("Import failed".to_string()), Ok(vec![]), NoticeKind::Error),
+            (
+                Err("Import failed".to_string()),
+                Err("Refresh failed".to_string()),
+                NoticeKind::Error,
+            ),
+            (Ok(2), Err("Refresh failed".to_string()), NoticeKind::Error),
+        ] {
+            view.update(cx, |view, _| {
+                let before = view.notices.items.len();
+                view.finish_connection_import(result, saved);
+                assert_eq!(view.notices.items.len(), before + 1);
+                assert_eq!(view.notices.items[0].kind, kind);
+                assert_eq!(view.notices.items[0].text, view.status);
+            });
+        }
+    }
 
     #[test]
     fn import_disposition_text_is_user_visible_and_distinct() {

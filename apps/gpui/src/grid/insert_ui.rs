@@ -149,7 +149,7 @@ impl GridView {
                 .child(div().w(px(size::FORM_CONTROL * 4.0)).child(field.input.clone()))
         });
         Some(
-            task_bar("New row", theme)
+            task_bar("Add row", theme)
                 .flex_wrap()
                 .child(div().flex_1().min_w_0().flex().flex_wrap().gap_3().children(fields))
                 .child(

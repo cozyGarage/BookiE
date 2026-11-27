@@ -40,7 +40,7 @@ pub fn run_check(address: &str) -> Outcome {
     block_on(async {
         Ok::<_, String>(bookie_app_services::checks::check_tcp(address, std::time::Duration::from_secs(5)).await)
     })
-        .unwrap_or_else(|reason| Outcome::Down { reason })
+    .unwrap_or_else(|reason| Outcome::Down { reason })
 }
 
 pub fn record(histories: &mut Vec<(String, History)>, address: &str, outcome: Outcome) -> (bool, String) {

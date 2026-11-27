@@ -154,6 +154,7 @@ struct GridView {
     schema_context: Option<String>,
     connections: Vec<bookie_app_services::read_session::ConnectionSummary>,
     keymap: Keymap,
+    editor_hint: String,
     dark_mode: bool,
     tabs: Tabs,
     window_title_tab: Option<Tab>,
@@ -210,6 +211,13 @@ pub(crate) struct Pace {
     step: u32,
     steps: u32,
     begun: Instant,
+}
+
+pub(crate) fn editor_placeholder(keymap: &Keymap) -> String {
+    keymap.binding(bookie_gpui::keymap::Command::RunAtCursor).map_or_else(
+        || "SELECT …".to_string(),
+        |chord| format!("SELECT … ({} runs the selection or statement)", chord.label()),
+    )
 }
 
 fn thousands(value: u64) -> String {
@@ -324,7 +332,7 @@ impl GridView {
                 .folding(true)
                 .searchable(true)
                 .replaceable(true)
-                .placeholder("SELECT … (Ctrl+Enter runs the selection or statement)");
+                .placeholder(editor_placeholder(&Keymap::default()));
             Self::install_sql_completion(&mut editor, owner);
             editor
         });
@@ -511,6 +519,17 @@ impl GridView {
         inputs
     }
 
+    fn init_row_detail_filter(cx: &mut Context<Self>) -> Entity<TextInput> {
+        let filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
+        cx.subscribe(&filter, |_, _, event: &InputEvent, cx| {
+            if matches!(event, InputEvent::Changed) {
+                cx.notify();
+            }
+        })
+        .detach();
+        filter
+    }
+
     fn with_source(source: Source, started: Instant, window: &mut Window, cx: &mut Context<Self>) -> Self {
         #[cfg(test)]
         test_config::isolate();
@@ -520,13 +539,7 @@ impl GridView {
         }
         let total = source.total();
         let (find, filter, editor, sql_input, value_editor, sql_mark_revision) = Self::init_query_inputs(window, cx);
-        let row_detail_filter = cx.new(|cx| TextInput::new("Filter fields by name or value", cx));
-        cx.subscribe(&row_detail_filter, |_, _, event: &InputEvent, cx| {
-            if matches!(event, InputEvent::Changed) {
-                cx.notify();
-            }
-        })
-        .detach();
+        let row_detail_filter = Self::init_row_detail_filter(cx);
         let (sidebar_search, palette_input) = Self::init_chrome_inputs(window, cx);
         let (table, table_focus, table_events) = Self::init_grid_table(window, cx);
         let font_names = installed_font_names(cx);
@@ -608,6 +621,7 @@ impl GridView {
             live: None,
             schema_context: None,
             keymap: Keymap::default(),
+            editor_hint: editor_placeholder(&Keymap::default()),
             tabs: Tabs::default(),
             window_title_tab: None,
             tab_scroll: ScrollHandle::new(),
