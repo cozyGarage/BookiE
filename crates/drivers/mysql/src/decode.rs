@@ -1,5 +1,5 @@
-use bookie_core::{QueryResultBudget, Value, single_precision_as_f64};
-use sqlx::mysql::{MySql, MySqlColumn, MySqlRow, MySqlValueRef};
+use bookie_core::{DriverError, QueryResultBudget, Value, single_precision_as_f64};
+use sqlx::mysql::{MySql, MySqlColumn, MySqlRow, MySqlTypeInfo, MySqlValueRef};
 use sqlx::{Column, Decode, Row, Type, TypeInfo, ValueRef};
 
 use crate::{packed, temporal};
@@ -71,30 +71,34 @@ pub(crate) fn decode_row_into(
     decoders: &[ColumnDecoder],
     budget: &mut QueryResultBudget,
     values: &mut Vec<Value>,
-) -> bool {
+) -> Result<bool, DriverError> {
     values.clear();
-    if row.len() != decoders.len() {
-        return false;
-    }
+    ensure_plan_width(row.len(), decoders.len())?;
     let mut payload_bytes = 0usize;
     for (index, decoder) in decoders.iter().enumerate() {
-        let Ok(raw) = row.try_get_raw(index) else {
-            values.clear();
-            return false;
-        };
+        let raw = row.try_get_raw(index).map_err(crate::map_sqlx_error)?;
         payload_bytes = payload_bytes.saturating_add(mysql_value_payload_bytes(raw.clone()));
         if !budget.can_admit_row_payload(row.len(), payload_bytes) {
             values.clear();
-            return false;
+            return Ok(false);
         }
         values.push(extract_value(raw, index, decoder));
     }
     if budget.admit(values) {
-        true
+        Ok(true)
     } else {
         values.clear();
-        false
+        Ok(false)
     }
+}
+
+fn ensure_plan_width(row_width: usize, plan_width: usize) -> Result<(), DriverError> {
+    if row_width == plan_width {
+        return Ok(());
+    }
+    Err(DriverError::Internal(format!(
+        "mysql row has {row_width} columns but its result set metadata has {plan_width}"
+    )))
 }
 
 pub(crate) fn extract_row(row: &MySqlRow, decoders: &[ColumnDecoder]) -> Vec<Value> {
@@ -124,10 +128,22 @@ fn extract_value(raw: MySqlValueRef<'_>, index: usize, decoder: &ColumnDecoder) 
 fn decode_by_type(raw: MySqlValueRef<'_>, decoder: &ColumnDecoder) -> Option<Value> {
     match decoder.kind {
         DecodeKind::SignedInteger => decode::<i64>(raw).map(Value::Int),
+        // sqlx's i64 decoder refuses an UNSIGNED-flagged column
+        // outright (a distinct type-compatibility class, not just the
+        // same decode with a wider range), so every one of these
+        // columns read back as an empty cell regardless of value --
+        // decode as u64 instead, and keep BIGINT UNSIGNED's digits as
+        // text on the rare value that exceeds i64::MAX.
         DecodeKind::UnsignedInteger => decode::<u64>(raw)
             .map(|value| i64::try_from(value).map_or_else(|_| Value::Text(value.to_string()), Value::Int)),
         DecodeKind::Float => decode::<f32>(raw).map(|value| Value::Float(single_precision_as_f64(value))),
         DecodeKind::Double => decode::<f64>(raw).map(Value::Float),
+        // DECIMAL/NUMERIC arrive over the wire as text, but sqlx only
+        // decodes that text into rust_decimal::Decimal, which caps out
+        // at ~28-29 significant digits -- well inside what MySQL
+        // itself allows (up to 65). A legitimately large value keeps
+        // its exact digits as text instead of the row's real number
+        // silently disappearing.
         DecodeKind::Decimal => decode_decimal_exact(raw),
         DecodeKind::Boolean => decode::<i64>(raw.clone())
             .or_else(|| decode::<u8>(raw).map(i64::from))
@@ -180,8 +196,12 @@ fn undecodable(index: usize, type_name: &str) -> Value {
     Value::Undecodable(type_name.to_string())
 }
 
+/// `String`'s `Type<MySql>` compatibility check refuses a DECIMAL
+/// column outright, even though its wire representation is already
+/// text -- decoding through the raw value ref bypasses that check
+/// instead of going through `Row::try_get`.
 fn decode_decimal_exact(raw: MySqlValueRef<'_>) -> Option<Value> {
-    if raw.is_null() {
+    if raw.is_null() || !is_decimal_wire_type(&raw.type_info()) {
         return None;
     }
     <&str as Decode<MySql>>::decode(raw)
@@ -191,6 +211,10 @@ fn decode_decimal_exact(raw: MySqlValueRef<'_>) -> Option<Value> {
                 .unwrap_or_else(|_| Value::Text(text.to_owned()))
         })
         .ok()
+}
+
+fn is_decimal_wire_type(type_info: &MySqlTypeInfo) -> bool {
+    <rust_decimal::Decimal as Type<MySql>>::compatible(type_info)
 }
 
 fn tiny_flag(stored: i64) -> Value {
@@ -224,5 +248,23 @@ mod tests {
         assert_eq!(ColumnDecoder::new("BIGINT UNSIGNED").kind, DecodeKind::UnsignedInteger);
         assert_eq!(ColumnDecoder::new("DECIMAL").kind, DecodeKind::Decimal);
         assert_eq!(ColumnDecoder::new("mystery").kind, DecodeKind::Text);
+    }
+
+    #[test]
+    fn the_exact_decimal_decoder_only_reads_decimal_wire_values() {
+        assert!(is_decimal_wire_type(
+            &<rust_decimal::Decimal as Type<MySql>>::type_info()
+        ));
+        assert!(!is_decimal_wire_type(&<i64 as Type<MySql>>::type_info()));
+        assert!(!is_decimal_wire_type(&<f64 as Type<MySql>>::type_info()));
+        assert!(!is_decimal_wire_type(&<String as Type<MySql>>::type_info()));
+        assert!(!is_decimal_wire_type(&<Vec<u8> as Type<MySql>>::type_info()));
+    }
+
+    #[test]
+    fn a_row_wider_or_narrower_than_its_decoder_plan_is_an_error() {
+        assert!(ensure_plan_width(2, 2).is_ok());
+        assert!(matches!(ensure_plan_width(2, 1), Err(DriverError::Internal(_))));
+        assert!(matches!(ensure_plan_width(1, 2), Err(DriverError::Internal(_))));
     }
 }
