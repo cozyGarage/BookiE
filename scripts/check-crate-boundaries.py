@@ -26,7 +26,7 @@ DRIVERS = {
     f"bookie-driver-{engine}"
     for engine in ("cassandra", "clickhouse", "duckdb", "mongodb", "mssql", "mysql", "oracle", "postgres", "redis", "sqlite")
 }
-TEST_CRATES = {"bookie-driver-tls-tests", "bookie-release-tests"}
+TEST_CRATES = {"bookie-data-integrity-tests", "bookie-driver-tls-tests", "bookie-release-tests"}
 ALLOWED = {
     "bookie-core": set(),
     "bookie-ssh": set(),

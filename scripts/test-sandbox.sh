@@ -26,6 +26,7 @@ CRATES=(
   bookie-mcp
   bookie-agentd
   bookie-driver-sqlite
+  bookie-data-integrity-tests
 )
 
 PKG_ARGS=()

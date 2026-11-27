@@ -1,0 +1,518 @@
+engine = "mysql"
+servers = ["mysql-8.4", "mariadb-11"]
+
+[[known_failing]]
+cases = ["bit64-beyond-i64", "binary", "varbinary", "blob", "longblob", "varchar-charset-binary", "geometry"]
+route = "param_select"
+servers = ["mysql-8.4"]
+issue = 4228
+expect = "expected carrier Bytes, BookiE has"
+reason = "MySQL 8.4 describes SELECT ? with a bound byte string as a character VARCHAR column, so the echo reads as text or Undecodable(VARCHAR)"
+
+[[case]]
+id = "tinyint"
+type = "TINYINT"
+literals = ["-128", "0", "127", "NULL"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "tinyint-unsigned"
+type = "TINYINT UNSIGNED"
+literals = ["0", "255"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "smallint"
+type = "SMALLINT"
+literals = ["-32768", "32767"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "smallint-unsigned"
+type = "SMALLINT UNSIGNED"
+literals = ["65535"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "mediumint"
+type = "MEDIUMINT"
+literals = ["-8388608", "8388607"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "mediumint-unsigned"
+type = "MEDIUMINT UNSIGNED"
+literals = ["16777215"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "int"
+type = "INT"
+literals = ["-2147483648", "2147483647", "NULL"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "int-unsigned"
+type = "INT UNSIGNED"
+literals = ["0", "4294967295"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "bigint"
+type = "BIGINT"
+literals = ["NULL"]
+literals_from = "integers"
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "bigint-unsigned-in-i64"
+type = "BIGINT UNSIGNED"
+literals = ["0", "9223372036854775807"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "bigint-unsigned-beyond-i64"
+type = "BIGINT UNSIGNED"
+literals = ["9223372036854775808", "18446744073709551615"]
+carrier = "Text"
+rule = "exact"
+note = "Value has no unsigned 64-bit integer; values above i64::MAX keep the exact server digits as text."
+
+[[case]]
+id = "tinyint1-flag"
+type = "TINYINT(1)"
+literals = ["0", "1", "NULL"]
+carrier = "Bool"
+rule = "bool"
+param_carrier = "Int"
+param_rule = "exact"
+note = "A bound Bool travels as TINYINT and SELECT ? reports a plain integer column with no TINYINT(1) display width, so the server itself echoes 0 or 1 as an integer."
+
+[[case]]
+id = "tinyint1-non-flag"
+type = "TINYINT(1)"
+literals = ["2", "-1", "127"]
+carrier = "Int"
+rule = "exact"
+note = "TINYINT(1) is only a display width; a stored 2 is 2, and reading it as true would change the value."
+
+[[case]]
+id = "bit1"
+type = "BIT(1)"
+literals = ["b'0'", "b'1'", "NULL"]
+carrier = "Int"
+rule = "number"
+referee = "CAST({v} + 0 AS CHAR)"
+note = "BIT reads as an integer while it fits i64; the referee is the server's numeric value of the bits."
+
+[[case]]
+id = "bit64-in-i64"
+type = "BIT(64)"
+literals = ["b'0'", "b'0111111111111111111111111111111111111111111111111111111111111111'"]
+carrier = "Int"
+rule = "number"
+referee = "CAST({v} + 0 AS CHAR)"
+
+[[case]]
+id = "bit64-beyond-i64"
+type = "BIT(64)"
+literals = ["b'1010101010101010101010101010101010101010101010101010101010101010'", "b'1000000000000000000000000000000000000000000000000000000000000000'"]
+carrier = "Bytes"
+rule = "bytes"
+referee = "LPAD(HEX({v}), 16, '0')"
+note = "Bits past i64::MAX keep their eight raw bytes."
+
+[[case]]
+id = "decimal-scaled"
+type = "DECIMAL(30,8)"
+literals = ["NULL", "0", "-0.0", "1.23"]
+literals_from = "decimals"
+carrier = "Decimal"
+rule = "exact"
+
+[[case]]
+id = "decimal-small-scale"
+type = "DECIMAL(5,5)"
+literals = ["0.00001", "-0.99999", "0"]
+carrier = "Decimal"
+rule = "exact"
+
+[[case]]
+id = "decimal-integer"
+type = "DECIMAL(10,0)"
+literals = ["9999999999", "-9999999999"]
+carrier = "Decimal"
+rule = "exact"
+
+[[case]]
+id = "decimal-max-precision"
+type = "DECIMAL(65,30)"
+literals = ["99999999999999999999999999999999999.999999999999999999999999999999", "-0.000000000000000000000000000001", "79228162514264337593543950336"]
+carrier = "Text"
+rule = "exact"
+note = "DECIMAL(65,30) is wider than rust_decimal: ADR 0007 requires the exact server text."
+
+[[case]]
+id = "float"
+type = "FLOAT"
+literals = ["0.1", "1.5", "-0", "1.17549435e-38", "3.40282e38", "16777217", "NULL"]
+carrier = "Float"
+rule = "float32"
+referee = "CAST({v} AS DOUBLE)"
+note = "CAST(float AS CHAR) prints six significant digits, so the referee widens the stored single to a double; BookiE widens through the shortest single decimal, so values compare at single precision."
+
+[[case]]
+id = "double"
+type = "DOUBLE"
+literals = ["NULL", "-0e0", "2.2250738585072014e-308", "1.7976931348623157e308", "0.30000000000000004"]
+literals_from = "floats"
+carrier = "Float"
+rule = "float"
+
+[[case]]
+id = "varchar-contract"
+type = "VARCHAR(100)"
+literals = ["NULL"]
+literals_from = "texts"
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "varchar-edges"
+type = "VARCHAR(100)"
+literals = ["'trailing  '", "'  leading'", "'a\\0b'", "'e\u0301 combining'", "'שלום RTL'", "'👩‍👩‍👧 zwj'", "'\\r\\n'"]
+carrier = "Text"
+rule = "exact"
+note = "MySQL VARCHAR keeps NUL and trailing spaces."
+
+[[case]]
+id = "char"
+type = "CHAR(10)"
+literals = ["'abc'", "'abc  '", "''", "NULL"]
+carrier = "Text"
+rule = "exact"
+note = "Without PAD_CHAR_TO_FULL_LENGTH the server strips CHAR padding on retrieval; that retrieval is the referee."
+
+[[case]]
+id = "varchar-latin1"
+type = "VARCHAR(20) CHARACTER SET latin1"
+literals = ["'café'", "'£'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "varchar-binary-collation"
+type = "VARCHAR(20) COLLATE utf8mb4_bin"
+literals = ["'A'", "'a'", "'é'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "text-large"
+type = "MEDIUMTEXT"
+literals = ["REPEAT('é', 70000)", "REPEAT('x', 262145)", "''"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "binary"
+type = "BINARY(4)"
+literals = ["x'DEADBEEF'", "x'00'", "''", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+note = "BINARY pads with 0x00 to its width; the stored padded bytes are the referee."
+
+[[case]]
+id = "varbinary"
+type = "VARBINARY(16)"
+literals = ["x'DEADBEEF'", "x'00'", "''", "x'00FF00'"]
+carrier = "Bytes"
+rule = "bytes"
+
+[[case]]
+id = "blob"
+type = "MEDIUMBLOB"
+literals = ["REPEAT(UNHEX('FF'), 70000)", "x'00'", "''", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+
+[[case]]
+id = "enum"
+type = "ENUM('a', 'b c', '')"
+literals = ["'a'", "'b c'", "''", "NULL"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "set"
+type = "SET('x', 'y', 'z')"
+literals = ["'x,z'", "''", "'y'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "date"
+type = "DATE"
+literals = ["'2024-02-29'", "'1000-01-01'", "'9999-12-31'", "'0001-01-01'", "NULL"]
+carrier = "Date"
+rule = "exact"
+
+[[case]]
+id = "date-zero"
+type = "DATE"
+session = "SET SESSION sql_mode = ''"
+literals = ["'0000-00-00'", "'2024-00-00'"]
+carrier = "Text"
+rule = "exact"
+note = "Zero and partial dates are real stored values in permissive modes; they are not NULL."
+
+[[case]]
+id = "time"
+type = "TIME(6)"
+literals = ["'00:00:00'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
+carrier = "Time"
+rule = "temporal"
+
+[[case]]
+id = "time-extended"
+type = "TIME(6)"
+literals = ["'838:59:59'", "'-838:59:59'", "'-00:00:01'", "'24:00:00'", "'100:00:00.000001'"]
+carrier = "Text"
+rule = "temporal"
+note = "TIME is a duration: negative and over-24-hour values are exact text."
+
+[[case]]
+id = "datetime"
+type = "DATETIME(6)"
+literals = ["'2024-02-29 13:45:30.123456'", "'1000-01-01 00:00:00'", "'9999-12-31 23:59:59.999999'", "NULL"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "timestamp"
+type = "TIMESTAMP(6) NULL"
+servers = ["mariadb-11"]
+literals = ["'1970-01-01 00:00:01'", "'2038-01-19 03:14:07.999999'", "'2024-02-29 13:45:30.123456'", "NULL"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "MariaDB echoes a bound TIMESTAMP parameter as a TIMESTAMP column."
+
+[[case]]
+id = "timestamp-mysql"
+type = "TIMESTAMP(6) NULL"
+servers = ["mysql-8.4"]
+literals = ["'1970-01-01 00:00:01'", "'2038-01-19 03:14:07.999999'", "'2024-02-29 13:45:30.123456'", "NULL"]
+carrier = "TimestampTz"
+rule = "instant"
+param_carrier = "DateTime"
+note = "MySQL 8.4 reports SELECT ? with a bound TIMESTAMP as a DATETIME column, so the echo is a wall clock; BookiE's session is UTC, so the instant rule reads it as UTC."
+
+[[case]]
+id = "year"
+type = "YEAR"
+literals = ["1901", "2155", "0", "NULL"]
+carrier = "Int"
+rule = "number"
+note = "The server renders YEAR 0 as 0000; leading zeros are display only."
+
+[[case]]
+id = "json"
+type = "JSON"
+servers = ["mysql-8.4"]
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'[1, 2.50, true, null]'", "'{\"nested\": {\"x\": [null, \"é\"]}}'", "'null'", "NULL"]
+carrier = "Json"
+rule = "json"
+param = "SELECT CAST(? AS JSON)"
+note = "MySQL stores JSON in a normalized binary form; the server's text rendering is the referee."
+
+[[case]]
+id = "json-mariadb"
+type = "JSON"
+servers = ["mariadb-11"]
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'  [1, 2.50]  '"]
+carrier = "Text"
+rule = "exact"
+note = "MariaDB JSON is LONGTEXT with a validity check; the source text is the value."
+
+[[case]]
+id = "geometry"
+type = "GEOMETRY"
+literals = ["ST_GeomFromText('POINT(1 2)')", "ST_GeomFromText('LINESTRING(0 0, 1 1)', 4326)"]
+carrier = "Bytes"
+rule = "bytes"
+note = "The referee is the stored internal format: a 4-byte SRID followed by WKB."
+
+
+[[case]]
+id = "timestamp-insert-zone"
+type = "TIMESTAMP(6) NULL"
+servers = ["mariadb-11"]
+session = "SET SESSION time_zone = '+05:30'"
+literals = ["'2024-02-29 13:45:30.123456'", "'1970-01-01 05:30:01'"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "The values are written from a +05:30 session, so the server converts them to UTC instants; BookiE must read the instant, not the writer's wall clock."
+
+[[case]]
+id = "timestamp-insert-zone-mysql"
+type = "TIMESTAMP(6) NULL"
+servers = ["mysql-8.4"]
+session = "SET SESSION time_zone = '+05:30'"
+literals = ["'2024-02-29 13:45:30.123456'", "'1970-01-01 05:30:01'"]
+carrier = "TimestampTz"
+rule = "instant"
+param_carrier = "DateTime"
+note = "As timestamp-insert-zone; MySQL 8.4 echoes a bound TIMESTAMP as DATETIME in BookiE's UTC session."
+
+[[case]]
+id = "timestamp-global-zone"
+type = "TIMESTAMP(6) NULL"
+servers = ["mariadb-11"]
+bookie_session = ["time_zone = '-03:30'"]
+literals = ["'2024-02-29 13:45:30.123456'", "'2038-01-19 03:14:07'"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "The server's global time_zone is -03:30 when BookiE connects; BookiE's own session must still read the stored instant."
+
+[[case]]
+id = "timestamp-global-zone-mysql"
+type = "TIMESTAMP(6) NULL"
+servers = ["mysql-8.4"]
+bookie_session = ["time_zone = '-03:30'"]
+literals = ["'2024-02-29 13:45:30.123456'", "'2038-01-19 03:14:07'"]
+carrier = "TimestampTz"
+rule = "instant"
+param_carrier = "DateTime"
+note = "As timestamp-global-zone; MySQL 8.4 echoes a bound TIMESTAMP as DATETIME in BookiE's UTC session."
+
+[[case]]
+id = "datetime-zero"
+type = "DATETIME"
+session = "SET SESSION sql_mode = ''"
+literals = ["'0000-00-00 00:00:00'", "'2024-00-00 00:00:00'"]
+carrier = "Text"
+rule = "exact"
+note = "Zero and partial datetimes are real stored values in permissive modes; they are not NULL."
+
+[[case]]
+id = "datetime-precision-0"
+type = "DATETIME(0)"
+literals = ["'2024-02-29 13:45:30.4'", "'2024-02-29 13:45:30.5'", "NULL"]
+carrier = "DateTime"
+rule = "temporal"
+note = "The server rounds to the declared precision on insert; the stored value is the referee."
+
+[[case]]
+id = "datetime-precision-3"
+type = "DATETIME(3)"
+literals = ["'2024-02-29 13:45:30.1235'", "'9999-12-31 23:59:59.999'"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "tinytext"
+type = "TINYTEXT"
+literals = ["REPEAT('x', 255)", "''", "'é'", "NULL"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "longtext"
+type = "LONGTEXT"
+literals = ["REPEAT('é', 300000)", "''"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "longblob"
+type = "LONGBLOB"
+literals = ["REPEAT(UNHEX('00FF'), 200000)", "''"]
+carrier = "Bytes"
+rule = "bytes"
+
+[[case]]
+id = "varchar-charset-binary"
+type = "VARCHAR(20) CHARACTER SET binary"
+literals = ["x'DEADBEEF'", "'abc'", "''"]
+carrier = "Bytes"
+rule = "bytes"
+note = "CHARACTER SET binary makes the column VARBINARY: the value is bytes even when they happen to be valid text."
+
+[[case]]
+id = "double-unsigned"
+type = "DOUBLE UNSIGNED"
+literals = ["0", "1.7976931348623157e308", "0.30000000000000004", "NULL"]
+carrier = "Float"
+rule = "float"
+
+[[case]]
+id = "decimal-unsigned"
+type = "DECIMAL(20,4) UNSIGNED"
+literals = ["0", "9999999999999999.9999", "1.5"]
+carrier = "Decimal"
+rule = "exact"
+
+[[case]]
+id = "uuid-mariadb"
+type = "UUID"
+servers = ["mariadb-11"]
+literals = ["'123e4567-e89b-42d3-a456-426614174000'", "'018f8e2c-7b6a-7c3d-8e9f-0a1b2c3d4e5f'", "'00000000-0000-0000-0000-000000000000'", "NULL"]
+carrier = "Text"
+rule = "exact"
+note = "MariaDB 11 refuses UUID text with an unknown version or variant, so the rows use version 4, version 7 and the nil UUID."
+
+[[case]]
+id = "inet4-mariadb"
+type = "INET4"
+servers = ["mariadb-11"]
+literals = ["'192.168.0.1'", "'0.0.0.0'", "'255.255.255.255'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "inet6-mariadb"
+type = "INET6"
+servers = ["mariadb-11"]
+literals = ["'::1'", "'2001:db8::ff00:42:8329'", "'::ffff:192.168.0.1'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "json-numbers-and-escapes"
+type = "JSON"
+servers = ["mysql-8.4"]
+literals = ["'{\"n\": 12345678901234567890123, \"m\": 18446744073709551615, \"f\": 1e300}'", "'\"\\\\u00e9\\\\u0000\\\\ud83d\\\\ude00\"'", "'{\"\\\\u0061\": 1}'"]
+carrier = "Json"
+rule = "json"
+param = "SELECT CAST(? AS JSON)"
+note = "MySQL parses JSON numbers past u64 as doubles and stores escapes decoded; the server's rendering is the referee."
+
+[[case]]
+id = "json-numbers-and-escapes-mariadb"
+type = "JSON"
+servers = ["mariadb-11"]
+literals = ["'{\"n\": 12345678901234567890123}'", "'\"\\\\u00e9\\\\u0000\"'"]
+carrier = "Text"
+rule = "exact"
+note = "MariaDB JSON is LONGTEXT; the source text, escapes and digits included, is the value."
+
+[[case]]
+id = "expression-comparison"
+type = "TINYINT(1)"
+literals = ["1=1", "1=0", "NULL=1"]
+carrier = "Bool"
+rule = "bool"
+param = "SELECT (? = 1)"
+param_carrier = "Int"
+param_rule = "exact"
+note = "SELECT (? = 1) is an expression column: the server types a comparison as BIGINT, so the echo is an integer 0 or 1."
