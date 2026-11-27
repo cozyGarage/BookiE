@@ -1,0 +1,360 @@
+engine = "mysql"
+servers = ["mysql-8.4", "mariadb-11"]
+
+[[case]]
+id = "tinyint"
+type = "TINYINT"
+literals = ["-128", "0", "127", "NULL"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "tinyint-unsigned"
+type = "TINYINT UNSIGNED"
+literals = ["0", "255"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "smallint"
+type = "SMALLINT"
+literals = ["-32768", "32767"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "smallint-unsigned"
+type = "SMALLINT UNSIGNED"
+literals = ["65535"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "mediumint"
+type = "MEDIUMINT"
+literals = ["-8388608", "8388607"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "mediumint-unsigned"
+type = "MEDIUMINT UNSIGNED"
+literals = ["16777215"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "int"
+type = "INT"
+literals = ["-2147483648", "2147483647", "NULL"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "int-unsigned"
+type = "INT UNSIGNED"
+literals = ["0", "4294967295"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bigint"
+type = "BIGINT"
+literals = ["NULL"]
+literals_from = "integers"
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bigint-unsigned-in-i64"
+type = "BIGINT UNSIGNED"
+literals = ["0", "9223372036854775807"]
+carrier = "Int"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bigint-unsigned-beyond-i64"
+type = "BIGINT UNSIGNED"
+literals = ["9223372036854775808", "18446744073709551615"]
+carrier = "Text"
+rule = "exact"
+note = "Value has no unsigned 64-bit integer; values above i64::MAX keep the exact server digits as text."
+
+[[case]]
+id = "tinyint1-flag"
+type = "TINYINT(1)"
+literals = ["0", "1", "NULL"]
+carrier = "Bool"
+rule = "bool"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "tinyint1-non-flag"
+type = "TINYINT(1)"
+literals = ["2", "-1", "127"]
+carrier = "Int"
+rule = "exact"
+note = "TINYINT(1) is only a display width; a stored 2 is 2, and reading it as true would change the value."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bit1"
+type = "BIT(1)"
+literals = ["b'0'", "b'1'", "NULL"]
+carrier = "Int"
+rule = "number"
+referee = "CAST({v} + 0 AS CHAR)"
+note = "BIT reads as an integer while it fits i64; the referee is the server's numeric value of the bits."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bit64-in-i64"
+type = "BIT(64)"
+literals = ["b'0'", "b'0111111111111111111111111111111111111111111111111111111111111111'"]
+carrier = "Int"
+rule = "number"
+referee = "CAST({v} + 0 AS CHAR)"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "bit64-beyond-i64"
+type = "BIT(64)"
+literals = ["b'1010101010101010101010101010101010101010101010101010101010101010'", "b'1000000000000000000000000000000000000000000000000000000000000000'"]
+carrier = "Bytes"
+rule = "bytes"
+referee = "LPAD(HEX({v}), 16, '0')"
+note = "Bits past i64::MAX keep their eight raw bytes."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "decimal-scaled"
+type = "DECIMAL(30,8)"
+literals = ["NULL", "0", "-0.0", "1.23"]
+literals_from = "decimals"
+carrier = "Decimal"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "decimal-small-scale"
+type = "DECIMAL(5,5)"
+literals = ["0.00001", "-0.99999", "0"]
+carrier = "Decimal"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "decimal-integer"
+type = "DECIMAL(10,0)"
+literals = ["9999999999", "-9999999999"]
+carrier = "Decimal"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "decimal-max-precision"
+type = "DECIMAL(65,30)"
+literals = ["99999999999999999999999999999999999.999999999999999999999999999999", "-0.000000000000000000000000000001", "79228162514264337593543950336"]
+carrier = "Text"
+rule = "exact"
+note = "DECIMAL(65,30) is wider than rust_decimal: ADR 0007 requires the exact server text."
+
+[[case]]
+id = "float"
+type = "FLOAT"
+literals = ["0.1", "1.5", "-0", "1.17549435e-38", "3.40282e38", "16777217", "NULL"]
+carrier = "Float"
+rule = "float32"
+referee = "CAST({v} AS DOUBLE)"
+note = "CAST(float AS CHAR) prints six significant digits, so the referee widens the stored single to a double; BookiE widens through the shortest single decimal, so values compare at single precision."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "double"
+type = "DOUBLE"
+literals = ["NULL", "-0e0", "2.2250738585072014e-308", "1.7976931348623157e308", "0.30000000000000004"]
+literals_from = "floats"
+carrier = "Float"
+rule = "float"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "varchar-contract"
+type = "VARCHAR(100)"
+literals = ["NULL"]
+literals_from = "texts"
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "varchar-edges"
+type = "VARCHAR(100)"
+literals = ["'trailing  '", "'  leading'", "'a\\0b'", "'e\u0301 combining'", "'שלום RTL'", "'👩‍👩‍👧 zwj'", "'\\r\\n'"]
+carrier = "Text"
+rule = "exact"
+note = "MySQL VARCHAR keeps NUL and trailing spaces."
+
+[[case]]
+id = "char"
+type = "CHAR(10)"
+literals = ["'abc'", "'abc  '", "''", "NULL"]
+carrier = "Text"
+rule = "exact"
+note = "Without PAD_CHAR_TO_FULL_LENGTH the server strips CHAR padding on retrieval; that retrieval is the referee."
+
+[[case]]
+id = "varchar-latin1"
+type = "VARCHAR(20) CHARACTER SET latin1"
+literals = ["'café'", "'£'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "varchar-binary-collation"
+type = "VARCHAR(20) COLLATE utf8mb4_bin"
+literals = ["'A'", "'a'", "'é'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "text-large"
+type = "MEDIUMTEXT"
+literals = ["REPEAT('é', 70000)", "REPEAT('x', 262145)", "''"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "binary"
+type = "BINARY(4)"
+literals = ["x'DEADBEEF'", "x'00'", "''", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+note = "BINARY pads with 0x00 to its width; the stored padded bytes are the referee."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "varbinary"
+type = "VARBINARY(16)"
+literals = ["x'DEADBEEF'", "x'00'", "''", "x'00FF00'"]
+carrier = "Bytes"
+rule = "bytes"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "blob"
+type = "MEDIUMBLOB"
+literals = ["REPEAT(UNHEX('FF'), 70000)", "x'00'", "''", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "enum"
+type = "ENUM('a', 'b c', '')"
+literals = ["'a'", "'b c'", "''", "NULL"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "set"
+type = "SET('x', 'y', 'z')"
+literals = ["'x,z'", "''", "'y'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "date"
+type = "DATE"
+literals = ["'2024-02-29'", "'1000-01-01'", "'9999-12-31'", "'0001-01-01'", "NULL"]
+carrier = "Date"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "date-zero"
+type = "DATE"
+session = "SET SESSION sql_mode = ''"
+literals = ["'0000-00-00'", "'2024-00-00'"]
+carrier = "Text"
+rule = "exact"
+note = "Zero and partial dates are real stored values in permissive modes; they are not NULL."
+
+[[case]]
+id = "time"
+type = "TIME(6)"
+literals = ["'00:00:00'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
+carrier = "Time"
+rule = "temporal"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "time-extended"
+type = "TIME(6)"
+literals = ["'838:59:59'", "'-838:59:59'", "'-00:00:01'", "'24:00:00'", "'100:00:00.000001'"]
+carrier = "Text"
+rule = "temporal"
+note = "TIME is a duration: negative and over-24-hour values are exact text."
+
+[[case]]
+id = "datetime"
+type = "DATETIME(6)"
+literals = ["'2024-02-29 13:45:30.123456'", "'1000-01-01 00:00:00'", "'9999-12-31 23:59:59.999999'", "NULL"]
+carrier = "DateTime"
+rule = "temporal"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "timestamp"
+type = "TIMESTAMP(6) NULL"
+literals = ["'1970-01-01 00:00:01'", "'2038-01-19 03:14:07.999999'", "'2024-02-29 13:45:30.123456'", "NULL"]
+carrier = "TimestampTz"
+rule = "instant"
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "year"
+type = "YEAR"
+literals = ["1901", "2155", "0", "NULL"]
+carrier = "Int"
+rule = "number"
+note = "The server renders YEAR 0 as 0000; leading zeros are display only."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+
+[[case]]
+id = "json"
+type = "JSON"
+servers = ["mysql-8.4"]
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'[1, 2.50, true, null]'", "'{\"nested\": {\"x\": [null, \"é\"]}}'", "'null'", "NULL"]
+carrier = "Json"
+rule = "json"
+param = "SELECT CAST(? AS JSON)"
+note = "MySQL stores JSON in a normalized binary form; the server's text rendering is the referee."
+
+[[case]]
+id = "json-mariadb"
+type = "JSON"
+servers = ["mariadb-11"]
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'  [1, 2.50]  '"]
+carrier = "Text"
+rule = "exact"
+note = "MariaDB JSON is LONGTEXT with a validity check; the source text is the value."
+
+[[case]]
+id = "geometry"
+type = "GEOMETRY"
+literals = ["ST_GeomFromText('POINT(1 2)')", "ST_GeomFromText('LINESTRING(0 0, 1 1)', 4326)"]
+carrier = "Bytes"
+rule = "bytes"
+note = "The referee is the stored internal format: a 4-byte SRID followed by WKB."
+known_failing = [{ route = "param_select", issue = 4094, reason = "SELECT ? decodes the executed column with the prepare-time VARCHAR or NULL plan" }]
+

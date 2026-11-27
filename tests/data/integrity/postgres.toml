@@ -1,0 +1,427 @@
+engine = "postgres"
+servers = ["pg16", "pg18"]
+
+[[case]]
+id = "smallint"
+type = "smallint"
+literals = ["-32768", "0", "32767", "NULL"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "integer"
+type = "integer"
+literals = ["-2147483648", "-1", "2147483647", "NULL"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "bigint"
+type = "bigint"
+literals = ["NULL"]
+literals_from = "integers"
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "numeric-scaled"
+type = "numeric(30,8)"
+literals = ["NULL", "0", "-0.0", "1.23"]
+literals_from = "decimals"
+carrier = "Decimal"
+rule = "exact"
+note = "The declared scale is part of the value: 1.23 is stored and rendered as 1.23000000."
+
+[[case]]
+id = "numeric-unconstrained"
+type = "numeric"
+literals = ["0", "-0.0", "0.00", "0.000", "1.50", "0.0000000000000000000000000001", "79228162514264337593543950335", "-79228162514264337593543950335"]
+carrier = "Decimal"
+rule = "exact"
+known_failing = [{ route = "param_select", issue = 4206, reason = "a bound zero Decimal is encoded with scale 0" }]
+
+[[case]]
+id = "numeric-beyond-rust-decimal"
+type = "numeric"
+literals = ["79228162514264337593543950336", "123456789012345678901234567890.123456789", "0.00000000000000000000000000000000000001", "-1e40"]
+carrier = "Text"
+rule = "exact"
+note = "Wider than rust_decimal: ADR 0007 requires the exact server text, not a rounded Decimal."
+
+[[case]]
+id = "numeric-max-precision"
+type = "numeric(1000,500)"
+literals = ["(repeat('9', 500) || '.' || repeat('9', 500))::numeric", "('-0.' || repeat('0', 499) || '1')::numeric"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "numeric-special"
+type = "numeric"
+literals = ["'NaN'", "'Infinity'", "'-Infinity'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "float8"
+type = "double precision"
+literals = ["NULL", "'-0'", "'Infinity'", "'-Infinity'", "'NaN'", "'4.9e-324'", "'2.2250738585072014e-308'", "'1.7976931348623157e308'", "'0.30000000000000004'"]
+literals_from = "floats"
+carrier = "Float"
+rule = "float"
+
+[[case]]
+id = "float4"
+type = "real"
+literals = ["NULL", "'0.1'", "'1.5'", "'-0'", "'1e-45'", "'1.17549435e-38'", "'3.4028235e38'", "'Infinity'", "'NaN'", "'16777217'"]
+carrier = "Float"
+rule = "float"
+note = "A real is widened through its shortest decimal, so the server's float4 text parses to the same double."
+
+[[case]]
+id = "boolean"
+type = "boolean"
+literals = ["true", "false", "NULL"]
+carrier = "Bool"
+rule = "bool"
+
+[[case]]
+id = "text-contract"
+type = "text"
+literals = ["NULL"]
+literals_from = "texts"
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "text-edges"
+type = "text"
+literals = ["'trailing  '", "'  leading'", "E'tab\\there'", "E'cr\\rlf\\r\\n'", "E'\\u0001control'", "'e\u0301 combining'", "'שלום RTL'", "'👩‍👩‍👧 zwj'", "repeat('é', 70000)", "repeat('x', 262145)"]
+carrier = "Text"
+rule = "exact"
+note = "PostgreSQL text cannot hold NUL; the server refuses it, so there is no NUL row."
+
+[[case]]
+id = "varchar"
+type = "varchar(20)"
+literals = ["'abc'", "'trailing  '", "''", "'NULL'", "NULL"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "bpchar"
+type = "char(10)"
+literals = ["'abc'", "''", "'abcdefghij'", "NULL"]
+carrier = "Text"
+rule = "exact"
+note = "char(n) output keeps the blank padding; the referee uses the type output function, not a text cast that strips it."
+
+[[case]]
+id = "text-collation-c"
+type = "text COLLATE \"C\""
+literals = ["'é'", "'Z'", "'a'"]
+carrier = "Text"
+rule = "exact"
+param = "SELECT $1::text"
+note = "The policy parser does not parse COLLATE after a cast and a read-only session refuses an unparsed statement, so the bound value is selected as plain text."
+
+[[case]]
+id = "name"
+type = "name"
+literals = ["'abc'", "'with space'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "char1"
+type = "\"char\""
+literals = ["'a'", "'Z'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "bytea"
+type = "bytea"
+literals = ["'\\xdeadbeef'", "'\\x'", "'\\x00'", "'\\x00ff00'", "'abc'::bytea", "decode(repeat('ff', 70000), 'hex')", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+
+[[case]]
+id = "date"
+type = "date"
+literals = ["'2024-02-29'", "'1970-01-01'", "'0001-01-01'", "'9999-12-31'", "NULL"]
+carrier = "Date"
+rule = "exact"
+
+[[case]]
+id = "date-bc-and-far-future"
+type = "date"
+literals = ["'4713-01-01 BC'", "'0001-12-31 BC'", "'10000-01-01'", "'262142-12-31'"]
+carrier = "Date"
+rule = "instant"
+referee = "extract(epoch from {v}::timestamp)::text"
+note = "Year 0 and BC dates compare as the UTC epoch of midnight, an exact form independent of the BC display spelling."
+
+[[case]]
+id = "date-beyond-chrono"
+type = "date"
+literals = ["'262143-01-01'", "'294276-12-31'", "'5874897-12-31'"]
+carrier = "Text"
+rule = "exact"
+note = "Years past chrono's range keep the exact server text."
+
+[[case]]
+id = "date-infinity"
+type = "date"
+literals = ["'infinity'", "'-infinity'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "time"
+type = "time"
+literals = ["'00:00:00'", "'13:45:30'", "'13:45:30.5'", "'23:59:59.999999'", "NULL"]
+carrier = "Time"
+rule = "temporal"
+
+[[case]]
+id = "time-2400"
+type = "time"
+literals = ["'24:00:00'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "timetz"
+type = "timetz"
+literals = ["'13:45:30+05:30'", "'00:00:00-12'", "'23:59:59.999999+14'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "timestamp"
+type = "timestamp"
+literals = ["'2024-02-29 13:45:30.123456'", "'1970-01-01 00:00:00'", "'0001-01-01 00:00:00'", "'9999-12-31 23:59:59.999999'", "NULL"]
+carrier = "DateTime"
+rule = "temporal"
+
+[[case]]
+id = "timestamp-extended"
+type = "timestamp"
+literals = ["'4713-01-01 00:00:00 BC'", "'0001-12-31 23:59:59.5 BC'", "'10000-01-01 00:00:00'", "'262142-12-31 23:59:59.999999'"]
+carrier = "DateTime"
+rule = "instant"
+
+[[case]]
+id = "timestamp-beyond-chrono"
+type = "timestamp"
+literals = ["'294276-12-31 23:59:59.999999'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "timestamp-infinity"
+type = "timestamp"
+literals = ["'infinity'", "'-infinity'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "timestamptz"
+type = "timestamptz"
+literals = ["'2024-02-29 13:45:30.123456+05:30'", "'1970-01-01 00:00:00+00'", "'1969-12-31 23:59:59.5+00'", "'2024-03-10 02:30:00 America/New_York'", "'2024-11-03 01:30:00 America/New_York'", "'2024-03-31 02:30:00 Europe/Berlin'", "'0001-01-01 00:00:00+00'", "'4713-01-01 00:00:00+00 BC'", "NULL"]
+carrier = "TimestampTz"
+rule = "instant"
+note = "DST gap and fold literals are resolved by the server; the referee is the stored instant, not a guess."
+
+[[case]]
+id = "timestamptz-infinity"
+type = "timestamptz"
+literals = ["'infinity'", "'-infinity'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "interval"
+type = "interval"
+literals = ["'1 year 2 mons 3 days 04:05:06.789'", "'-1 day'", "'00:00:00'", "'1 mon -1 day'", "'178000000 years'", "'-00:00:00.000001'", "'P1Y2M3DT4H5M6S'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "uuid"
+type = "uuid"
+literals = ["'12345678-9abc-def0-1122-334455667788'", "'00000000-0000-0000-0000-000000000000'", "'FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF'", "NULL"]
+carrier = "Uuid"
+rule = "exact"
+
+[[case]]
+id = "json"
+type = "json"
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'{\"n\": 12345678901234567890123}'", "'[1, 2.50, 1e400]'", "'  {\"a\" : 1}  '", "'\"\\u0000\"'", "'null'"]
+carrier = "JsonText"
+rule = "exact"
+note = "json keeps its source text exactly: key order, duplicate keys, number spelling and whitespace."
+
+[[case]]
+id = "jsonb"
+type = "jsonb"
+literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'{\"n\": 12345678901234567890123}'", "'[1, 2.50, 1e400]'", "'{\"nested\": {\"x\": [null, true]}}'", "'null'", "NULL"]
+carrier = "Json"
+rule = "json"
+note = "jsonb is normalized by the server (key order, duplicate keys); the referee is that normalized document."
+
+[[case]]
+id = "int-array"
+type = "integer[]"
+literals = ["'{1,2,3}'", "'{}'", "'{NULL,1}'", "'{{1,2},{3,4}}'", "'[0:1]={5,6}'", "NULL"]
+carrier = "Text"
+rule = "server_cast"
+
+[[case]]
+id = "text-array"
+type = "text[]"
+literals = ["'{\"a,b\",\"NULL\",NULL,\"\"}'", "'{\"quote\\\"d\",\"back\\\\slash\"}'", "ARRAY['é', '😀']"]
+carrier = "Text"
+rule = "server_cast"
+
+[[case]]
+id = "numeric-array"
+type = "numeric[]"
+literals = ["'{1.50,-0.001,123456789012345678901234567890.1}'"]
+carrier = "Text"
+rule = "server_cast"
+
+[[case]]
+id = "enum"
+type = "{table}_mood"
+setup = ["CREATE TYPE {table}_mood AS ENUM ('sad', 'ok', 'happy', 'with space', '')"]
+literals = ["'sad'", "'with space'", "''", "NULL"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "domain"
+type = "{table}_positive"
+setup = ["CREATE DOMAIN {table}_positive AS numeric(10,2) CHECK (VALUE > 0)"]
+literals = ["1", "12345678.90", "NULL"]
+carrier = "Decimal"
+rule = "exact"
+
+[[case]]
+id = "composite"
+type = "{table}_pair"
+setup = ["CREATE TYPE {table}_pair AS (a integer, b text)"]
+literals = ["ROW(1, 'x y')", "ROW(NULL, '')", "ROW(2, NULL)"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+
+[[case]]
+id = "int4range"
+type = "int4range"
+literals = ["'[1,5)'", "'empty'", "'(,)'", "'[3,3]'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "tstzrange"
+type = "tstzrange"
+literals = ["'[2024-01-01 00:00:00+00,2024-02-01 00:00:00+00)'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+
+[[case]]
+id = "int4multirange"
+type = "int4multirange"
+literals = ["'{[1,3),[5,7)}'", "'{}'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+
+[[case]]
+id = "inet"
+type = "inet"
+literals = ["'192.168.0.1/24'", "'192.168.0.1'", "'::1'", "'2001:db8::ff00:42:8329/64'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "cidr"
+type = "cidr"
+literals = ["'10.0.0.0/8'", "'2001:db8::/32'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "macaddr"
+type = "macaddr"
+literals = ["'08:00:2b:01:02:03'", "'08-00-2B-01-02-03'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "macaddr8"
+type = "macaddr8"
+literals = ["'08:00:2b:01:02:03:04:05'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "money"
+type = "money"
+literals = ["'12.34'", "'-92233720368547758.08'", "'92233720368547758.07'", "'0'"]
+carrier = "Undecodable"
+rule = "refusal"
+skip = [{ route = "param_select", reason = "a refused cell cannot be bound back as a parameter" }]
+note = "BookiE refuses money cells instead of guessing the server's lc_monetary format."
+
+[[case]]
+id = "bit"
+type = "bit(8)"
+literals = ["B'10101010'", "B'00000000'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "varbit"
+type = "varbit"
+literals = ["B'1'", "B''", "B'0101010101010101010101010101010101010101010101010101010101010101010101'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "point"
+type = "point"
+literals = ["'(1,2)'", "'(-0.5,1e-10)'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "xml"
+type = "xml"
+literals = ["'<a>1</a>'", "'<a b=\"x\">é</a>'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "tsvector"
+type = "tsvector"
+literals = ["'a fat cat'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "pg-lsn"
+type = "pg_lsn"
+literals = ["'16/B374D848'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "oid"
+type = "oid"
+literals = ["4294967295", "0"]
+carrier = "Text"
+rule = "exact"

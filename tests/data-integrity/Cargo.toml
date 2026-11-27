@@ -1,0 +1,39 @@
+[package]
+name = "bookie-data-integrity-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "bookie_data_integrity"
+path = "src/lib.rs"
+
+[dependencies]
+bookie-core = { path = "../../crates/core" }
+bookie-driver-registry = { path = "../../crates/registry" }
+bookie-policy = { path = "../../crates/policy" }
+bookie-storage = { path = "../../crates/storage" }
+bookie-transport = { path = "../../crates/transport" }
+chrono.workspace = true
+hex.workspace = true
+secrecy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+testcontainers.workspace = true
+testcontainers-modules = { workspace = true, features = ["postgres", "mysql"] }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+toml.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+rust_decimal.workspace = true
+
+[lints.clippy]
+unwrap_used = "allow"
+expect_used = "allow"
+panic = "allow"
+todo = "deny"
+unimplemented = "deny"

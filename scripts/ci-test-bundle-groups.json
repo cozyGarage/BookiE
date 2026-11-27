@@ -15,7 +15,7 @@
       "test": ["bookie-app", "bookie-app-services", "bookie-mcp", "bookie-policy"]
     },
     "driver-core": {
-      "test": ["bookie-app-services", "bookie-dump", "bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
+      "test": ["bookie-app-services", "bookie-data-integrity-tests", "bookie-dump", "bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
     },
     "driver-analytics": {
       "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
@@ -28,7 +28,7 @@
         "bookie-driver-cassandra", "bookie-driver-clickhouse", "bookie-driver-duckdb",
         "bookie-driver-mssql", "bookie-driver-mongodb", "bookie-driver-mysql",
         "bookie-driver-oracle", "bookie-driver-postgres", "bookie-driver-redis",
-        "bookie-dump", "bookie-app-services"
+        "bookie-dump", "bookie-app-services", "bookie-data-integrity-tests"
       ]
     },
     "pg-release": {

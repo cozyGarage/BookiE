@@ -1123,6 +1123,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "bookie-data-integrity-tests"
+version = "0.2.10"
+dependencies = [
+ "bookie-core",
+ "bookie-driver-registry",
+ "bookie-policy",
+ "bookie-storage",
+ "bookie-transport",
+ "chrono",
+ "hex",
+ "rust_decimal",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "testcontainers",
+ "testcontainers-modules",
+ "tokio",
+ "toml",
+ "uuid",
+]
+
+[[package]]
 name = "bookie-driver-cassandra"
 version = "0.2.10"
 dependencies = [
