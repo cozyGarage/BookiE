@@ -29,6 +29,7 @@ pub struct DuckdbDriver;
 impl DatabaseDriver for DuckdbDriver {
     fn value_input_capabilities(&self) -> DriverValueInputCapabilities {
         DriverValueInputCapabilities {
+            bit_string_input: true,
             extended_calendar_dates: true,
             timestamp_with_timezone: true,
             temporal_fraction_precision: true,

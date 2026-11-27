@@ -174,6 +174,7 @@ async fn native_connection() -> Box<dyn Connection> {
 
 #[tokio::test]
 async fn bit_values_round_trip_as_exact_text_without_changing_blobs_or_nulls() {
+    assert!(DuckdbDriver.value_input_capabilities().bit_string_input);
     let connection = native_connection().await;
     for bits in [
         "0",

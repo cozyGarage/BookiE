@@ -263,13 +263,6 @@ type = "BIT"
 literals = ["'101010'", "'0'"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "copy_tsv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_csv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json_lines", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_sql", issue = 4214, expect = "server stored", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-]
 
 [[case]]
 id = "smallint"

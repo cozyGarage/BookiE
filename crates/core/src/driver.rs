@@ -36,6 +36,7 @@ pub enum EnumInputStyle {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct DriverValueInputCapabilities {
+    pub bit_string_input: bool,
     pub integer_range_validation: bool,
     pub spatial_edit_requires_native_value: bool,
     pub numeric_affinity_input: bool,

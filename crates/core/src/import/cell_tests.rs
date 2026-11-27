@@ -29,6 +29,16 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
 }
 
 #[test]
+fn duckdb_bit_import_keeps_the_exact_bit_string() {
+    let bit = column("value", "BIT");
+    let options = CsvImportOptions::default();
+    for text in ["0", "1", "101010"] {
+        assert_eq!(value_for(text, &bit, &options, "duckdb"), Ok(Value::Text(text.into())));
+    }
+    assert_eq!(value_for("1", &bit, &options, "mssql"), Ok(Value::Bool(true)));
+}
+
+#[test]
 fn value_contract_parser_preserves_boundaries_and_rejects_rounding() {
     let parse = |kind: ColumnKind| move |text: &str| parse_cell(text, kind).ok();
     crate::parser_contract::assert_numeric_parsers(
