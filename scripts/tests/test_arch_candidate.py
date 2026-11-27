@@ -7,6 +7,8 @@ import tempfile
 
 def main():
     source = Path(__file__).resolve().parents[2]
+    release_pkgbuild = (source / "apps/linux/packaging/arch/PKGBUILD").read_text()
+    assert 'pkgdesc="Native Linux database client"' in release_pkgbuild
     with tempfile.TemporaryDirectory(prefix="bookie-candidate-test-") as temporary:
         root = Path(temporary)
         scripts = root / "scripts"
