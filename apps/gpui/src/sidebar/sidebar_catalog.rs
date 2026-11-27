@@ -4,7 +4,7 @@ use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 use crate::GridView;
 use crate::assets::icon;
 use crate::sidebar_state::ObjectState;
-use crate::surfaces::note;
+use crate::surfaces::{ListState, list_state, truncated};
 use bookie_gpui::theme::{Theme, size};
 
 pub(crate) fn kind_label(kind: CatalogObjectKind) -> &'static str {
@@ -120,7 +120,7 @@ impl GridView {
                 }))
                 .into_any_element()
             }
-            CatalogLine::Entry(kind, entry) => state_row(self.catalog_state(kind), entry, theme),
+            CatalogLine::Entry(kind, entry) => state_row(self.catalog_state(kind), kind, entry, theme),
         }
     }
 }
@@ -132,13 +132,13 @@ pub(crate) enum CatalogLine {
     Entry(CatalogObjectKind, usize),
 }
 
-fn state_row(state: Option<&ObjectState>, entry: usize, theme: Theme) -> gpui::AnyElement {
+fn state_row(state: Option<&ObjectState>, kind: CatalogObjectKind, entry: usize, theme: Theme) -> gpui::AnyElement {
     match state {
-        Some(ObjectState::Loading) | None => catalog_note("Loading…", theme),
-        Some(ObjectState::Failed(message)) => catalog_note(message, theme),
+        Some(ObjectState::Loading) | None => catalog_note(ListState::Loading("Loading…"), theme),
+        Some(ObjectState::Failed(message)) => catalog_note(ListState::Failed(message), theme),
         Some(ObjectState::Loaded(objects)) => match objects.get(entry) {
-            Some(object) => object_row(object, theme),
-            None => catalog_note("Nothing of this kind was found", theme),
+            Some(object) => object_row(object, format!("catalog-object-{kind:?}-{entry}"), theme),
+            None => catalog_note(ListState::Empty("Nothing of this kind was found"), theme),
         },
     }
 }
@@ -168,15 +168,7 @@ fn tree_line(
                 theme.muted_foreground,
             )
         })))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .text_ellipsis()
-                .child(label),
-        )
+        .child(truncated("label", label).flex_1())
         .child(
             div()
                 .text_size(px(size::TEXT_SMALL))
@@ -185,7 +177,7 @@ fn tree_line(
         )
 }
 
-fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyElement {
+fn object_row(object: &bookie_core::CatalogObject, id: String, theme: Theme) -> gpui::AnyElement {
     let name = match &object.schema {
         Some(schema) => format!("{schema}.{}", object.name),
         None => object.name.clone(),
@@ -197,15 +189,7 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .pr(px(size::SM))
         .text_size(px(size::TEXT_SMALL))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .overflow_hidden()
-                .whitespace_nowrap()
-                .text_ellipsis()
-                .child(name),
-        )
+        .child(truncated(id, name).flex_1())
         .child(
             div()
                 .text_color(rgb(theme.muted_foreground))
@@ -214,9 +198,11 @@ fn object_row(object: &bookie_core::CatalogObject, theme: Theme) -> gpui::AnyEle
         .into_any_element()
 }
 
-fn catalog_note(text: &str, theme: Theme) -> gpui::AnyElement {
-    note(text.to_string(), theme)
+fn catalog_note(state: ListState<'_>, theme: Theme) -> gpui::AnyElement {
+    list_state(state, theme)
         .h(px(size::TREE_ROW))
+        .py_0()
+        .pr(px(size::SM))
         .pl(px(crate::chrome::tree_indent(2.0) + size::CHEVRON))
         .text_size(px(size::TEXT_SMALL))
         .into_any_element()

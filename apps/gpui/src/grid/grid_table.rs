@@ -431,14 +431,11 @@ impl TableDelegate for GridDelegate {
                             .id(("column-sort-direction", col_ix))
                             .debug_selector(move || format!("column-sort-direction-{col_ix}"))
                             .flex_none()
-                            .tooltip(crate::surfaces::tooltip_view(
-                                if ascending {
-                                    "Sorted ascending"
-                                } else {
-                                    "Sorted descending"
-                                }
-                                .into(),
-                            ))
+                            .tooltip(crate::surfaces::tip(if ascending {
+                                "Sorted ascending"
+                            } else {
+                                "Sorted descending"
+                            }))
                             .child(crate::assets::icon(
                                 if ascending { "chevron-up" } else { "chevron-down" },
                                 theme.foreground,
@@ -446,22 +443,10 @@ impl TableDelegate for GridDelegate {
                     }))
                     .children(key.then(|| crate::assets::icon("key-round", theme.warning)))
                     .child(
-                        div()
-                            .id(("column-header-name", col_ix))
-                            .debug_selector(move || format!("column-header-name-{col_ix}"))
-                            .tooltip({
-                                let full_name = name.clone();
-                                move |window, cx| {
-                                    gpui_component::tooltip::Tooltip::new(full_name.clone()).build(window, cx)
-                                }
-                            })
+                        crate::surfaces::truncated(("column-header-name", col_ix), name)
                             .flex_none()
                             .max_w_full()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .text_color(gpui::rgb(theme.foreground))
-                            .child(name),
+                            .text_color(gpui::rgb(theme.foreground)),
                     )
                     .when(!kind.is_empty(), |el| {
                         el.child(

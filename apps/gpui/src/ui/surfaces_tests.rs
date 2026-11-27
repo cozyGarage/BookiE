@@ -257,3 +257,124 @@ fn menu_buttons_take_the_bar_height_and_name_themselves_by_their_tooltip(cx: &mu
         .expect("a leading element carries the tooltip marker");
     assert!(long.contains(&marker.center()));
 }
+
+const LONG_NAME: &str = "A very long connection name that cannot fit in a narrow column of the window";
+
+struct TruncatedProbe;
+
+impl Render for TruncatedProbe {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let theme = Theme::light();
+        div()
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .debug_selector(|| "probe-column".into())
+                    .flex()
+                    .w(px(size::BUTTON_MIN_WIDTH))
+                    .child(truncated("probe-long-text", LONG_NAME).flex_1()),
+            )
+            .child(div().flex().child(truncated("probe-short-text", "id")))
+            .child(div().w(px(size::BUTTON_MIN_WIDTH)).child(picker_chip(
+                "probe-chip",
+                Some("database"),
+                LONG_NAME,
+                "Show the status",
+                theme,
+            )))
+            .child(div().flex().children(shortcut(Some("Ctrl+K".into()), theme)))
+            .child(div().debug_selector(|| "probe-group".into()).child(group(
+                "Connection",
+                vec![
+                    div().debug_selector(|| "probe-group-first".into()).child("Host"),
+                    div().debug_selector(|| "probe-group-second".into()).child("Port"),
+                ],
+                theme,
+            )))
+    }
+}
+
+#[gpui::test]
+fn truncated_text_stays_on_one_line_inside_its_column(cx: &mut TestAppContext) {
+    let (_view, cx) = cx.add_window_view(|_, _| TruncatedProbe);
+    cx.run_until_parked();
+    let column = cx.debug_bounds("probe-column").expect("the column is drawn");
+    let long = cx.debug_bounds("probe-long-text").expect("the long text is drawn");
+    let short = cx.debug_bounds("probe-short-text").expect("the short text is drawn");
+    assert!(
+        long.size.width <= column.size.width,
+        "the long text is cut at the column edge"
+    );
+    assert_eq!(long.size.height, short.size.height, "the long text does not wrap");
+}
+
+#[test]
+fn truncated_text_carries_its_full_text_as_a_tooltip_unless_it_is_blank() {
+    assert_eq!(truncation_tooltip(&LONG_NAME.into()), Some(LONG_NAME.into()));
+    assert_eq!(truncation_tooltip(&"".into()), None);
+    assert_eq!(truncation_tooltip(&"  ".into()), None);
+    let mut text = truncated("probe", LONG_NAME);
+    assert_eq!(text.style().overflow.x, Some(gpui::Overflow::Hidden));
+    assert_eq!(
+        text.style().min_size.width,
+        Some(gpui::Length::Definite(px(0.0).into()))
+    );
+}
+
+#[gpui::test]
+fn a_picker_chip_has_the_small_control_height_and_truncates_its_label(cx: &mut TestAppContext) {
+    let (_view, cx) = cx.add_window_view(|_, _| TruncatedProbe);
+    cx.run_until_parked();
+    let chip = cx.debug_bounds("probe-chip").expect("the chip is drawn");
+    assert_eq!(chip.size.height, px(size::SMALL_CONTROL));
+    assert!(
+        chip.size.width <= px(size::BUTTON_MIN_WIDTH),
+        "a long label truncates inside the chip"
+    );
+}
+
+#[test]
+fn a_selected_list_row_uses_the_selection_fill_and_others_stay_flat() {
+    for theme in [Theme::light(), Theme::dark()] {
+        let mut selected = list_row("on", true, theme);
+        let mut other = list_row("off", false, theme);
+        assert_eq!(
+            selected.style().background,
+            Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.accent))))
+        );
+        assert!(other.style().background.is_none());
+        assert!(
+            selected.style().border_widths.left.is_none(),
+            "selection has no side bar"
+        );
+    }
+}
+
+#[gpui::test]
+fn a_shortcut_is_a_keycap_and_a_missing_one_draws_nothing(cx: &mut TestAppContext) {
+    let theme = Theme::light();
+    assert!(shortcut(None, theme).is_none());
+    assert!(shortcut(Some(String::new()), theme).is_none());
+    let (_view, cx) = cx.add_window_view(|_, _| TruncatedProbe);
+    cx.run_until_parked();
+    let keycap = cx.debug_bounds("shortcut-keycap-Ctrl+K").expect("the keycap is drawn");
+    assert!(keycap.size.width > px(0.0));
+}
+
+#[gpui::test]
+fn a_group_draws_its_rows_in_order_inside_one_frame(cx: &mut TestAppContext) {
+    let (_view, cx) = cx.add_window_view(|_, _| TruncatedProbe);
+    cx.run_until_parked();
+    let group = cx.debug_bounds("probe-group").expect("the group is drawn");
+    let first = cx.debug_bounds("probe-group-first").expect("the first row is drawn");
+    let second = cx.debug_bounds("probe-group-second").expect("the second row is drawn");
+    assert!(group.contains(&first.center()) && group.contains(&second.center()));
+    assert!(first.origin.y > group.origin.y, "the caption sits above the rows");
+    assert!(first.bottom() <= second.origin.y, "rows keep their order");
+    let mut frame = card(Theme::light());
+    assert_eq!(
+        frame.style().corner_radii.top_left,
+        Some(px(size::SURFACE_RADIUS).into())
+    );
+}

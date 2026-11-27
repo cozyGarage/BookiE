@@ -22,13 +22,6 @@ pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
 pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
-pub(crate) fn tip(
-    label: impl Into<gpui::SharedString>,
-) -> impl Fn(&mut gpui::Window, &mut gpui::App) -> gpui::AnyView + 'static {
-    let label = label.into();
-    move |window, cx| gpui_component::tooltip::Tooltip::new(label.clone()).build(window, cx)
-}
-
 fn expand_sidebar_button(tooltip: String, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
     icon_button("sidebar-open-top-left", "chevrons-right", tooltip, theme).on_click(cx.listener(|this, _, _, cx| {
         this.sidebar.open = true;
@@ -937,18 +930,13 @@ impl GridView {
                     .text_color(rgb(theme.border)),
             )
             .child(
-                div()
+                crate::surfaces::card(theme)
                     .relative()
                     .debug_selector(|| "settings-card".into())
                     .w_full()
                     .max_w(px(size::HOME_WIDTH))
                     .h_full()
                     .min_h_0()
-                    .flex()
-                    .flex_col()
-                    .rounded(px(size::SURFACE_RADIUS))
-                    .border_1()
-                    .border_color(rgb(theme.border))
                     .bg(rgb(theme.popover))
                     .child(
                         div()

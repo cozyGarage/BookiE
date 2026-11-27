@@ -1,7 +1,8 @@
 use crate::chrome::{STATUS_HEIGHT, TAB_HEIGHT, TOOLBAR_HEIGHT};
 use crate::palette_state::PaletteMode;
 use crate::surfaces::{
-    Bar, ButtonKind, button, compact_button, compact_icon_button, dialog_surface, scrim, segment, segmented,
+    Bar, ButtonKind, ListState, button, compact_button, compact_icon_button, dialog_surface, list_row, list_state,
+    scrim, segment, segmented, shortcut, truncated,
 };
 use crate::*;
 use gpui::uniform_list;
@@ -147,15 +148,7 @@ impl GridView {
             .border_color(rgb(theme.border))
             .text_color(rgb(theme.muted_foreground))
             .children(can_page.then_some(previous))
-            .child(
-                div()
-                    .debug_selector(|| "page-summary".into())
-                    .min_w_0()
-                    .truncate()
-                    .id("page-summary")
-                    .tooltip(crate::surfaces::tooltip_view(label.clone().into()))
-                    .child(label),
-            )
+            .child(crate::surfaces::truncated("page-summary", label))
             .children(can_page.then_some(next))
             .child(self.page_options(theme, cx))
     }
@@ -540,6 +533,7 @@ impl Render for GridView {
         if std::mem::take(&mut self.connection_form.restore_focus) {
             window.focus(&self.focus, cx);
         }
+        self.restore_notifications_focus(window, cx);
         if let Some(focus) = self.connection_form.focus_validation.take() {
             window.focus(&focus, cx);
         }
@@ -692,38 +686,26 @@ impl GridView {
             .zip(range)
             .map(|(index, position)| {
                 let action = &actions[*index];
-                let shortcut = self.action_shortcut(action.id);
-                let row = div()
-                    .id(("palette-command-row", position))
-                    .debug_selector(move || format!("palette-command-row-{position}").into())
-                    .px_2()
-                    .py_1()
-                    .rounded_md()
-                    .flex()
+                let keys = self.action_shortcut(action.id);
+                list_row(("palette-command-row", position), position == selected, *theme)
+                    .debug_selector(move || format!("palette-command-row-{position}"))
                     .justify_between()
-                    .gap_2()
                     .cursor_pointer()
-                    .child(action.label.clone())
+                    .child(truncated(("palette-command-label", position), action.label.clone()).flex_1())
                     .child(
                         div()
                             .flex()
+                            .flex_none()
+                            .items_center()
                             .gap_2()
                             .text_color(rgb(theme.muted_foreground))
                             .child(bookie_gpui::palette::group(action.id))
-                            .children(shortcut.map(|keys| div().child(keys))),
-                    );
-                let hover = theme.active_row;
-                let row =
-                    row.hover(move |style| style.bg(rgb(hover)))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.palette.index = position;
-                            this.run_palette(window, cx);
-                        }));
-                if position == selected {
-                    row.bg(rgb(theme.active_row))
-                } else {
-                    row
-                }
+                            .children(shortcut(keys, *theme)),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.palette.index = position;
+                        this.run_palette(window, cx);
+                    }))
             })
             .collect()
     }
@@ -736,46 +718,32 @@ impl GridView {
         cx: &mut Context<Self>,
     ) -> Vec<gpui::Stateful<Div>> {
         let selected = self.palette.index.min(shown.len().saturating_sub(1));
+        let shortcuts = self.palette.mode == PaletteMode::Shortcuts;
         shown[range.clone()]
             .iter()
             .zip(range)
             .map(|(item, position)| {
-                let mut row = div()
-                    .id(("palette-picker-row", position))
-                    .px_2()
-                    .py_1()
-                    .rounded_md()
-                    .cursor_pointer()
-                    .flex()
-                    .justify_between()
-                    .gap_2()
-                    .child(
-                        div()
-                            .min_w_0()
-                            .overflow_hidden()
-                            .whitespace_nowrap()
-                            .text_ellipsis()
-                            .child(item.title.clone()),
-                    )
-                    .child(
+                let detail = if shortcuts {
+                    shortcut(Some(item.subtitle.clone()), *theme).map(IntoElement::into_any_element)
+                } else {
+                    Some(
                         div()
                             .flex_none()
                             .whitespace_nowrap()
                             .text_color(rgb(theme.muted_foreground))
-                            .child(item.subtitle.clone()),
-                    );
-                let hover = theme.active_row;
-                row = row
-                    .hover(move |style| style.bg(rgb(hover)))
+                            .child(item.subtitle.clone())
+                            .into_any_element(),
+                    )
+                };
+                list_row(("palette-picker-row", position), position == selected, *theme)
+                    .justify_between()
+                    .cursor_pointer()
+                    .child(truncated(("palette-picker-title", position), item.title.clone()))
+                    .children(detail)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.palette.index = position;
                         this.run_picker(window, cx);
-                    }));
-                if position == selected {
-                    row.bg(rgb(theme.active_row))
-                } else {
-                    row
-                }
+                    }))
             })
             .collect()
     }
@@ -812,7 +780,7 @@ impl GridView {
             });
             (count, uniform_list("palette-results", count, rows))
         };
-        let empty = (count == 0).then(|| div().px_2().text_color(rgb(theme.muted_foreground)).child(empty_text));
+        let empty = (count == 0).then(|| list_state(ListState::Empty(empty_text), theme));
         let max_height = (window.viewport_size().height - px(size::PALETTE_TOP * 1.5 + STATUS_HEIGHT)).max(px(0.0));
         scrim(theme)
             .id("palette-overlay")

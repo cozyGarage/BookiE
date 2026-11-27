@@ -197,7 +197,8 @@ impl GridView {
                     form.child(draft.schema.clone()).child(draft.name.clone())
                 })
                 .children(draft.table.as_ref().map(|table| {
-                    div().truncate().child(
+                    crate::surfaces::truncated(
+                        "diagram-ddl-table",
                         table
                             .schema
                             .as_ref()
