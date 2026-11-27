@@ -196,13 +196,15 @@ type = "JSON"
 literals = ["'{\"b\":1,\"a\":2}'", "'{\"a\":1,\"a\":2}'", "'[1, 2.50, 1e400]'", "'null'"]
 carrier = "JsonText"
 rule = "exact"
+note = "DuckDB JSON keeps its source text exactly."
 known_failing = [
     { route = "query", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "browse", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "param_where", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
     { route = "param_select", issue = 4231, expect = "expected carrier JsonText, BookiE has Text", reason = "DuckDB JSON reads as Text" },
+    { route = "export_json", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
+    { route = "export_json_lines", issue = 4223, expect = "server", reason = "JSON export writes a JSON null document like SQL NULL" },
 ]
-note = "DuckDB JSON keeps its source text exactly."
 
 [[case]]
 id = "list"
@@ -243,6 +245,10 @@ literals = ["union_value(num := 2)", "union_value(str := 'x')"]
 carrier = "Undecodable"
 rule = "refusal"
 expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
+known_failing = [
+    { route = "import_csv", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
+    { route = "import_xlsx", issue = 4219, expect = "server stored", reason = "import stores the undecodable export marker as a value" },
+]
 
 [[case]]
 id = "enum"
@@ -262,6 +268,11 @@ known_failing = [
     { route = "browse", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
     { route = "param_where", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
     { route = "param_select", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "binding the internal bytes back stores a different bit string" },
+    { route = "copy_tsv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_csv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_json_lines", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
+    { route = "export_sql", issue = 4214, expect = "server stored", reason = "BIT reads as DuckDB's internal bitstring bytes" },
 ]
 
 [[case]]
@@ -340,6 +351,12 @@ known_failing = [
     { route = "browse", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
     { route = "param_where", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
     { route = "param_select", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
+    { route = "copy_tsv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_csv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_json", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_json_lines", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
+    { route = "export_sql", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
+    { route = "import_xlsx", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
 ]
 
 [[case]]

@@ -9,6 +9,8 @@ use bookie_storage::AuditJournal;
 
 pub struct Governed {
     pub guard: PolicyGuard,
+    pub capabilities: bookie_core::DriverCapabilities,
+    pub value_input: bookie_core::DriverValueInputCapabilities,
     _journal: tempfile::TempDir,
 }
 
@@ -65,6 +67,8 @@ async fn open_with(
     );
     Governed {
         guard,
+        capabilities: driver.capabilities(),
+        value_input: driver.value_input_capabilities(),
         _journal: journal_dir,
     }
 }

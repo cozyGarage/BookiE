@@ -106,6 +106,10 @@ literals = ["-0.", "inf", "-inf", "nan", "4.9e-324", "1.7976931348623157e308", "
 literals_from = "floats"
 carrier = "Float"
 rule = "float"
+known_failing = [
+    { route = "import_csv", issue = 4226, expect = "server stored", reason = "the largest Float64 is written as infinity" },
+    { route = "import_xlsx", issue = 4226, expect = "server stored", reason = "the largest Float64 is written as infinity" },
+]
 
 [[case]]
 id = "float32"
@@ -151,6 +155,10 @@ literals = ["unhex('DEADBEEF')", "unhex('00FF')"]
 carrier = "Bytes"
 rule = "bytes"
 note = "ClickHouse String is a byte string; non-UTF-8 bytes stay bytes."
+known_failing = [
+    { route = "import_csv", issue = 4227, expect = "server stored", reason = "binary String values are imported as their export spelling" },
+    { route = "import_xlsx", issue = 4227, expect = "server stored", reason = "binary String values are imported as their export spelling" },
+]
 
 [[case]]
 id = "fixed-string"
@@ -289,6 +297,10 @@ known_failing = [
     { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
 ]
 
 [[case]]
@@ -394,6 +406,10 @@ known_failing = [
     { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
 ]
 
 [[case]]
@@ -408,6 +424,10 @@ known_failing = [
     { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
     { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
+    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
 ]
 
 [[case]]
@@ -423,6 +443,13 @@ known_failing = [
     { route = "browse", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
     { route = "param_where", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
     { route = "param_select", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "copy_tsv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "export_csv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "export_json", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "export_json_lines", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "export_sql", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "import_csv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
+    { route = "import_xlsx", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
 ]
 
 [[case]]
@@ -444,8 +471,12 @@ rule = "temporal"
 referee = "toString({v}, 'America/New_York')"
 note = "A login whose profile sets session_timezone sees DateTime wall clocks in that zone; the referee renders the stored instant there."
 known_failing = [
-    { route = "query", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
-    { route = "browse", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
-    { route = "param_where", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
-    { route = "param_select", issue = 4236, servers = ["clickhouse-24.8"], expect = "(DateTime(", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "query", issue = 4236, expect = "(DateTime(", servers = ["clickhouse-24.8"], reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "browse", issue = 4236, expect = "(DateTime(", servers = ["clickhouse-24.8"], reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "param_where", issue = 4236, expect = "(DateTime(", servers = ["clickhouse-24.8"], reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "param_select", issue = 4236, expect = "(DateTime(", servers = ["clickhouse-24.8"], reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "copy_tsv", issue = 4236, expect = "server", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "export_csv", issue = 4236, expect = "server", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "export_json", issue = 4236, expect = "server", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
+    { route = "export_json_lines", issue = 4236, expect = "server", reason = "DateTime without a zone is shown in the server time zone, not the session time zone" },
 ]
