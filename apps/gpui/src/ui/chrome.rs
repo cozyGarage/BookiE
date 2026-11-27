@@ -682,10 +682,10 @@ impl GridView {
             _ => false,
         };
         if showing_grid && (self.detail_open || self.row_detail_open || self.fk_peek.is_some()) {
-            return self
-                .sidebar
-                .width
-                .min((window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - 320.0).max(260.0));
+            return self.sidebar.width.min(
+                (window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - size::GRID_PREFERRED_MIN_WIDTH)
+                    .max(size::CONNECTION_SIDEBAR_MIN_WIDTH),
+            );
         }
         self.sidebar.width
     }

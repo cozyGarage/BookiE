@@ -30,6 +30,8 @@ pub mod size {
     pub const STATUS_CONNECTION_WIDTH: f32 = 360.0;
     pub const STATUS_SQL_PREVIEW_WIDTH: f32 = 320.0;
     pub const DETAIL_SIDEBAR_MIN_WIDTH: f32 = 240.0;
+    pub const CONNECTION_SIDEBAR_MIN_WIDTH: f32 = 260.0;
+    pub const GRID_PREFERRED_MIN_WIDTH: f32 = 320.0;
     pub const CHART_COLUMN_WIDTH: f32 = 180.0;
     pub const GUTTER_MARKER_WIDTH: f32 = 3.0;
     pub const FULL_VALUE_EDITOR_WIDTH: f32 = 760.0;

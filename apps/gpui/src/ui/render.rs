@@ -56,7 +56,7 @@ impl GridView {
             self.drag_diagram_card(event, cx);
         }
         if self.sidebar.resizing {
-            self.sidebar.width = f32::from(event.position.x).clamp(260.0, 480.0);
+            self.sidebar.width = f32::from(event.position.x).clamp(size::CONNECTION_SIDEBAR_MIN_WIDTH, 480.0);
             cx.notify();
         }
         if self.panel.resizing {
