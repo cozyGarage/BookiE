@@ -181,6 +181,16 @@ async fn json_columns_preserve_exact_json_text_without_changing_varchar() {
     assert_eq!(result.rows[0][2], Value::Null);
 }
 
+#[test]
+fn duckdb_json_result_exposes_its_logical_alias() {
+    let connection = duckdb::Connection::open_in_memory().unwrap();
+    let mut statement = connection.prepare("SELECT '{}'::JSON, '{}'::VARCHAR").unwrap();
+    let mut rows = statement.query([]).unwrap();
+    let row = rows.next().unwrap().unwrap();
+    assert_eq!(row.as_ref().column_logical_type(0).get_alias().as_deref(), Some("JSON"));
+    assert_eq!(row.as_ref().column_logical_type(1).get_alias(), None);
+}
+
 #[tokio::test]
 async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
     let connection = native_connection().await;
