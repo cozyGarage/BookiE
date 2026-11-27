@@ -123,9 +123,6 @@ literals = ["'abc'", "''", "'abcdefghij'", "NULL"]
 carrier = "Text"
 rule = "exact"
 note = "char(n) output keeps the blank padding; the referee uses the type output function, not a text cast that strips it."
-known_failing = [
-    { route = "import_xlsx", issue = 4222, expect = "server stored", reason = "XLSX export then import turns NULL into empty text" },
-]
 
 [[case]]
 id = "text-collation-c"

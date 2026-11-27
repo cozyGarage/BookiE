@@ -56,6 +56,41 @@ fn every_row_binds_to_the_same_statement() {
 }
 
 #[test]
+fn workbook_blank_text_is_not_silently_restored_as_an_empty_string() {
+    let mut workbook = rust_xlsxwriter::Workbook::new();
+    let sheet = workbook.add_worksheet();
+    sheet.write_string(0, 0, "note").unwrap();
+    sheet.write_string(1, 0, "first").unwrap();
+    sheet
+        .write_blank(2, 0, &rust_xlsxwriter::Format::new().set_unlocked())
+        .unwrap();
+    let sheet = crate::import::read_xlsx(&workbook.save_to_buffer().unwrap(), 10).unwrap();
+    let columns = [column("note", "TEXT")];
+    let error = build_insert_plan(&target(&columns, &[Some(0)]), &sheet, &CsvImportOptions::default()).unwrap_err();
+    let PlanError::Rows { first, .. } = error else {
+        panic!("expected ambiguous-cell error")
+    };
+    assert_eq!(first[0].line, 3);
+    assert_eq!(first[0].column, "note");
+    assert!(first[0].to_string().contains("ambiguous"));
+    let options = CsvImportOptions {
+        null_marker: "\\N".into(),
+        ..CsvImportOptions::default()
+    };
+    let plan = build_insert_plan(&target(&columns, &[Some(0)]), &sheet, &options).unwrap();
+    assert_eq!(plan.rows[1], vec![Value::Text(String::new())]);
+    let number = [column("note", "INTEGER")];
+    let numeric_sheet = self::sheet(&[&[""], &["42"]], &["note"]);
+    let csv_plan = build_insert_plan(
+        &target(&number, &[Some(0)]),
+        &numeric_sheet,
+        &CsvImportOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(csv_plan.rows[0], vec![Value::Null]);
+}
+
+#[test]
 fn clickhouse_date_import_refuses_out_of_range_in_csv_and_xlsx() {
     let options = CsvImportOptions::default();
     let csv = crate::import::read_csv(b"day\n2024-01-01\n1900-01-01\n", &options, None).unwrap();
