@@ -683,10 +683,24 @@ impl GridView {
         if !self.sidebar.open {
             return 0.0;
         }
-        if matches!(self.tabs.current(), Tab::Table(_) | Tab::Query)
-            && (self.detail_open || self.row_detail_open || self.fk_peek.is_some())
-        {
-            return self.sidebar.width.min((window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - 320.0).max(260.0));
+        let showing_grid = match self.tabs.current() {
+            Tab::Table(table) => *table == self.catalog.grid_table,
+            Tab::Query => {
+                self.panel.open
+                    && self.panel.view == bookie_gpui::shell::ResultView::Table
+                    && self
+                        .run_tabs
+                        .slots
+                        .get(self.run_tabs.active)
+                        .is_some_and(|slot| slot.failure.is_none())
+            }
+            _ => false,
+        };
+        if showing_grid && (self.detail_open || self.row_detail_open || self.fk_peek.is_some()) {
+            return self
+                .sidebar
+                .width
+                .min((window_width - size::DETAIL_SIDEBAR_MIN_WIDTH - 320.0).max(260.0));
         }
         self.sidebar.width
     }
