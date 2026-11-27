@@ -268,7 +268,7 @@ impl GridView {
             .map(bookie_gpui::messages::format_elapsed);
         let count_rows = (grid && !self.grid_is_query && self.source.is_partial()).then(|| {
             compact_button(ButtonKind::Ghost, "count-rows", "Count rows", theme)
-                .tooltip(tip("Count the rows of this table in the database"))
+                .tooltip("Count the rows of this table in the database")
                 .on_click(cx.listener(|this, _, _, cx| this.count_table_rows(cx)))
         });
         let details = sql.map(|sql| {

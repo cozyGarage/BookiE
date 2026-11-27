@@ -5,7 +5,7 @@ use gpui::{Context, Div, Entity, Focusable, Stateful, Window, div, prelude::*, p
 use secrecy::SecretString;
 
 use crate::GridView;
-use crate::surfaces::{ButtonKind, button, group, group_rows, segment, segmented, unavailable_button};
+use crate::surfaces::{Button, ButtonKind, button, group, group_rows, segment, segmented, unavailable_button};
 use crate::text_input::TextInput;
 use bookie_gpui::theme::{Theme, size};
 
@@ -236,11 +236,11 @@ pub(crate) fn labelled_row(theme: Theme, label: impl Into<gpui::SharedString>, c
         .child(div().flex_1().min_w_0().flex().child(control))
 }
 
-pub(crate) fn choice_row(
-    theme: Theme,
-    label: impl Into<gpui::SharedString>,
-    choices: impl IntoIterator<Item = Stateful<Div>>,
-) -> Div {
+pub(crate) fn choice_row<I, E>(theme: Theme, label: impl Into<gpui::SharedString>, choices: I) -> Div
+where
+    I: IntoIterator<Item = E>,
+    E: IntoElement,
+{
     labelled_row(
         theme,
         label,
@@ -692,7 +692,7 @@ impl GridView {
         rows
     }
 
-    fn driver_chips(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Stateful<Div>> {
+    fn driver_chips(&self, theme: Theme, cx: &mut Context<Self>) -> Vec<Button> {
         let form = &self.connection_form;
         form.drivers
             .iter()
@@ -714,7 +714,7 @@ impl GridView {
             .collect()
     }
 
-    fn save_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn save_button(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         if self.connection_form.saving {
             return unavailable_button(
                 ButtonKind::Primary,
@@ -734,7 +734,7 @@ impl GridView {
         }))
     }
 
-    fn connect_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn connect_button(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         if self.connection_form.testing || self.connection_form.saving {
             return unavailable_button(
                 ButtonKind::Primary,
@@ -748,7 +748,7 @@ impl GridView {
             .on_click(cx.listener(|this, _, _, cx| this.save_connection_with_open(true, cx)))
     }
 
-    fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn test_button(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         if self.connection_form.saving {
             return unavailable_button(
                 ButtonKind::Ghost,
@@ -771,7 +771,7 @@ impl GridView {
             .on_click(cx.listener(|this, _, _, cx| this.test_connection(cx)))
     }
 
-    fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn delete_button(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         button(ButtonKind::Destructive, "delete-connection", "Delete", theme)
             .on_click(cx.listener(|this, _, _, cx| this.ask_delete_connection(cx)))
     }
@@ -801,7 +801,7 @@ impl GridView {
                 .into(),
             sql: None,
         };
-        let actions = [
+        let actions = vec![
             button(ButtonKind::Destructive, "confirm-delete-connection", "Delete", theme)
                 .on_click(cx.listener(|this, _, _, cx| this.delete_connection(cx))),
             button(ButtonKind::Ghost, "cancel-delete-connection", "Cancel", theme)

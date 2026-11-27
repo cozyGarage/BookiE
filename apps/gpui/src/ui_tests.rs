@@ -7,7 +7,7 @@ use bookie_results::grid_cursor::Cursor;
 
 use crate::palette_state::PaletteMode;
 use crate::text_input;
-use crate::ui_tests::test_kit::{MEDIUM, NARROW, WIDE};
+use crate::ui_tests::test_kit::{MEDIUM, NARROW, WIDE, add_rooted_grid};
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
@@ -72,7 +72,7 @@ fn paging_options_change_the_page_size_and_keep_the_visible_row(cx: &mut TestApp
 
 pub(super) fn open(cx: &mut TestAppContext) -> (gpui::Entity<GridView>, &mut VisualTestContext) {
     cx.update(text_input::bind_keys);
-    let (view, cx) = cx.add_window_view(|window, cx| GridView::new(150_000, Instant::now(), window, cx));
+    let (view, cx) = add_rooted_grid(cx, |window, cx| GridView::new(150_000, Instant::now(), window, cx));
     cx.update(|window, cx| {
         let focus = view.read(cx).focus.clone();
         window.focus(&focus, cx);
