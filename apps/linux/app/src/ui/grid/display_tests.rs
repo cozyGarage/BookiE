@@ -791,3 +791,13 @@ fn typed_widget_slots_round_trip_and_keep_same_value_types_apart() {
     assert_eq!(PREEDIT_SLOT.get(&label), Some(false));
     assert_eq!(IS_NULL_SLOT.get(&label), Some(true));
 }
+
+#[test]
+fn edit_and_display_text_keep_every_fractional_digit_of_a_time_and_an_instant() {
+    let time = Value::Time("13:45:30.5".parse().unwrap());
+    let instant = Value::TimestampTz("2024-02-29T08:15:30.123456Z".parse().unwrap());
+    assert_eq!(value_to_full_edit_text(&time), "13:45:30.5");
+    assert_eq!(value_to_display_text(&time), "13:45:30.5");
+    assert_eq!(value_to_full_edit_text(&instant), "2024-02-29 08:15:30.123456+00:00");
+    assert_eq!(value_to_display_text(&instant), "2024-02-29 08:15:30.123456+00:00");
+}
