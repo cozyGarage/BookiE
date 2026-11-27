@@ -296,9 +296,7 @@ impl GridView {
                 self.status = message;
             }
             (Err(message), Err(_)) => self.status = message,
-            (Ok(_), Err(_)) => {
-                self.status = "Connections were imported, but the list could not be refreshed".into()
-            }
+            (Ok(_), Err(_)) => self.status = "Connections were imported, but the list could not be refreshed".into(),
         }
         self.notices.push(self.status.clone(), kind);
     }
@@ -577,7 +575,11 @@ mod tests {
         for (result, saved, kind) in [
             (Ok(2), Ok(vec![]), NoticeKind::Success),
             (Err("Import failed".to_string()), Ok(vec![]), NoticeKind::Error),
-            (Err("Import failed".to_string()), Err("Refresh failed".to_string()), NoticeKind::Error),
+            (
+                Err("Import failed".to_string()),
+                Err("Refresh failed".to_string()),
+                NoticeKind::Error,
+            ),
             (Ok(2), Err("Refresh failed".to_string()), NoticeKind::Error),
         ] {
             view.update(cx, |view, _| {
