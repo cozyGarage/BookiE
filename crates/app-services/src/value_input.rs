@@ -130,7 +130,7 @@ pub fn parse_input_for_driver_with_style(
         return result;
     }
     let trimmed = text.trim();
-    if hooks.capabilities.bit_string_input && col.is_some_and(|column| column.data_type.eq_ignore_ascii_case("bit")) {
+    if hooks.capabilities.bit_string_input && col.is_some_and(|column| column.data_type.trim().eq_ignore_ascii_case("bit")) {
         return parse_bit_string(trimmed);
     }
     if hooks.capabilities.integer_range_validation

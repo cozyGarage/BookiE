@@ -152,6 +152,14 @@ fn duckdb_bit_input_stays_text_for_edit_and_paste() {
         parse_input_for_driver_with_style("1012", Some(&column), &duckdb_hooks()),
         Err(ValueInputError::InvalidBitString)
     );
+    let padded = ColumnInfo {
+        data_type: " bit ".into(),
+        ..column
+    };
+    assert_eq!(
+        parse_input_for_driver_with_style("1012", Some(&padded), &duckdb_hooks()),
+        Err(ValueInputError::InvalidBitString)
+    );
 }
 
 fn sqlite_hooks() -> ParseHooks {
