@@ -412,8 +412,9 @@ class CiWorkflowTests(unittest.TestCase):
         self.assertLess(build.index("cargo build"), build.index("cargo nextest run"))
         self.assertNotIn("\n  lint:\n", jobs)
         self.assertIn("name: GPUI macOS\n", result)
-        self.assertIn("if: always()", result)
+        self.assertIn("if: always() && !cancelled()", result)
         self.assertIn("needs: [changes, build-and-test]", result)
+        self.assertIn("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", trigger)
         self.assertIn('"$BUILD_RESULT" = "skipped" ] && [ "$GPUI_CHANGED" = "false"', result)
 
     def test_release_appimage_uses_the_arch_candidate_vendor_inputs_offline(self):
