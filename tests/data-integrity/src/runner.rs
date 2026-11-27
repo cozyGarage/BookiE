@@ -2,7 +2,6 @@ use std::collections::BTreeMap;
 
 use bookie_core::{Connection, QueryResult, Value};
 use bookie_policy::PolicyGuard;
-use testcontainers::Image;
 
 use crate::corpus::{Case, Corpus, Route};
 use crate::governed::{self, control};
@@ -19,39 +18,74 @@ pub struct RefereeRow {
     pub columns: BTreeMap<RefereeColumn, Option<String>>,
 }
 
-pub async fn run_reads<I: Image>(server: &Server<I>, corpus: &Corpus) -> Vec<CaseResult> {
-    let governed = governed::open(server.dialect.driver_id, server.options.clone(), true).await;
-    let mut results = Vec::new();
+type Prepared<'a> = (&'a Case, Result<Vec<RefereeRow>, String>);
+type RouteReads = Vec<(Route, Option<Observed>)>;
+
+pub async fn run_reads(server: &Server, corpus: &Corpus) -> Vec<CaseResult> {
+    let mut prepared: Vec<Prepared<'_>> = Vec::new();
     for case in corpus.cases.iter().filter(|case| case.applies_to(&server.label)) {
-        results.extend(run_case(server, &governed.guard, case).await);
+        let referee = match prepare_case(server, case).await {
+            Ok(()) => referee_rows(server, case)
+                .await
+                .map_err(|error| format!("referee failed: {error}")),
+            Err(error) => Err(error),
+        };
+        prepared.push((case, referee));
+    }
+    let reads = read_all(server, &prepared).await;
+    let mut results = Vec::new();
+    for ((case, referee), routes) in prepared.iter().zip(reads) {
+        match referee {
+            Err(error) => results.extend(fail_all(&server.label, case, error)),
+            Ok(rows) => results.extend(judge_case(server, case, rows, routes).await),
+        }
     }
     results
 }
 
-async fn run_case<I: Image>(server: &Server<I>, guard: &PolicyGuard, case: &Case) -> Vec<CaseResult> {
-    if let Err(error) = prepare_case(server, case).await {
-        return fail_all(&server.label, case, &error);
+async fn read_all(server: &Server, prepared: &[Prepared<'_>]) -> Vec<RouteReads> {
+    let governed = governed::open(server.dialect.driver_id, server.options.clone(), true).await;
+    let mut reads = Vec::new();
+    for (case, referee) in prepared {
+        let routes = match referee {
+            Ok(rows) => read_case(&governed.guard, server.dialect, case, rows).await,
+            Err(_) => Vec::new(),
+        };
+        reads.push(routes);
     }
-    let referee = match referee_rows(server, case).await {
-        Ok(rows) => rows,
-        Err(error) => return fail_all(&server.label, case, &format!("referee failed: {error}")),
-    };
+    governed.close().await;
+    reads
+}
+
+async fn read_case(guard: &PolicyGuard, dialect: &Dialect, case: &Case, referee: &[RefereeRow]) -> RouteReads {
     let table = case.table();
-    let dialect = server.dialect;
     let queried = read_query(guard, &table).await;
-    let mut results = Vec::new();
+    let mut routes = Vec::new();
     for route in Route::READS {
-        let outcome = match case.skip_reason(route) {
-            Some(reason) => Outcome::Skipped(reason.to_string()),
-            None => {
-                let observed = match route {
-                    Route::Query => queried.clone(),
-                    Route::Browse => read_browse(guard, dialect, &table).await,
-                    Route::ParamWhere => read_param_where(guard, dialect, &table, &referee).await,
-                    Route::ParamSelect => read_param_select(guard, dialect, case, &queried).await,
-                };
+        if case.skip_reason(route).is_some() {
+            routes.push((route, None));
+            continue;
+        }
+        let observed = match route {
+            Route::Query => queried.clone(),
+            Route::Browse => read_browse(guard, dialect, &table).await,
+            Route::ParamWhere => read_param_where(guard, dialect, &table, referee).await,
+            Route::ParamSelect => read_param_select(guard, dialect, case, &queried).await,
+            Route::Command | Route::FullValue => Err(format!("{} is not a SQL route", route.name())),
+        };
+        routes.push((route, Some(observed)));
+    }
+    routes
+}
+
+async fn judge_case(server: &Server, case: &Case, referee: &[RefereeRow], routes: RouteReads) -> Vec<CaseResult> {
+    let mut results = Vec::new();
+    for (route, observed) in routes {
+        let outcome = match observed {
+            None => Outcome::Skipped(case.skip_reason(route).unwrap_or_default().to_string()),
+            Some(observed) => {
                 let observed = server_cast(server, case, route, observed).await;
-                compare_rows(case, route, &referee, observed)
+                compare_rows(case, route, referee, observed)
             }
         };
         results.push(CaseResult {
@@ -64,7 +98,7 @@ async fn run_case<I: Image>(server: &Server<I>, guard: &PolicyGuard, case: &Case
     results
 }
 
-pub async fn prepare_case<I: Image>(server: &Server<I>, case: &Case) -> Result<(), String> {
+pub async fn prepare_case(server: &Server, case: &Case) -> Result<(), String> {
     let table = case.table();
     let dialect = server.dialect;
     server
@@ -77,11 +111,8 @@ pub async fn prepare_case<I: Image>(server: &Server<I>, case: &Case) -> Result<(
             .await
             .map_err(|error| format!("setup failed: {error}"))?;
     }
-    let create = format!(
-        "CREATE TABLE {table} (id {} PRIMARY KEY, v {})",
-        dialect.id_type,
-        case.column_type(&table)
-    );
+    let template = case.create.as_deref().unwrap_or(dialect.create_table);
+    let create = Dialect::fill(template, &table, &case.column_type(&table));
     server
         .run_sql(&create)
         .await
@@ -102,8 +133,9 @@ pub async fn prepare_case<I: Image>(server: &Server<I>, case: &Case) -> Result<(
 
 pub fn referee_columns(case: &Case) -> Vec<RefereeColumn> {
     let mut columns = vec![case.rule.referee_column()];
-    for route in Route::READS {
-        let column = case.rule_for(route).referee_column();
+    let typed = case.by_type.values().map(|expectation| expectation.rule);
+    for rule in Route::READS.iter().map(|route| case.rule_for(*route)).chain(typed) {
+        let column = rule.referee_column();
         if !columns.contains(&column) {
             columns.push(column);
         }
@@ -125,7 +157,7 @@ fn referee_expression(dialect: &Dialect, case: &Case, column: RefereeColumn) -> 
     Dialect::on(template, "v")
 }
 
-pub async fn referee_rows<I: Image>(server: &Server<I>, case: &Case) -> Result<Vec<RefereeRow>, String> {
+pub async fn referee_rows(server: &Server, case: &Case) -> Result<Vec<RefereeRow>, String> {
     let dialect = server.dialect;
     let table = case.table();
     let columns = referee_columns(case);
@@ -143,8 +175,17 @@ pub async fn referee_rows<I: Image>(server: &Server<I>, case: &Case) -> Result<V
     output
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| parse_referee_line(line.trim(), &columns))
+        .map(|line| parse_referee_line(line.trim(), &columns).map(|row| seconds_epoch(dialect, row)))
         .collect()
+}
+
+fn seconds_epoch(dialect: &Dialect, mut row: RefereeRow) -> RefereeRow {
+    if dialect.epoch_in_nanos
+        && let Some(Some(nanos)) = row.columns.get_mut(&RefereeColumn::Epoch)
+    {
+        *nanos = rules::nanos_to_seconds(nanos);
+    }
+    row
 }
 
 fn parse_referee_line(line: &str, columns: &[RefereeColumn]) -> Result<RefereeRow, String> {
@@ -242,7 +283,7 @@ async fn read_param_select(guard: &PolicyGuard, dialect: &Dialect, case: &Case, 
     Ok(rows)
 }
 
-async fn server_cast<I: Image>(server: &Server<I>, case: &Case, route: Route, observed: Observed) -> Observed {
+async fn server_cast(server: &Server, case: &Case, route: Route, observed: Observed) -> Observed {
     if case.rule_for(route) != Rule::ServerCast {
         return observed;
     }
@@ -282,10 +323,10 @@ fn compare_rows(case: &Case, route: Route, referee: &[RefereeRow], observed: Obs
         Ok(rows) => rows,
         Err(error) => return Outcome::Fail(vec![error]),
     };
-    let rule = case.rule_for(route);
-    let carrier = case.carrier_for(route);
     let mut failures = Vec::new();
     for row in referee {
+        let expected = case.expectation(route, row.type_name.as_deref());
+        let (rule, carrier) = (expected.rule, expected.carrier);
         let server = row.columns.get(&rule.referee_column()).cloned().flatten();
         match observed.get(&row.id) {
             None => failures.push(format!("id {}: row missing", row.id)),

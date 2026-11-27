@@ -5,13 +5,13 @@ use testcontainers::ImageExt;
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::postgres::Postgres;
 
-use crate::server::{Cli, Dialect, Server, exec, labelled};
+use crate::server::{Cli, ContainerCli, Dialect, Server, exec, labelled};
 
 pub const DATABASE: &str = "integrity";
 
 pub static DIALECT: Dialect = Dialect {
     driver_id: "postgres",
-    id_type: "integer",
+    create_table: "CREATE TABLE {table} (id integer PRIMARY KEY, v {type})",
     quote_text,
     text_expr: "CASE WHEN {v} IS NULL THEN NULL ELSE format('%s', {v}) END",
     hex_expr: "encode({v}, 'hex')",
@@ -23,6 +23,7 @@ pub static DIALECT: Dialect = Dialect {
     param_where: "SELECT v FROM {table} WHERE id = $1",
     drop_table: "DROP TABLE IF EXISTS {table} CASCADE",
     schema: Some("public"),
+    epoch_in_nanos: false,
 };
 
 pub fn quote_text(text: &str) -> String {
@@ -63,7 +64,7 @@ impl Cli for Psql {
     }
 }
 
-pub async fn start(tag: &str, label: &str) -> Server<Postgres> {
+pub async fn start(tag: &str, label: &str) -> Server {
     let image = Postgres::default().with_tag(tag).with_cmd([
         "postgres",
         "-c",
@@ -95,7 +96,9 @@ pub async fn start(tag: &str, label: &str) -> Server<Postgres> {
         label: label.to_string(),
         dialect: &DIALECT,
         options,
-        container,
-        cli: Box::new(Psql { database: DATABASE }),
+        referee: Box::new(ContainerCli {
+            container,
+            cli: Box::new(Psql { database: DATABASE }),
+        }),
     }
 }

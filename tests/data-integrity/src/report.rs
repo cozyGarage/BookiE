@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::corpus::{Corpus, Route};
+use crate::corpus::{Corpus, KnownFailing, Route};
 
 #[derive(Debug, Clone)]
 pub enum Outcome {
@@ -35,14 +35,23 @@ pub struct Verdict {
 }
 
 pub fn judge(corpus: &Corpus, results: &[CaseResult]) -> Verdict {
-    let mut verdict = Verdict::default();
-    for result in results {
-        let case = corpus
+    judge_with(results, |result| {
+        corpus
             .cases
             .iter()
             .find(|case| case.id == result.case)
-            .unwrap_or_else(|| panic!("result for unknown case {}", result.case));
-        let known = case.known_issue(result.route, &result.server);
+            .unwrap_or_else(|| panic!("result for unknown case {}", result.case))
+            .known_issue(result.route, &result.server)
+    })
+}
+
+pub fn judge_with<'a>(
+    results: &[CaseResult],
+    known_issue: impl Fn(&CaseResult) -> Option<&'a KnownFailing>,
+) -> Verdict {
+    let mut verdict = Verdict::default();
+    for result in results {
+        let known = known_issue(result);
         let tally = verdict.tallies.entry(result.server.clone()).or_default();
         let label = format!("{} {} {}", result.server, result.case, result.route.name());
         match (&result.outcome, known) {

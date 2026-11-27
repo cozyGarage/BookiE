@@ -1,10 +1,13 @@
+use std::future::Future;
+use std::pin::Pin;
+
 use bookie_core::ConnectOptions;
 use testcontainers::core::ExecCommand;
 use testcontainers::{ContainerAsync, ContainerRequest, Image, ImageExt};
 
 pub struct Dialect {
     pub driver_id: &'static str,
-    pub id_type: &'static str,
+    pub create_table: &'static str,
     pub quote_text: fn(&str) -> String,
     pub text_expr: &'static str,
     pub hex_expr: &'static str,
@@ -16,6 +19,7 @@ pub struct Dialect {
     pub param_where: &'static str,
     pub drop_table: &'static str,
     pub schema: Option<&'static str>,
+    pub epoch_in_nanos: bool,
 }
 
 impl Dialect {
@@ -28,21 +32,37 @@ impl Dialect {
     }
 }
 
+pub type SqlFuture<'a> = Pin<Box<dyn Future<Output = Result<String, String>> + 'a>>;
+
+pub trait Referee: Send + Sync {
+    fn run<'a>(&'a self, sql: &'a str) -> SqlFuture<'a>;
+}
+
 pub trait Cli: Send + Sync {
     fn command(&self, sql: &str) -> Vec<String>;
 }
 
-pub struct Server<I: Image> {
-    pub label: String,
-    pub dialect: &'static Dialect,
-    pub options: ConnectOptions,
+pub struct ContainerCli<I: Image> {
     pub container: ContainerAsync<I>,
     pub cli: Box<dyn Cli>,
 }
 
-impl<I: Image> Server<I> {
+impl<I: Image> Referee for ContainerCli<I> {
+    fn run<'a>(&'a self, sql: &'a str) -> SqlFuture<'a> {
+        Box::pin(exec(&self.container, self.cli.command(sql)))
+    }
+}
+
+pub struct Server {
+    pub label: String,
+    pub dialect: &'static Dialect,
+    pub options: ConnectOptions,
+    pub referee: Box<dyn Referee>,
+}
+
+impl Server {
     pub async fn run_sql(&self, sql: &str) -> Result<String, String> {
-        exec(&self.container, self.cli.command(sql)).await
+        self.referee.run(sql).await
     }
 }
 

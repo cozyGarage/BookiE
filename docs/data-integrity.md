@@ -8,7 +8,7 @@ It applies [ADR 0007](decisions/0007-type-and-value-preservation.md) and the [va
 
 The expected value always comes from the database server, never from BookiE code:
 
-- The table is created and filled by the server's own command-line client inside the container (`psql`, `mysql`, `mariadb`). BookiE code does not write the values.
+- The table is created and filled by the server's own command-line client inside the container (`psql`, `mysql`, `mariadb`, `clickhouse-client`, `redis-cli`). For the file engines it is the engine library opened directly: `sqlx-sqlite` for SQLite and the `duckdb` crate for DuckDB, used only to run SQL and read back text, never through BookiE's driver or decoder. BookiE code does not write the values.
 - The same client asks the server for its canonical rendering. Every rendered field is hex-encoded by the server, so the client output cannot be altered by quoting, newlines or character sets.
 - BookiE reads the rows through the registry driver wrapped in `PolicyGuard`, with an audit journal and a read-only session, the same way an app read session does.
 - The harness compares BookiE's typed `Value` with the server rendering using the case's rule. The harness formats a `Value` itself; it does not call BookiE's display, copy or export code, so a formatter bug cannot hide a decoder bug.
@@ -21,6 +21,12 @@ Server renderings per engine:
 | --- | --- | --- | --- | --- |
 | PostgreSQL | `format('%s', v)` (the type output function, which keeps `char(n)` padding and host-only `inet`) | `encode(v, 'hex')` | `extract(epoch from v)` | `pg_typeof(v)` |
 | MySQL, MariaDB | `CAST(v AS CHAR)` | `HEX(v)` | `UNIX_TIMESTAMP(v)` | `information_schema.COLUMNS.COLUMN_TYPE` |
+| SQLite | `CAST(v AS TEXT)`; REAL as `printf('%!.17g', v)`; BLOB as `hex(v)` | `hex(v)` | `unixepoch(v, 'subsec')` | `typeof(v)` per row |
+| DuckDB | `CAST(v AS VARCHAR)` | `hex(v)` | `epoch_ns(v)` | `typeof(v)` |
+| ClickHouse | `toString(v)`; decimals as `toDecimalString(v, scale)` | `hex(v)` | `toUnixTimestamp64Nano(toDateTime64(v, 9))` | `toTypeName(v)` |
+| Redis | The reply of the read command, flattened and hex-encoded by a server-side Lua script (`EVAL`) | Same | Not applicable | `TYPE` |
+
+Nanosecond epochs are converted to exact decimal seconds before comparison.
 
 ## Routes
 
@@ -32,6 +38,16 @@ Each case runs through every read route:
 | `browse` | `fetch_rows_controlled(schema, t, 0, 1000)` | Table page read |
 | `param_where` | `query_params_controlled("SELECT v FROM t WHERE id = $1")` | Parameterised read of a stored column; on MySQL this is the binary protocol |
 | `param_select` | `query_params_controlled("SELECT $1::type")` on PostgreSQL, `SELECT ?` on MySQL, binding the value BookiE read in `query` | A typed parameter echoed back, the class of the #4094 decoder-plan bug |
+
+Redis has no tables, so its routes differ:
+
+| Route | BookiE call | Server reply it is compared with |
+| --- | --- | --- |
+| `command` | The read command (`GET`, `HGETALL`, `LRANGE`, `SMEMBERS`, `ZRANGE ... WITHSCORES`, `XRANGE` and others) through `query_result_sets_controlled`, every cell in row order | The same command run inside the server |
+| `full_value` | `SELECT "Value" FROM "db0" WHERE "Key" = ?` | `GET`, or no row for a missing key, or a refusal for a collection |
+| `browse` | `fetch_rows_controlled(None, "db0", ...)` | `TYPE`, `HLEN`/`LLEN`/`SCARD`/`ZCARD`, and `GET` for values under the 4 KiB preview; a larger value must not be shown as whole |
+
+A bulk reply that is valid UTF-8 must be `Value::Text`; other bytes must be `Value::Bytes`. Redis commands are not SQL, so the policy asks for confirmation; the Redis run confirms, as a user would.
 
 ## Corpus format
 
@@ -51,6 +67,8 @@ rule = "exact"                 # how BookiE's value is compared with the server
 servers = ["pg16"]             # optional: only these servers
 setup = ["CREATE TYPE ..."]    # optional: statements run before CREATE TABLE
 session = "SET SESSION ..."    # optional: prefix for every INSERT, same client session
+create = "CREATE TABLE {table} (id INTEGER PRIMARY KEY, v {type}) STRICT"  # optional: replaces the engine's CREATE TABLE
+by_type = { integer = { carrier = "Int", rule = "exact" } }  # optional: expectation by the server's per-row type, for SQLite storage classes
 referee = "CAST({v} AS DOUBLE)"  # optional: server expression for the rule's rendering
 param = "SELECT CAST(? AS JSON)" # optional: replaces the param_select statement
 param_carrier = "Text"         # optional: carrier for param_select
@@ -60,7 +78,9 @@ known_failing = [{ route = "param_select", issue = 4206, servers = ["pg16"], rea
 note = "Why this case exists or why its rule is what it is."
 ```
 
-The tables are created in a fresh container, so a case does not need cleanup.
+The tables are created in a fresh container or temporary file, so a case does not need cleanup.
+
+The Redis corpus (`tests/data/integrity/redis.toml`) lists, per case, the setup commands, the read command and optional `skip` and `known_failing`. `{key}` expands to the case key, and an argument written `hex:...` is sent as those bytes.
 
 ### Comparison rules
 
@@ -103,43 +123,49 @@ All targets need Docker except the corpus check. Build with plain Cargo.
 cargo test -p bookie-data-integrity-tests --test corpus
 cargo test -p bookie-data-integrity-tests --test postgres -- --include-ignored --test-threads=1 --nocapture
 cargo test -p bookie-data-integrity-tests --test mysql -- --include-ignored --test-threads=1 --nocapture
+cargo test -p bookie-data-integrity-tests --test clickhouse -- --include-ignored --test-threads=1 --nocapture
+cargo test -p bookie-data-integrity-tests --test redis -- --include-ignored --test-threads=1 --nocapture
+cargo test -p bookie-data-integrity-tests --test sqlite --test duckdb -- --nocapture
 ```
 
-`--nocapture` prints a summary per server and every known failure. Each test starts its own container from the images listed in `ci/test-images.txt` for that driver group (PostgreSQL 16 and 18, MySQL 8.4.13, MariaDB 11) and removes it at the end. With `BOOKIE_TEST_RUN_ID` set, containers carry the run label that `scripts/cleanup-testcontainers.py` removes.
+`--nocapture` prints a summary per server and every known failure. Each Docker test starts its own container from the images listed in `ci/test-images.txt` for that driver group (PostgreSQL 16 and 18, MySQL 8.4.13, MariaDB 11, ClickHouse 24.8, Redis 7.4.12) and removes it at the end. SQLite and DuckDB use a temporary file and need no Docker. With `BOOKIE_TEST_RUN_ID` set, containers carry the run label that `scripts/cleanup-testcontainers.py` removes.
 
 ## CI tier
 
-The corpus check runs in the sandbox tier. The Docker targets belong to the driver tier: `scripts/run-driver-group.sh <driver>` runs `tests/data-integrity/tests/<driver>.rs` after that driver's own targets, so they run in the `driver-core` job (PostgreSQL and MySQL) of the Forgejo and GitHub gates.
+The corpus check and the SQLite and DuckDB targets run in the sandbox tier. The Docker targets belong to the driver tier: `scripts/run-driver-group.sh <driver>` runs `tests/data-integrity/tests/<driver>.rs` after that driver's own targets, so they run in the `driver-core` job (PostgreSQL and MySQL) and the `driver-analytics` job (ClickHouse and Redis) of the Forgejo and GitHub gates.
 
 ## Coverage
 
-Current corpus: PostgreSQL 57 cases (pg16 and pg18), MySQL 43 cases shared by MySQL 8.4 and MariaDB 11.
+Current corpus: PostgreSQL 57 cases (pg16 and pg18), MySQL 43 cases shared by MySQL 8.4 and MariaDB 11, SQLite 18, DuckDB 34, ClickHouse 37 (24.8), Redis 18 (7.4.12).
 
-Read routes by type family. "Covered" means all four read routes pass on every listed server.
+Read routes by type family. "Covered" means every read route passes on every listed server. "Refusal" means BookiE returns `Undecodable` instead of a value, which ADR 0007 accepts as a safe outcome but is not support.
 
-| Family | PostgreSQL | MySQL 8.4 | MariaDB 11 |
-| --- | --- | --- | --- |
-| Integers, signed and unsigned, boundaries | covered (`oid` as exact text) | covered except `param_select`: known-failing #4094 | covered except `param_select`: known-failing #4094 |
-| Exact decimals, max precision, beyond rust_decimal | covered; bound zero loses scale on `param_select`: known-failing #4206 | covered (wide values as exact text) except `param_select`: #4094 | as MySQL |
-| Floats: -0, subnormal, infinity, NaN | covered | covered except `param_select`: #4094 | covered except `param_select`: #4094 |
-| Boolean, bit, varbit | covered | covered (`TINYINT(1)` other than 0 and 1 stays an integer) except `param_select`: #4094 | as MySQL |
-| Text: Unicode, padding, trailing spaces, NUL where allowed, 'NULL' vs NULL vs '', collations, large | covered | covered | covered |
-| Binary | covered | covered except `param_select`: #4094 | covered except `param_select`: #4094 |
-| Date, time, timestamp, time zones, DST, BC, infinity, zero dates, TIME over 24 h, YEAR | covered | covered except `param_select` for typed temporal columns: #4094 | as MySQL |
-| Interval | covered (exact text) | not applicable | not applicable |
-| UUID | covered | not applicable | not applicable |
-| JSON and JSONB: key order, duplicate keys, big numbers | covered | covered | covered (JSON is text) |
-| Arrays: nested, NULL elements, empty, bounds | covered (`server_cast`) | not applicable | not applicable |
-| Enum, set, domain | covered | covered | covered |
-| Composite, `tstzrange`, multirange, money | explicit refusal (`Undecodable`) | not applicable | not applicable |
-| Ranges (`int4range`), network types, geometric, xml, tsvector, pg_lsn | covered (exact text) | geometry covered as stored bytes except `param_select`: #4094 | as MySQL |
+| Family | PostgreSQL | MySQL 8.4, MariaDB 11 | SQLite | DuckDB | ClickHouse |
+| --- | --- | --- | --- | --- | --- |
+| Integers, signed and unsigned, boundaries, 128 and 256 bit | covered | covered except `param_select`: #4094 | covered | covered (HUGEINT, UHUGEINT and UBIGINT past i64 as exact text) | covered (Int128, UInt256 and UInt64 past i64 as exact text) |
+| Exact decimals, max precision, beyond rust_decimal | covered; bound zero loses scale: #4206 | covered except `param_select`: #4094 | not applicable (stored as REAL) | covered | covered (Decimal256 as exact text when wide) |
+| Floats: -0, subnormal, infinity, NaN, single precision | covered | covered except `param_select`: #4094 | covered | covered | covered |
+| Boolean and bits | covered | covered except `param_select`: #4094 | covered | BIT known-failing #4214 | covered |
+| Text: Unicode, NUL, padding, 'NULL' vs NULL vs '', collations, large | covered | covered | covered | covered | covered (FixedString keeps NUL padding; binary String as bytes) |
+| Binary | covered | covered except `param_select`: #4094 | covered | covered | covered |
+| Temporal: dates, times, timestamps, time zones, DST, BC, infinity, zero dates, nanoseconds | covered | covered except `param_select`: #4094 | covered (declared temporal TEXT, INTEGER, REAL and BLOB storage) | covered (TIMESTAMP_NS, infinity) | covered (Date32, DateTime64 with zones; DST fold is a refusal); bound Date32 outside 1970-2149 clamps: #4215 |
+| Interval | covered (exact text) | not applicable | not applicable | covered (`server_cast`) | not yet |
+| UUID | covered | not applicable | not applicable | covered | covered |
+| JSON | covered (json exact, jsonb normalized) | covered | not applicable | covered (exact text) | not yet |
+| Arrays and nested values | covered (`server_cast`) | not applicable | not applicable | refusal (LIST, STRUCT, MAP, UNION) | covered as JSON (Array, Tuple, Map); binding refused |
+| Enum, set, domain, LowCardinality, Nullable | covered | covered | not applicable | covered | covered |
+| Composite, `tstzrange`, multirange, money | refusal | not applicable | not applicable | not applicable | not applicable |
+| Network, geometric, other | covered (exact text) | geometry as stored bytes, except `param_select`: #4094 | not applicable | not applicable | IPv4 and IPv6 covered |
+| SQLite affinity and mixed storage classes | not applicable | not applicable | covered (NUMERIC, untyped, STRICT ANY) | not applicable | not applicable |
+
+Redis: strings (UTF-8, empty, the text `NULL`, NUL, binary, number-like, integer-encoded, 300000 bytes), hashes, lists, sets, sorted sets with float scores, streams and a missing key are covered on the `command`, `full_value` and `browse` routes.
 
 Engines and routes:
 
 | Route | PostgreSQL | MySQL, MariaDB | SQLite | DuckDB | ClickHouse | Redis |
 | --- | --- | --- | --- | --- | --- | --- |
-| Read: query, browse, param_where | covered | covered | not yet | not yet | not yet | not yet |
-| Read: param_select | covered except #4206 | known-failing #4094 for non-text types | not yet | not yet | not yet | not yet |
+| Read: query, browse, param_where | covered | covered | covered | covered except #4214 | covered | covered (command, full_value, browse) |
+| Read: param_select | covered except #4206 | known-failing #4094 for non-text types | covered | covered except #4214 | covered except #4215 | not applicable |
 | Copy as TSV | not yet | not yet | not yet | not yet | not yet | not yet |
 | Export CSV, JSON, JSON Lines, XLSX, SQL INSERT and re-read | not yet | not yet | not yet | not yet | not yet | not yet |
 | Grid edit, insert row, set cells, paste, CSV and XLSX import | not yet | not yet | not yet | not yet | not yet | not yet |

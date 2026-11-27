@@ -6,7 +6,7 @@ use testcontainers::runners::AsyncRunner;
 use testcontainers::{GenericImage, Image, ImageExt};
 use testcontainers_modules::mysql::Mysql;
 
-use crate::server::{Cli, Dialect, Server, labelled};
+use crate::server::{Cli, ContainerCli, Dialect, Server, labelled};
 
 pub const DATABASE: &str = "integrity";
 pub const MYSQL_TAG: &str = "8.4.13";
@@ -14,7 +14,7 @@ const PASSWORD: &str = "bookie_test";
 
 pub static DIALECT: Dialect = Dialect {
     driver_id: "mysql",
-    id_type: "INT",
+    create_table: "CREATE TABLE {table} (id INT PRIMARY KEY, v {type})",
     quote_text,
     text_expr: "CAST({v} AS CHAR)",
     hex_expr: "HEX({v})",
@@ -26,6 +26,7 @@ pub static DIALECT: Dialect = Dialect {
     param_where: "SELECT v FROM {table} WHERE id = ?",
     drop_table: "DROP TABLE IF EXISTS {table}",
     schema: None,
+    epoch_in_nanos: false,
 };
 
 pub fn quote_text(text: &str) -> String {
@@ -76,7 +77,7 @@ fn options(host: String, port: u16) -> ConnectOptions {
     }
 }
 
-pub async fn start_mysql(label: &str) -> Server<Mysql> {
+pub async fn start_mysql(label: &str) -> Server {
     let image = Mysql::default()
         .with_tag(MYSQL_TAG)
         .with_env_var("MYSQL_ROOT_PASSWORD", PASSWORD)
@@ -96,7 +97,7 @@ pub async fn start_mysql(label: &str) -> Server<Mysql> {
     server(label, container, "mysql").await
 }
 
-pub async fn start_mariadb(label: &str) -> Server<GenericImage> {
+pub async fn start_mariadb(label: &str) -> Server {
     let image = GenericImage::new("mariadb", "11")
         .with_exposed_port(3306.tcp())
         .with_wait_for(WaitFor::message_on_stderr("port: 3306"))
@@ -116,18 +117,20 @@ pub async fn start_mariadb(label: &str) -> Server<GenericImage> {
     server(label, container, "mariadb").await
 }
 
-async fn server<I: Image>(
+async fn server<I: Image + 'static>(
     label: &str,
     container: testcontainers::ContainerAsync<I>,
     binary: &'static str,
-) -> Server<I> {
+) -> Server {
     let host = container.get_host().await.expect("host").to_string();
     let port = container.get_host_port_ipv4(3306).await.expect("port");
     Server {
         label: label.to_string(),
         dialect: &DIALECT,
         options: options(host, port),
-        container,
-        cli: Box::new(MysqlClient { binary }),
+        referee: Box::new(ContainerCli {
+            container,
+            cli: Box::new(MysqlClient { binary }),
+        }),
     }
 }

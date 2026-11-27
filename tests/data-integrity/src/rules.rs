@@ -219,6 +219,16 @@ pub fn canonical_decimal(text: &str) -> String {
     }
 }
 
+pub fn nanos_to_seconds(nanos: &str) -> String {
+    let (sign, digits) = match nanos.trim().strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", nanos.trim()),
+    };
+    let padded = format!("{digits:0>10}");
+    let (whole, fraction) = padded.split_at(padded.len() - 9);
+    canonical_decimal(&format!("{sign}{whole}.{fraction}"))
+}
+
 fn instant_epoch(value: &Value) -> Option<String> {
     let stamp = match value {
         Value::TimestampTz(stamp) => *stamp,

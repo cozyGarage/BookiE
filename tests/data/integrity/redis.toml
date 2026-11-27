@@ -1,0 +1,100 @@
+engine = "redis"
+servers = ["redis-7.4"]
+
+[[case]]
+id = "string-utf8"
+setup = [["SET", "{key}", "héllo 世界 🚀"]]
+read = ["GET", "{key}"]
+
+[[case]]
+id = "string-empty"
+setup = [["SET", "{key}", ""]]
+read = ["GET", "{key}"]
+
+[[case]]
+id = "string-text-null"
+setup = [["SET", "{key}", "NULL"]]
+read = ["GET", "{key}"]
+note = "The text NULL is a value, not a missing key."
+
+[[case]]
+id = "string-nul"
+setup = [["SET", "{key}", "hex:6265666f7265006166746572"]]
+read = ["GET", "{key}"]
+
+[[case]]
+id = "string-binary"
+setup = [["SET", "{key}", "hex:fffe008041"]]
+read = ["GET", "{key}"]
+note = "Bytes that are not UTF-8 stay bytes."
+
+[[case]]
+id = "string-number-like"
+setup = [["SET", "{key}", "9007199254740993"]]
+read = ["GET", "{key}"]
+
+[[case]]
+id = "string-int-encoded"
+setup = [["SET", "{key}", "12345"], ["INCRBY", "{key}", "1"]]
+read = ["GET", "{key}"]
+note = "Redis stores this as an integer encoding; GET still returns the bulk text."
+
+[[case]]
+id = "string-large"
+setup = [["SETRANGE", "{key}", "299999", "x"]]
+read = ["GET", "{key}"]
+note = "300000 bytes, NUL-padded by SETRANGE. Browse shows a bounded preview and must not pass it off as the whole value."
+
+[[case]]
+id = "string-range"
+setup = [["SET", "{key}", "hex:00ff41e282ac"]]
+read = ["GETRANGE", "{key}", "2", "-1"]
+
+[[case]]
+id = "strlen"
+setup = [["SET", "{key}", "héllo"]]
+read = ["STRLEN", "{key}"]
+
+[[case]]
+id = "hash"
+setup = [["HSET", "{key}", "f1", "v1", "empty", "", "fé", "ü", "NULL", "NULL"]]
+read = ["HGETALL", "{key}"]
+
+[[case]]
+id = "hash-binary"
+setup = [["HSET", "{key}", "bin", "hex:ff00"]]
+read = ["HGETALL", "{key}"]
+
+[[case]]
+id = "list"
+setup = [["RPUSH", "{key}", "a", "", "NULL", "b b", "a"]]
+read = ["LRANGE", "{key}", "0", "-1"]
+note = "Order and duplicates are part of a list."
+
+[[case]]
+id = "set"
+setup = [["SADD", "{key}", "a", "b", "", "é"]]
+read = ["SMEMBERS", "{key}"]
+
+[[case]]
+id = "zset"
+setup = [["ZADD", "{key}", "1.5", "a", "-0", "b", "0.1", "c", "1e-320", "d", "inf", "e", "-inf", "f", "9007199254740993", "g"]]
+read = ["ZRANGE", "{key}", "0", "-1", "WITHSCORES"]
+note = "Scores are doubles: 0.1, a subnormal, infinities and an integer past 2^53."
+
+[[case]]
+id = "zscore"
+setup = [["ZADD", "{key}", "0.30000000000000004", "m"]]
+read = ["ZSCORE", "{key}", "m"]
+
+[[case]]
+id = "stream"
+setup = [["XADD", "{key}", "1-1", "f", "v", "g", ""], ["XADD", "{key}", "2-0", "k", "é"]]
+read = ["XRANGE", "{key}", "-", "+"]
+
+[[case]]
+id = "missing-key"
+setup = [["DEL", "{key}"]]
+read = ["GET", "{key}"]
+skip = [{ route = "browse", reason = "a missing key has no browse row" }]
+note = "A missing key reads as nil, distinct from the empty string."

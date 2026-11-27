@@ -2,7 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use bookie_core::{ConnectOptions, Connection, Environment, OperationControl};
-use bookie_policy::{AuditState, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal};
+use bookie_policy::{
+    ApprovalSink, AuditState, AutoApproveSink, DenyApprovalSink, GuardContext, PolicyConfig, PolicyGuard, Principal,
+};
 use bookie_storage::AuditJournal;
 
 pub struct Governed {
@@ -15,6 +17,19 @@ pub fn control() -> OperationControl {
 }
 
 pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> Governed {
+    open_with(driver_id, options, read_only, Arc::new(DenyApprovalSink)).await
+}
+
+pub async fn open_confirming(driver_id: &str, options: ConnectOptions) -> Governed {
+    open_with(driver_id, options, false, Arc::new(AutoApproveSink)).await
+}
+
+async fn open_with(
+    driver_id: &str,
+    options: ConnectOptions,
+    read_only: bool,
+    approval: Arc<dyn ApprovalSink>,
+) -> Governed {
     bookie_transport::install_crypto_provider();
     let registry = drivers_registry::default_registry();
     let driver = registry
@@ -39,7 +54,7 @@ pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> 
             read_only,
             principal: Principal::human_gui(),
             policy: Arc::new(PolicyConfig::default()),
-            approval: Arc::new(DenyApprovalSink),
+            approval,
             audit: Arc::new(journal),
             audit_state: Arc::new(AuditState::new()),
         },
@@ -47,5 +62,11 @@ pub async fn open(driver_id: &str, options: ConnectOptions, read_only: bool) -> 
     Governed {
         guard,
         _journal: journal_dir,
+    }
+}
+
+impl Governed {
+    pub async fn close(self) {
+        let _ = Box::new(self.guard).close().await;
     }
 }
