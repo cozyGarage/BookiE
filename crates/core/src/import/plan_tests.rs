@@ -79,6 +79,15 @@ fn workbook_blank_text_is_not_silently_restored_as_an_empty_string() {
     };
     let plan = build_insert_plan(&target(&columns, &[Some(0)]), &sheet, &options).unwrap();
     assert_eq!(plan.rows[1], vec![Value::Text(String::new())]);
+    let number = [column("note", "INTEGER")];
+    let numeric_sheet = self::sheet(&[&[""], &["42"]], &["note"]);
+    let csv_plan = build_insert_plan(
+        &target(&number, &[Some(0)]),
+        &numeric_sheet,
+        &CsvImportOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(csv_plan.rows[0], vec![Value::Null]);
 }
 
 #[test]

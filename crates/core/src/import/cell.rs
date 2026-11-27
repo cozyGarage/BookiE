@@ -45,6 +45,10 @@ pub enum CellError {
     UndecodableMarker,
     #[error("ClickHouse Date requires a date between 1970-01-01 and 2149-06-06")]
     ClickhouseDateOutOfRange,
+    #[error(
+        "blank workbook cell is ambiguous between NULL and empty text; choose a non-empty NULL marker to import it as empty text"
+    )]
+    AmbiguousWorkbookBlank,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -259,6 +263,10 @@ fn parse_bytes(text: &str) -> Result<Value, CellError> {
 pub trait CsvFields {
     fn field(&self, index: usize) -> Option<&str>;
 
+    fn is_workbook(&self) -> bool {
+        false
+    }
+
     fn native_value(&self, _index: usize, _column: &ColumnInfo, _driver_id: &str) -> Option<Result<Value, CellError>> {
         None
     }
@@ -273,6 +281,10 @@ impl<T: AsRef<[String]> + ?Sized> CsvFields for T {
 impl CsvFields for super::TextRow<'_> {
     fn field(&self, index: usize) -> Option<&str> {
         self.get(index)
+    }
+
+    fn is_workbook(&self) -> bool {
+        (*self).is_workbook()
     }
 
     fn native_value(&self, index: usize, column: &ColumnInfo, driver_id: &str) -> Option<Result<Value, CellError>> {
@@ -329,6 +341,17 @@ pub(crate) fn row_to_values_for_driver(
             let Some(text) = row.field(*index) else {
                 return Ok(Value::Null);
             };
+            if row.is_workbook()
+                && text.is_empty()
+                && options.null_marker.is_empty()
+                && crate::import::text_kind::column_kind_for(column, driver_id) == ColumnKind::Text
+            {
+                return Err(CsvRowError {
+                    line,
+                    column: column.name.clone(),
+                    reason: CellError::AmbiguousWorkbookBlank,
+                });
+            }
             if text
                 .strip_prefix("<undecodable ")
                 .and_then(|value| value.strip_suffix('>'))
