@@ -214,6 +214,7 @@ struct GridView {
     selection_stats_cache: selection_stats_ui::SelectionStatsCache,
     scroll: UniformListScrollHandle,
     focus: FocusHandle,
+    restore_grid_focus: bool,
 }
 
 pub(crate) struct Pace {
@@ -600,6 +601,7 @@ impl GridView {
             selection: None,
             selection_stats_cache: selection_stats_ui::SelectionStatsCache::default(),
             focus_editor: false,
+            restore_grid_focus: false,
             continuous: false,
             grid_is_query: false,
             search: panel_state::SearchState::new(find, filter),

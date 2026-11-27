@@ -10,12 +10,22 @@ pub(crate) const IMPORT_ROW_CAP: usize = 1_000;
 #[derive(Default)]
 pub(crate) struct ImportState {
     pub open: bool,
+    pub focus_input: bool,
     pub input: Option<Entity<TextInput>>,
     pub delimiter: Option<bookie_core::export::CsvDelimiter>,
     pub null_input: Option<Entity<TextInput>>,
 }
 
 impl GridView {
+    pub(crate) fn focus_import_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !std::mem::take(&mut self.import.focus_input) {
+            return;
+        }
+        if let Some(input) = &self.import.input {
+            window.focus(&input.read(cx).focus_handle(cx), cx);
+        }
+    }
+
     pub(crate) fn form_open(&self) -> bool {
         self.insert.open || self.import.open || self.structure.open
     }
@@ -50,12 +60,16 @@ impl GridView {
             self.import.null_input = Some(cx.new(|cx| TextInput::new("Leave empty: an empty field is NULL", cx)));
         }
         self.import.open = true;
+        self.import.focus_input = true;
+        self.restore_grid_focus = false;
         self.status = "Type the path of the file to import, then review it".into();
         cx.notify();
     }
 
     pub(crate) fn close_import_bar(&mut self) {
         self.import.open = false;
+        self.import.focus_input = false;
+        self.restore_grid_focus = true;
     }
 
     pub(crate) fn cancel_import_bar(&mut self, cx: &mut Context<Self>) {
