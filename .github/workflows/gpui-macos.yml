@@ -3,22 +3,8 @@ name: GPUI macOS build
 on:
   push:
     branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "rust-toolchain.toml"
-      - "crates/**"
-      - "vendor/**"
-      - "apps/gpui/**"
-      - ".github/workflows/gpui-macos.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "rust-toolchain.toml"
-      - "crates/**"
-      - "vendor/**"
-      - "apps/gpui/**"
-      - ".github/workflows/gpui-macos.yml"
   workflow_dispatch:
 
 permissions:
@@ -29,8 +15,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect GPUI changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      gpui: ${{ steps.filter.outputs.gpui }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Check for GPUI-relevant changes
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          relevant=true
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && [ -n "$BASE_SHA" ] && git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+            changed="$(git diff --name-only --no-renames "$BASE_SHA" "$HEAD_SHA")"
+            pattern='^(Cargo\.toml|Cargo\.lock|rust-toolchain\.toml|\.cargo/|crates/|vendor/|apps/gpui/|\.github/workflows/gpui-macos\.yml$)'
+            if ! grep -Eq "$pattern" <<<"$changed"; then
+              relevant=false
+            fi
+          fi
+          echo "GPUI-relevant changes: $relevant"
+          echo "gpui=$relevant" >> "$GITHUB_OUTPUT"
+
   build-and-test:
-    name: GPUI build and tests (macOS 15 arm64)
+    name: GPUI lint, build and tests (macOS 15 arm64)
+    needs: changes
+    if: needs.changes.outputs.gpui == 'true'
     runs-on: macos-15
     timeout-minutes: 60
     env:
@@ -43,6 +61,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
         with:
           toolchain: 1.98
+          components: clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
         with:
           workspaces: apps/gpui
@@ -66,6 +85,8 @@ jobs:
             echo "- Native graphics: Apple Metal via Xcode command line tools"
             echo "- Scope: compile and headless tests only; no package or platform support claim"
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Lint the GPUI application
+        run: cargo clippy --manifest-path apps/gpui/Cargo.toml --all-targets --locked
       - name: Build the GPUI application
         run: cargo build --manifest-path apps/gpui/Cargo.toml --locked
       - name: Run GPUI tests
@@ -79,25 +100,29 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  lint:
-    name: GPUI lint (macOS 15 arm64)
-    runs-on: macos-15
-    timeout-minutes: 60
-    env:
-      CARGO_BUILD_JOBS: 2
-      CARGO_TARGET_DIR: apps/gpui/target
+  result:
+    name: GPUI macOS
+    needs: [changes, build-and-test]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772
-        with:
-          toolchain: 1.98
-          components: clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
-        with:
-          workspaces: apps/gpui
-          prefix-key: gpui-macos-lint
-          save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: Lint the GPUI application
-        run: cargo clippy --manifest-path apps/gpui/Cargo.toml --all-targets --locked
+      - name: Check GPUI macOS result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          GPUI_CHANGED: ${{ needs.changes.outputs.gpui }}
+          BUILD_RESULT: ${{ needs.build-and-test.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != "success" ]; then
+            echo "::error::GPUI change detection did not pass (result: $CHANGES_RESULT)."
+            exit 1
+          fi
+          if [ "$BUILD_RESULT" = "success" ]; then
+            exit 0
+          fi
+          if [ "$BUILD_RESULT" = "skipped" ] && [ "$GPUI_CHANGED" = "false" ]; then
+            echo "No GPUI-relevant changes; macOS build skipped."
+            exit 0
+          fi
+          echo "::error::GPUI macOS build did not pass (result: $BUILD_RESULT)."
+          exit 1

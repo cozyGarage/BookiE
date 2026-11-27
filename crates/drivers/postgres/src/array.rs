@@ -286,10 +286,10 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
         ),
         19 | 25 | 1042 | 1043 if !bytes.contains(&0) => std::str::from_utf8(bytes).ok()?.into(),
         BIT_OID | VARBIT_OID => crate::decode::decode_bit_string_with_limit(bytes, MAX_ARRAY_TEXT_BYTES)?,
-        MACADDR_OID => crate::decode::decode_pg_binary_text("MACADDR", bytes)?,
-        MACADDR8_OID => crate::decode::decode_pg_binary_text("MACADDR8", bytes)?,
-        INET_OID => crate::decode::decode_pg_binary_text("INET", bytes)?,
-        CIDR_OID => crate::decode::decode_pg_binary_text("CIDR", bytes)?,
+        MACADDR_OID => crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::Macaddr, bytes)?,
+        MACADDR8_OID => crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::Macaddr8, bytes)?,
+        INET_OID => crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::Inet, bytes)?,
+        CIDR_OID => crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::Cidr, bytes)?,
         20 => i64::from_be_bytes(bytes.try_into().ok()?).to_string(),
         21 => i16::from_be_bytes(bytes.try_into().ok()?).to_string(),
         23 => i32::from_be_bytes(bytes.try_into().ok()?).to_string(),
@@ -304,7 +304,7 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
         2950 => uuid::Uuid::from_slice(bytes).ok()?.to_string(),
         114 => std::str::from_utf8(bytes).ok()?.to_string(),
         3802 => std::str::from_utf8(bytes.strip_prefix(&[1])?).ok()?.to_string(),
-        PG_LSN_OID => crate::decode::decode_pg_binary_text("PG_LSN", bytes)?,
+        PG_LSN_OID => crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::PgLsn, bytes)?,
         1082 | 1083 | 1114 | 1184 | 1186 | 1266 => temporal_element(oid, bytes)?,
         _ => return None,
     })
@@ -312,11 +312,11 @@ fn element_text(oid: u32, text_element: bool, bytes: &[u8]) -> Option<String> {
 
 fn temporal_element(oid: u32, bytes: &[u8]) -> Option<String> {
     let value = match oid {
-        1082 => crate::temporal::decode_temporal(bytes, "DATE")?,
+        1082 => crate::temporal::decode_temporal(bytes, crate::temporal::PgTemporalKind::Date)?,
         1083 | 1266 => crate::temporal::decode_time(bytes, oid == 1266)?,
-        1114 => crate::temporal::decode_temporal(bytes, "TIMESTAMP")?,
-        1184 => crate::temporal::decode_temporal(bytes, "TIMESTAMPTZ")?,
-        1186 => return crate::decode::decode_pg_binary_text("INTERVAL", bytes),
+        1114 => crate::temporal::decode_temporal(bytes, crate::temporal::PgTemporalKind::Timestamp)?,
+        1184 => crate::temporal::decode_temporal(bytes, crate::temporal::PgTemporalKind::TimestampTz)?,
+        1186 => return crate::decode::decode_pg_binary_text_kind(crate::decode::PgBinaryTextKind::Interval, bytes),
         _ => return None,
     };
     crate::temporal::array_text(value)
