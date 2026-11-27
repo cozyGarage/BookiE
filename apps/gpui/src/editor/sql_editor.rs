@@ -386,3 +386,67 @@ mod tests {
         });
     }
 }
+
+#[cfg(test)]
+mod interaction_tests {
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn alias_completion_accepts_a_quoted_column_and_escape_dismisses(cx: &mut TestAppContext) {
+        let (view, cx, _orders) = crate::ui_tests::live_ui_tests::open_live(cx);
+        cx.simulate_keystrokes("ctrl-t");
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.sql_input.update(cx, |editor, cx| {
+                    editor.set_value("SELECT o.c FROM orders o", window, cx);
+                    editor.set_cursor_position(lsp_types::Position::new(0, 10), window, cx);
+                    editor.focus(window, cx);
+                    editor.show_completions(window, cx);
+                });
+            });
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            cx.run_until_parked();
+            if view.read_with(cx, |view, cx| view.sql_input.read(cx).completion_menu_state().open) {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "completion did not open");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        view.read_with(cx, |view, cx| {
+            let editor = view.sql_input.read(cx);
+            let menu = editor.completion_menu_state();
+            assert!(
+                menu.items
+                    .iter()
+                    .any(|item| item.label == "customer" && item.kind == Some(lsp_types::CompletionItemKind::FIELD))
+            );
+        });
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        view.read_with(cx, |view, cx| {
+            assert!(!view.sql_input.read(cx).completion_menu_state().open)
+        });
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.sql_input
+                    .update(cx, |editor, cx| editor.show_completions(window, cx))
+            })
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+        loop {
+            cx.run_until_parked();
+            if view.read_with(cx, |view, cx| view.sql_input.read(cx).completion_menu_state().open) {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "completion did not reopen");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        cx.simulate_keystrokes("enter");
+        cx.run_until_parked();
+        view.read_with(cx, |view, cx| {
+            assert!(view.sql_input.read(cx).value().contains("o.\"customer\""))
+        });
+    }
+}
