@@ -227,7 +227,7 @@ async fn value_contract_duckdb_enum_list_result_matches_native_json() {
         native_type.starts_with("ENUM(") && native_type.ends_with("[]"),
         "{native_type}"
     );
-    let Value::Text(json_text) = &native.rows[0][1] else {
+    let Value::JsonText(json_text) = &native.rows[0][1] else {
         panic!("native LIST<ENUM> JSON oracle returned {:?}", native.rows[0][1]);
     };
     assert_eq!(
@@ -284,7 +284,7 @@ async fn value_contract_duckdb_empty_enum_list_stays_distinct_from_sql_null() {
     assert_eq!(
         native.rows,
         vec![
-            vec![Value::Text(list_type.clone()), Value::Text("[]".into())],
+            vec![Value::Text(list_type.clone()), Value::JsonText("[]".into())],
             vec![Value::Text(list_type.clone()), Value::Null],
         ]
     );
