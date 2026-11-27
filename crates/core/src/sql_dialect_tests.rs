@@ -17,6 +17,44 @@ fn col(name: &str, pk: bool) -> ColumnInfo {
 }
 
 #[test]
+fn clickhouse_date_writes_refuse_narrow_destination_overflow() {
+    let mut date = col("day", false);
+    let id = col("id", true);
+    let invalid = Value::Date(chrono::NaiveDate::from_ymd_opt(1900, 1, 1).unwrap());
+    let original = [Value::Int(1), Value::Null];
+    for data_type in ["Date", "Nullable(Date)", "LowCardinality(Nullable(Date))"] {
+        date.data_type = data_type.into();
+        let columns = [id.clone(), date.clone()];
+        assert!(build_insert_from_draft("clickhouse", None, "t", &columns, &[Value::Int(1), invalid.clone()]).is_err());
+        assert!(
+            build_keyed_update(
+                "clickhouse",
+                None,
+                "t",
+                &columns,
+                &[(1, invalid.clone())],
+                &[Value::Int(1)]
+            )
+            .is_err()
+        );
+        assert!(
+            build_optimistic_keyed_update(
+                "clickhouse",
+                None,
+                "t",
+                &columns,
+                &[(1, Value::Null, invalid.clone())],
+                &[Value::Int(1)]
+            )
+            .is_err()
+        );
+        assert!(build_single_cell_update("clickhouse", "t", &columns, &original, 1, invalid.clone()).is_err());
+    }
+    date.data_type = "Date32".into();
+    assert!(build_insert_from_draft("clickhouse", None, "t", &[id, date], &[Value::Int(1), invalid]).is_ok());
+}
+
+#[test]
 fn validate_ident_accepts_ordinary_and_quoted_names() {
     for name in ["users", "Order Details", "naïve", "a\"b", "a`b", "a]b"] {
         assert_eq!(validate_ident(name), Ok(()), "{name}");
