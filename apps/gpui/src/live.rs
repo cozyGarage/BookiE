@@ -458,7 +458,8 @@ impl LiveSession {
         capabilities: bookie_core::DriverCapabilities,
         cancellation: &CancellationToken,
     ) -> Result<LiveTable, String> {
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let started = std::time::Instant::now();
         let result = self.runtime.block_on(dictionary_pages(
             &self.sessions,
@@ -466,7 +467,7 @@ impl LiveSession {
             capabilities,
             cancellation,
             epoch,
-            &self.epoch,
+            &current_epoch,
         ))?;
         Ok(LiveTable {
             session: self.clone(),
@@ -788,13 +789,14 @@ impl LiveSession {
         if sort.is_some() && !self.supports_snapshot_cursor {
             return Err("Server-side table sorting is not available for this connection".into());
         }
-        let epoch = self.next_epoch();
+        let epoch = Epoch(0);
+        let current_epoch = AtomicU64::new(epoch.0);
         let started = std::time::Instant::now();
         let reader = PageReader {
             sessions: &self.sessions,
             session_id: self.session_id,
             epoch,
-            current_epoch: &self.epoch,
+            current_epoch: &current_epoch,
         };
         let result = self
             .runtime

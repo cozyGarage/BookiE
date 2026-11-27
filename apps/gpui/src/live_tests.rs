@@ -226,6 +226,55 @@ fn unsupported_server_sort_is_refused_instead_of_sorting_a_partial_page() {
 }
 
 #[test]
+fn reading_the_data_dictionary_does_not_supersede_an_independent_query() {
+    let session = LiveSession::open(&fixture()).unwrap();
+    let query_epoch = session.next_epoch();
+    let capabilities = drivers_registry::default_registry().get("sqlite").unwrap().capabilities();
+    let dictionary = session
+        .data_dictionary_controlled(capabilities, &CancellationToken::new())
+        .unwrap();
+    assert!(dictionary.total() > 0);
+    let (result, _) = session
+        .runtime
+        .block_on(query_pages(
+            &session.sessions,
+            session.session_id,
+            ("SELECT id FROM orders", &[]),
+            100,
+            &CancellationToken::new(),
+            query_epoch,
+            &session.epoch,
+        ))
+        .unwrap();
+    assert!(!result.rows.is_empty());
+}
+
+#[test]
+fn opening_a_table_does_not_supersede_an_independent_query() {
+    let session = LiveSession::open(&fixture()).unwrap();
+    let query_epoch = session.next_epoch();
+    let table = TableInfo {
+        schema: None,
+        name: "orders".into(),
+    };
+    let loaded = session.load_table(&table, 100).unwrap();
+    assert!(loaded.total() > 0);
+    let (result, _) = session
+        .runtime
+        .block_on(query_pages(
+            &session.sessions,
+            session.session_id,
+            ("SELECT id FROM orders", &[]),
+            100,
+            &CancellationToken::new(),
+            query_epoch,
+            &session.epoch,
+        ))
+        .unwrap();
+    assert!(!result.rows.is_empty());
+}
+
+#[test]
 fn diagram_metadata_does_not_supersede_a_query() {
     let session = LiveSession::open(&fixture()).unwrap();
     let query_epoch = session.next_epoch();
