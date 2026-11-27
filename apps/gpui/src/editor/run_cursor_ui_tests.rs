@@ -1,4 +1,5 @@
 use gpui::TestAppContext;
+use gpui_kit::test::TestWindowExt as _;
 
 use super::run_target;
 use crate::ui_tests::open;
