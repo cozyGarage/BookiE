@@ -7,10 +7,7 @@ pub(crate) fn is_clickhouse_date_type(driver_id: &str, data_type: &str) -> bool 
         return false;
     }
     let mut current = data_type.trim();
-    loop {
-        let Some((outer, inner)) = current.split_once('(') else {
-            break;
-        };
+    while let Some((outer, inner)) = current.split_once('(') {
         if !outer.trim().eq_ignore_ascii_case("nullable") && !outer.trim().eq_ignore_ascii_case("lowcardinality") {
             break;
         }
