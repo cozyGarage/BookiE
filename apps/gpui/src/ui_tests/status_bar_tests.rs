@@ -22,7 +22,7 @@ fn sidebar_connection_menu_offers_saved_profiles_and_uses_the_switch_guard(cx: &
     view.update(cx, |view, cx| {
         view.connections = vec![bookie_app_services::read_session::ConnectionSummary {
             id,
-            name: "Another database".into(),
+            name: "/tmp/bookie-test/orders.sqlite".into(),
             driver_id: "sqlite".into(),
             read_only: false,
             environment: bookie_core::Environment::Dev,
@@ -53,6 +53,7 @@ fn sidebar_connection_menu_offers_saved_profiles_and_uses_the_switch_guard(cx: &
         .debug_bounds("sidebar-connection-entry")
         .expect("the menu shows the other saved profile");
     assert!(cx.debug_bounds("connection-disconnected").is_some());
+    cx.update(|window, _| assert!(window.try_find_by_label("orders.sqlite · Disconnected").is_some()));
     cx.simulate_click(entry.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
