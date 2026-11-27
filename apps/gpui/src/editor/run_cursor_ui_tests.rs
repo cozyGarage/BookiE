@@ -154,6 +154,8 @@ fn clicking_go_to_error_selects_the_second_line_token(cx: &mut TestAppContext) {
 #[gpui::test]
 fn database_error_diagnostic_carries_the_token_and_clears_after_edit(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
+    cx.simulate_keystrokes("ctrl-t");
+    cx.run_until_parked();
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
             let sql = "SELECT missing FROM t";
