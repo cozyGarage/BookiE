@@ -15,6 +15,7 @@ mod text_kind;
 mod text_rows;
 mod upsert;
 mod xlsx_import;
+mod year;
 
 pub use cell::{CellError, ColumnKind, CsvFields, CsvRowError, column_kind, parse_cell, row_to_values};
 pub use csv_import::{
@@ -31,3 +32,4 @@ pub use plan::{
 pub use text_rows::{TextRow, TextRows};
 pub use upsert::{ConflictKey, MAX_CONFLICT_KEYS, WriteMode, apply_upsert, conflict_key_candidates};
 pub use xlsx_import::{is_xlsx, read_xlsx, xlsx_to_csv};
+pub use year::is_year_type;

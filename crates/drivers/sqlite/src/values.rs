@@ -84,8 +84,9 @@ pub(crate) fn decode_temporal_text(row: &SqliteRow, idx: usize, declared_type: &
             .unwrap_or(Value::Text(text)),
         "TIME" => row
             .try_get::<chrono::NaiveTime, _>(idx)
-            .map(Value::Time)
-            .unwrap_or(Value::Text(text)),
+            .ok()
+            .filter(|time| bookie_core::sql_literal::time_text(*time) == text)
+            .map_or(Value::Text(text), Value::Time),
         "DATETIME" | "TIMESTAMP" => row
             .try_get::<chrono::NaiveDateTime, _>(idx)
             .map(Value::DateTime)
@@ -181,7 +182,7 @@ pub(crate) fn bind_sqlite_params<'q>(
             Value::JsonText(s) => q.bind(s.clone()),
             Value::Bytes(b) => q.bind(b.clone()),
             Value::Date(d) => q.bind(*d),
-            Value::Time(t) => q.bind(*t),
+            Value::Time(t) => q.bind(bookie_core::sql_literal::time_text(*t)),
             Value::DateTime(dt) => q.bind(*dt),
             Value::TimestampTz(ts) => q.bind(*ts),
             Value::Decimal(d) => match exact_real(d) {
