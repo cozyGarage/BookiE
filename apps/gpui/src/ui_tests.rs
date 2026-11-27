@@ -1046,6 +1046,12 @@ fn favorites_are_saved_from_the_editor_listed_loaded_and_deleted(cx: &mut TestAp
     view.read_with(cx, |view, _| {
         assert_eq!(view.status, "Saved favorite \u{201c}SELECT 1\u{201d}");
         assert_eq!(view.favorites.list.len(), 1);
+        assert!(
+            view.notices
+                .items
+                .iter()
+                .any(|notice| notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status)
+        );
     });
     cx.update(|window, cx| {
         view.update(cx, |view, cx| {
@@ -1075,8 +1081,37 @@ fn favorites_are_saved_from_the_editor_listed_loaded_and_deleted(cx: &mut TestAp
     view.read_with(cx, |view, _| {
         assert!(view.favorites.list.is_empty(), "the favorite is gone");
         assert!(view.status.starts_with("Deleted favorite"), "{}", view.status);
+        assert!(
+            view.notices
+                .items
+                .iter()
+                .any(|notice| notice.kind == crate::notifications::NoticeKind::Success && notice.text == view.status)
+        );
     });
     std::fs::remove_file(&file).ok();
+}
+
+#[gpui::test]
+fn favorite_storage_failures_are_reported_in_notifications(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let directory = tempfile::tempdir().unwrap();
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.favorites.path = Some(directory.path().to_path_buf());
+            view.tabs.open_query();
+            view.sync_grid_owner();
+            view.sql_input
+                .update(cx, |input, cx| input.set_value("SELECT 1", window, cx));
+            view.save_favorite(cx);
+        });
+    });
+    cx.executor().advance_clock(std::time::Duration::from_secs(1));
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| {
+        assert!(view.notices.items.iter().any(|notice| {
+            notice.kind == crate::notifications::NoticeKind::Error && notice.text.contains("save the favorite")
+        }));
+    });
 }
 
 #[gpui::test]

@@ -37,7 +37,8 @@ impl GridView {
                 match result {
                     Ok(list) if this.favorites.is_latest(ticket) => this.favorites.list = list,
                     Ok(_) => {}
-                    Err(message) => this.status = format!("Could not read favorites: {message}"),
+                    Err(message) if this.favorites.is_latest(ticket) => this.report_failure("read favorites", &message),
+                    Err(_) => {}
                 }
                 cx.notify();
             })
@@ -74,8 +75,10 @@ impl GridView {
                             this.favorites.list = list;
                         }
                         this.status = format!("Saved favorite \u{201c}{name}\u{201d}");
+                        this.notices
+                            .push(this.status.clone(), crate::notifications::NoticeKind::Success);
                     }
-                    Err(message) => this.status = format!("Could not save the favorite: {message}"),
+                    Err(message) => this.report_failure("save the favorite", &message),
                 }
                 cx.notify();
             })
@@ -106,8 +109,10 @@ impl GridView {
                             this.favorites.list = list;
                         }
                         this.status = format!("Deleted favorite \u{201c}{name}\u{201d}");
+                        this.notices
+                            .push(this.status.clone(), crate::notifications::NoticeKind::Success);
                     }
-                    Err(message) => this.status = format!("Could not delete the favorite: {message}"),
+                    Err(message) => this.report_failure("delete the favorite", &message),
                 }
                 cx.notify();
             })
