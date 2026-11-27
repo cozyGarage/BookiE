@@ -20,13 +20,22 @@ pub(crate) fn until(
     what: &str,
     ready: impl Fn(&GridView) -> bool,
 ) {
+    until_with_context(view, cx, what, |view, _| ready(view));
+}
+
+pub(crate) fn until_with_context(
+    view: &Entity<GridView>,
+    cx: &mut VisualTestContext,
+    what: &str,
+    ready: impl Fn(&GridView, &gpui::App) -> bool,
+) {
     let deadline = Instant::now() + DEADLINE;
     loop {
         cx.executor().advance_clock(CLOCK_STEP);
         cx.run_until_parked();
         cx.update(|window, _| window.refresh());
         cx.run_until_parked();
-        if view.read_with(cx, |view, _| ready(view)) {
+        if view.read_with(cx, |view, app| ready(view, app)) {
             return;
         }
         if Instant::now() >= deadline {
