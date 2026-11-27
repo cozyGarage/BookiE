@@ -13,7 +13,7 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
             } else if f.is_infinite() {
                 if f.is_sign_negative() { "-inf" } else { "inf" }.into()
             } else {
-                f.to_string()
+                format!("{f:e}")
             }
         }
         Value::Text(s) => format!("'{}'", escape_str(s)),
@@ -64,6 +64,15 @@ fn hex_encode(bytes: &[u8]) -> String {
 mod tests {
     use super::literal;
     use bookie_core::{DriverError, Value};
+
+    #[test]
+    fn finite_float_literals_round_trip_and_use_exponents() {
+        for number in [f64::MAX, f64::MIN, f64::MIN_POSITIVE, f64::from_bits(1), -0.0, 0.3] {
+            let rendered = literal(&Value::Float(number)).unwrap();
+            assert!(rendered.contains('e'), "{rendered}");
+            assert_eq!(rendered.parse::<f64>().unwrap().to_bits(), number.to_bits());
+        }
+    }
 
     #[test]
     fn nested_json_cell_edits_refuse_values_without_native_type_metadata() {
