@@ -16,6 +16,10 @@ pub fn build_sql_message(error: &BuildSqlError) -> String {
             bookie_app_services::tr!("Column {column} contains a value that cannot be copied into a SQL statement.")
                 .replace("{column}", column)
         }
+        BuildSqlError::ClickhouseDateOutOfRange { column } => {
+            bookie_app_services::tr!("Column {column} requires a ClickHouse Date between 1970-01-01 and 2149-06-06.")
+                .replace("{column}", column)
+        }
         BuildSqlError::UnsupportedDriver(driver) => {
             bookie_app_services::tr!("Optimistic grid updates are not supported for {driver}.")
                 .replace("{driver}", driver)
