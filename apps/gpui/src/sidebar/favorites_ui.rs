@@ -26,7 +26,9 @@ impl GridView {
                 match result {
                     Ok(list) if this.favorites.requests.is_current(ticket) => this.favorites.list = list,
                     Ok(_) => {}
-                    Err(message) if this.favorites.is_latest(ticket) => this.report_failure("read favorites", &message),
+                    Err(message) if this.favorites.requests.is_current(ticket) => {
+                        this.report_failure("read favorites", &message)
+                    }
                     Err(_) => {}
                 }
                 cx.notify();
