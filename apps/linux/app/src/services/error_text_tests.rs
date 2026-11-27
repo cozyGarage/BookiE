@@ -148,6 +148,11 @@ fn build_sql_messages_have_actionable_advice() {
     assert!(mismatch.contains("got 2"));
     assert!(build_sql_message(&BuildSqlError::DefaultUnsupported("sqlite".into())).contains("sqlite"));
     assert!(build_sql_message(&BuildSqlError::EmptyExpression).contains("expression"));
+    let date = build_sql_message(&BuildSqlError::ClickhouseDateOutOfRange {
+        column: "event_day".into(),
+    });
+    assert!(date.contains("event_day"));
+    assert!(date.contains("1970-01-01") && date.contains("2149-06-06"));
 }
 
 #[test]
