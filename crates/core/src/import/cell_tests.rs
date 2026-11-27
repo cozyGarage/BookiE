@@ -29,6 +29,30 @@ fn column(name: &str, data_type: &str) -> ColumnInfo {
 }
 
 #[test]
+fn import_rejects_undecodable_export_markers_with_location() {
+    let columns = vec![column("value", "TEXT")];
+    let error = row_to_values(
+        &["<undecodable UNION>".to_owned()],
+        &[Some(0)],
+        &columns,
+        &CsvImportOptions::default(),
+        3,
+    )
+    .expect_err("diagnostic markers cannot be restored");
+    assert_eq!(error.line, 3);
+    assert_eq!(error.column, "value");
+    assert!(error.to_string().contains("undecodable"));
+    let ordinary = ["before <undecodable UNION>", "<undecodable >", "<undecodable UNION> after"];
+    for text in ordinary {
+        assert_eq!(
+            row_to_values(&[text.to_owned()], &[Some(0)], &columns, &CsvImportOptions::default(), 2)
+                .expect("ordinary text must remain importable"),
+            vec![Value::Text(text.to_owned())]
+        );
+    }
+}
+
+#[test]
 fn duckdb_bit_import_keeps_the_exact_bit_string() {
     let bit = column("value", "BIT");
     let options = CsvImportOptions::default();
