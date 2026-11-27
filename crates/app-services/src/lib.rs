@@ -5,6 +5,7 @@ pub use bookie_results::{
     highlight_match, result_compare, result_filter, result_find, result_predicate, result_scan, sidebar_tree,
     stream_result_spool, text_match, value_exact,
 };
+pub use bookie_storage::{isolated_test_state_active, isolated_test_state_dir, use_user_state};
 pub use bookie_transport::install_crypto_provider as initialize_process_crypto;
 
 #[cfg(test)]

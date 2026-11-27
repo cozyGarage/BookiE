@@ -169,6 +169,9 @@ pub async fn delete_mcp_token(id: Uuid) -> Result<(), StorageError> {
 }
 
 pub(crate) async fn load_or_create_audit_sql_hash_key() -> Result<AuditSqlHashKey, StorageError> {
+    if let Some(key) = crate::test_state::with_memory(load_or_create_audit_sql_hash_key_in_memory) {
+        return key;
+    }
     let path = crate::data_path("audit-sql-hash-key")?;
     let _lock = crate::file_access::lock_path(&path).await?;
     let attrs = attrs_for(Uuid::nil(), KIND_AUDIT_SQL_HASH_KEY);
@@ -212,6 +215,18 @@ pub(crate) async fn load_or_create_audit_sql_hash_key() -> Result<AuditSqlHashKe
         }
     }
     write_audit_sql_hash_key_file(&path, &key).await?;
+    Ok(key)
+}
+
+fn load_or_create_audit_sql_hash_key_in_memory(
+    memory: &mut crate::test_state::MemorySecrets,
+) -> Result<AuditSqlHashKey, StorageError> {
+    let attrs = attrs_for(Uuid::nil(), KIND_AUDIT_SQL_HASH_KEY);
+    if let Some(value) = memory.load(&attrs) {
+        return parse_audit_sql_hash_key(value.expose_secret());
+    }
+    let key = new_audit_sql_hash_key();
+    memory.store(&attrs, &audit_sql_hash_key_value(&key));
     Ok(key)
 }
 
@@ -282,6 +297,9 @@ async fn store_secret_with_attrs(
     value: &str,
     label: &str,
 ) -> Result<(), StorageError> {
+    if crate::test_state::with_memory(|memory| memory.store(attrs, value)).is_some() {
+        return Ok(());
+    }
     let keyring = open().await?;
     keyring
         .create_item(label, attrs, value.as_bytes(), true)
@@ -295,6 +313,9 @@ async fn load_secret(id: Uuid, kind: &str) -> Result<Option<SecretString>, Stora
 }
 
 async fn load_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Result<Option<SecretString>, StorageError> {
+    if let Some(value) = crate::test_state::with_memory(|memory| memory.load(attrs)) {
+        return Ok(value);
+    }
     let Some(keyring) = open_without_creating_a_keyring().await? else {
         return Ok(None);
     };
@@ -342,6 +363,9 @@ async fn delete_secret(id: Uuid, kind: &str) -> Result<(), StorageError> {
 }
 
 async fn delete_secret_with_attrs(attrs: &HashMap<&'static str, String>) -> Result<(), StorageError> {
+    if crate::test_state::with_memory(|memory| memory.delete(attrs)).is_some() {
+        return Ok(());
+    }
     let Some(keyring) = open_without_creating_a_keyring().await? else {
         return Ok(());
     };
