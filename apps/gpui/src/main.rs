@@ -79,6 +79,7 @@ enum Mode {
 #[derive(Clone, Copy)]
 enum Work {
     Load,
+    Tool,
     Query,
     Scan,
     Count,
@@ -226,6 +227,7 @@ struct GridView {
     export: panel_state::ExportState,
     measure: measure::Measure,
     loads: Ticket,
+    tool_jobs: Ticket,
     queries: Ticket,
     scans: Ticket,
     counts: Ticket,
@@ -671,6 +673,7 @@ impl GridView {
             connections: Vec::new(),
             check_histories: Vec::new(),
             loads: Ticket::new(),
+            tool_jobs: Ticket::new(),
             queries: Ticket::new(),
             scans: Ticket::new(),
             counts: Ticket::new(),
@@ -860,7 +863,8 @@ impl GridView {
         apply: impl FnOnce(&mut Self, T, &mut Context<Self>) + 'static,
     ) {
         match work_kind {
-            Work::Load => self.invalidate_background(),
+            Work::Load => self.invalidate_load(),
+            Work::Tool => self.tool_jobs.invalidate(),
             Work::Query => self.invalidate_query(),
             Work::Scan => self.invalidate_scans(),
             Work::Count => self.counts.invalidate(),
@@ -868,6 +872,7 @@ impl GridView {
         }
         let ticket = match work_kind {
             Work::Load => &mut self.loads,
+            Work::Tool => &mut self.tool_jobs,
             Work::Query => &mut self.queries,
             Work::Scan => &mut self.scans,
             Work::Count => &mut self.counts,
@@ -881,6 +886,7 @@ impl GridView {
             this.update(cx, |this, cx| {
                 let current = match work_kind {
                     Work::Load => this.loads.generation,
+                    Work::Tool => this.tool_jobs.generation,
                     Work::Query => this.queries.generation,
                     Work::Scan => this.scans.generation,
                     Work::Count => this.counts.generation,
@@ -897,8 +903,17 @@ impl GridView {
     }
 
     fn invalidate_background(&mut self) {
-        self.clear_chart();
+        self.invalidate_load();
+        self.tool_jobs.invalidate();
+    }
+
+    fn invalidate_load(&mut self) {
         self.loads.invalidate();
+        self.invalidate_grid_work();
+    }
+
+    fn invalidate_grid_work(&mut self) {
+        self.clear_chart();
         self.invalidate_scans();
         self.counts.invalidate();
         self.charts.invalidate();

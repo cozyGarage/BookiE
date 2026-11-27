@@ -364,7 +364,7 @@ impl GridView {
         }
         self.status = "Reading the data dictionary…".into();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| {
                 let started = Instant::now();
@@ -481,7 +481,7 @@ impl GridView {
         self.params.rows.clear();
         self.panel.error_location = None;
         if self.grid_is_query {
-            self.invalidate_background();
+            self.invalidate_grid_work();
             self.cell_edit.edits = std::mem::take(&mut self.cell_edit.table);
             self.source = self.table_source.clone();
             self.grid_is_query = false;
@@ -508,7 +508,7 @@ impl GridView {
             Tab::Table(name) if *name == self.catalog.grid_table => false,
             Tab::Home | Tab::Settings | Tab::History | Tab::AuditLog | Tab::Diagram => return,
             _ => {
-                self.invalidate_background();
+                self.invalidate_grid_work();
                 return;
             }
         };
@@ -535,7 +535,7 @@ impl GridView {
             }
             return;
         }
-        self.invalidate_background();
+        self.invalidate_grid_work();
         self.reset_edit_history();
         self.cell_edit.active = None;
         self.compare = None;
@@ -569,7 +569,7 @@ impl GridView {
             self.status = "Finish or discard the active cell edit using Commands before switching results".into();
             return;
         }
-        self.invalidate_background();
+        self.invalidate_grid_work();
         if let Some(previous) = self.run_tabs.slots.get_mut(self.run_tabs.active) {
             previous.edits = std::mem::take(&mut self.cell_edit.edits);
         }
@@ -629,7 +629,7 @@ impl GridView {
         if index != self.run_tabs.active {
             return;
         }
-        self.invalidate_background();
+        self.invalidate_grid_work();
         self.cell_edit.edits.clear();
         self.reset_edit_history();
         if self.run_tabs.slots.is_empty() {

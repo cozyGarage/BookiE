@@ -95,7 +95,7 @@ impl GridView {
         }
         self.status = format!("Reading {}…", report_label(report).to_lowercase());
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| {
                 let started = Instant::now();

@@ -23,7 +23,7 @@ impl GridView {
         let current_schema = self.catalog.grid_table.schema.clone();
         self.status = "Comparing schemas…".into();
         self.begin_background(
-            Work::Load,
+            Work::Tool,
             cx,
             move |cancel| {
                 let mut all_tables = Vec::new();
