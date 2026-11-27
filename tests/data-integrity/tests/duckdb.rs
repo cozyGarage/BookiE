@@ -3,6 +3,24 @@
 use bookie_data_integrity::{duckdb, judge_and_report, load_corpus, routes, runner};
 
 #[tokio::test]
+async fn duckdb_workbook_null_is_refused_before_import() {
+    let mut corpus = load_corpus("duckdb");
+    corpus.cases.retain(|case| case.id == "enum");
+    assert_eq!(corpus.cases.len(), 1);
+    let server = duckdb::start("duckdb");
+    let results = routes::run_routes(&server, &corpus, true).await;
+    let import = results
+        .iter()
+        .find(|result| result.route == bookie_data_integrity::corpus::Route::ImportXlsx)
+        .unwrap();
+    assert!(
+        matches!(&import.outcome, bookie_data_integrity::report::Outcome::Refused(errors) if errors.iter().any(|error| error.contains("ambiguous"))),
+        "{import:?}"
+    );
+    judge_and_report(&corpus, &results).assert_clean();
+}
+
+#[tokio::test]
 async fn duckdb_reads_match_the_engine_rendering() {
     let corpus = load_corpus("duckdb");
     let server = duckdb::start("duckdb");
