@@ -386,3 +386,55 @@ mod tests {
         });
     }
 }
+
+#[cfg(test)]
+mod interaction_tests {
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn alias_completion_accepts_a_quoted_column_and_escape_dismisses(cx: &mut TestAppContext) {
+        let (view, cx, _orders) = crate::ui_tests::live_ui_tests::open_live(cx);
+        cx.simulate_keystrokes("ctrl-t");
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.sql_input.update(cx, |editor, cx| {
+                    editor.set_value("SELECT o.c FROM orders o", window, cx);
+                    editor.set_cursor_position(lsp_types::Position::new(0, 10), window, cx);
+                    editor.focus(window, cx);
+                    editor.show_completions(window, cx);
+                });
+            });
+        });
+        crate::ui_tests::test_kit::until_with_context(&view, cx, "completion menu", |view, app| {
+            view.sql_input.read(app).completion_menu_state().open
+        });
+        view.read_with(cx, |view, cx| {
+            let editor = view.sql_input.read(cx);
+            let menu = editor.completion_menu_state();
+            assert!(
+                menu.items
+                    .iter()
+                    .any(|item| item.label == "customer" && item.kind == Some(lsp_types::CompletionItemKind::FIELD))
+            );
+        });
+        cx.simulate_keystrokes("escape");
+        cx.run_until_parked();
+        view.read_with(cx, |view, cx| {
+            assert!(!view.sql_input.read(cx).completion_menu_state().open)
+        });
+        cx.update(|window, cx| {
+            view.update(cx, |view, cx| {
+                view.sql_input
+                    .update(cx, |editor, cx| editor.show_completions(window, cx))
+            })
+        });
+        crate::ui_tests::test_kit::until_with_context(&view, cx, "completion menu to reopen", |view, app| {
+            view.sql_input.read(app).completion_menu_state().open
+        });
+        cx.simulate_keystrokes("enter");
+        cx.run_until_parked();
+        view.read_with(cx, |view, cx| {
+            assert!(view.sql_input.read(cx).value().contains("o.\"customer\""))
+        });
+    }
+}

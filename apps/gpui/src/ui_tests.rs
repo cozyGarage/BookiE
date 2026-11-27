@@ -1005,6 +1005,26 @@ fn a_long_sidebar_scrolls_and_reveal_brings_the_open_table_into_view(cx: &mut Te
 }
 
 #[gpui::test]
+fn a_narrow_sidebar_keeps_the_connection_row_inside_its_resize_boundary(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.sidebar.open = true;
+        view.sidebar.width = 280.0;
+        view.sidebar.connection_open = true;
+        view.catalog.connection = "postgres · Long acceptance fixture connection title".into();
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    let row = cx.debug_bounds("sidebar-row-0").expect("connection row is rendered");
+    let resize = cx.debug_bounds("sidebar-resize").expect("sidebar divider is rendered");
+    assert!(
+        row.right() <= resize.origin.x,
+        "connection row should not extend under the sidebar divider: row={row:?}, resize={resize:?}"
+    );
+}
+
+#[gpui::test]
 fn favorites_are_saved_from_the_editor_listed_loaded_and_deleted(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let file = std::env::temp_dir().join(format!("bookie-gpui-favorites-{}.json", uuid::Uuid::new_v4()));
@@ -1958,6 +1978,32 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
     });
     cx.run_until_parked();
     view.read_with(cx, |view, _| assert_ne!(view.status, "stale"));
+}
+
+#[gpui::test]
+fn switching_connections_cancels_the_previous_load_and_discards_its_callback(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(
+                Work::Load,
+                cx,
+                |_| (),
+                |view, ()| view.status = "stale load result".into(),
+            );
+            let cancel = view.loads.cancel.clone();
+            view.connect(
+                bookie_gpui::live::Origin::File("/nonexistent/bookie-switch.sqlite".into()),
+                cx,
+            );
+            assert!(
+                cancel.is_cancelled(),
+                "switching connection must cancel the previous load"
+            );
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale load result"));
 }
 
 #[gpui::test]
