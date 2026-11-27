@@ -8,7 +8,7 @@ use crate::corpus::{Case, Corpus, Route};
 use crate::governed::{self, control};
 use crate::report::{CaseResult, Outcome};
 use crate::rules::{self, RefereeColumn, Rule};
-use crate::server::{Dialect, Server};
+use crate::server::{Dialect, Server, SettingCheck};
 
 pub type Observed = Result<BTreeMap<i64, Value>, String>;
 
@@ -23,12 +23,17 @@ pub async fn run_reads<I: Image>(server: &Server<I>, corpus: &Corpus) -> Vec<Cas
     let governed = governed::open(server.dialect.driver_id, server.options.clone(), true).await;
     let mut results = Vec::new();
     for case in corpus.cases.iter().filter(|case| case.applies_to(&server.label)) {
-        results.extend(run_case(server, &governed.guard, case).await);
+        let outcome = if case.bookie_session.is_empty() {
+            run_case(server, Some(&governed.guard), case).await
+        } else {
+            run_case(server, None, case).await
+        };
+        results.extend(outcome);
     }
     results
 }
 
-async fn run_case<I: Image>(server: &Server<I>, guard: &PolicyGuard, case: &Case) -> Vec<CaseResult> {
+async fn run_case<I: Image>(server: &Server<I>, shared: Option<&PolicyGuard>, case: &Case) -> Vec<CaseResult> {
     if let Err(error) = prepare_case(server, case).await {
         return fail_all(&server.label, case, &error);
     }
@@ -36,6 +41,72 @@ async fn run_case<I: Image>(server: &Server<I>, guard: &PolicyGuard, case: &Case
         Ok(rows) => rows,
         Err(error) => return fail_all(&server.label, case, &format!("referee failed: {error}")),
     };
+    if let Some(guard) = shared {
+        return read_routes(server, guard, case, &referee).await;
+    }
+    let variant = (server.dialect.session_variant)(&case.table(), &case.bookie_session);
+    for statement in &variant.setup {
+        if let Err(error) = server.run_sql(statement).await {
+            return fail_all(&server.label, case, &format!("session setup failed: {error}"));
+        }
+    }
+    let mut options = server.options.clone();
+    if let Some((username, password)) = &variant.login {
+        options.username.clone_from(username);
+        options.password = secrecy::SecretString::new(password.clone().into());
+    }
+    let governed = governed::open(server.dialect.driver_id, options, true).await;
+    let results = match check_settings(server, &governed.guard, &variant.checks).await {
+        Ok(()) => read_routes(server, &governed.guard, case, &referee).await,
+        Err(error) => fail_all(&server.label, case, &error),
+    };
+    drop(governed);
+    for statement in &variant.teardown {
+        server
+            .run_sql(statement)
+            .await
+            .unwrap_or_else(|error| panic!("{}: session teardown failed: {error}", case.id));
+    }
+    results
+}
+
+async fn check_settings<I: Image>(
+    server: &Server<I>,
+    guard: &PolicyGuard,
+    checks: &[SettingCheck],
+) -> Result<(), String> {
+    for check in checks {
+        let actual = if check.through_bookie {
+            let batch = guard
+                .query_result_sets_controlled(&check.sql, &[], &control())
+                .await
+                .map_err(|error| format!("{}: {error}", check.sql))?;
+            match batch.result_sets.first().and_then(|result| result.rows.iter().next()) {
+                Some(row) => match row.first() {
+                    Some(Value::Text(text)) => text.clone(),
+                    other => format!("{other:?}"),
+                },
+                None => String::new(),
+            }
+        } else {
+            server.run_sql(&check.sql).await?.trim().to_string()
+        };
+        if actual != check.expected {
+            return Err(format!(
+                "session setting was not applied: {} returned {actual:?}, expected {:?}",
+                check.sql, check.expected
+            ));
+        }
+    }
+    Ok(())
+}
+
+async fn read_routes<I: Image>(
+    server: &Server<I>,
+    guard: &PolicyGuard,
+    case: &Case,
+    referee: &[RefereeRow],
+) -> Vec<CaseResult> {
     let table = case.table();
     let dialect = server.dialect;
     let queried = read_query(guard, &table).await;
@@ -47,11 +118,11 @@ async fn run_case<I: Image>(server: &Server<I>, guard: &PolicyGuard, case: &Case
                 let observed = match route {
                     Route::Query => queried.clone(),
                     Route::Browse => read_browse(guard, dialect, &table).await,
-                    Route::ParamWhere => read_param_where(guard, dialect, &table, &referee).await,
+                    Route::ParamWhere => read_param_where(guard, dialect, &table, referee).await,
                     Route::ParamSelect => read_param_select(guard, dialect, case, &queried).await,
                 };
                 let observed = server_cast(server, case, route, observed).await;
-                compare_rows(case, route, &referee, observed)
+                compare_rows(case, route, referee, observed)
             }
         };
         results.push(CaseResult {
@@ -255,7 +326,8 @@ async fn server_cast<I: Image>(server: &Server<I>, case: &Case, route: Route, ob
             continue;
         };
         let cast = format!("CAST({} AS {column_type})", (dialect.quote_text)(text));
-        let sql = format!("SELECT {}", (dialect.wrap_hex)(&Dialect::on(dialect.text_expr, &cast)));
+        let render = (dialect.wrap_hex)(&Dialect::on(dialect.text_expr, "v"));
+        let sql = (dialect.cast_query)(&case.bookie_session, &cast, &render);
         let output = server
             .run_sql(&sql)
             .await
@@ -277,7 +349,14 @@ fn single_value(result: &QueryResult, id: i64) -> Result<Value, String> {
     }
 }
 
-fn compare_rows(case: &Case, route: Route, referee: &[RefereeRow], observed: Observed) -> Outcome {
+pub fn compare_rows(case: &Case, route: Route, referee: &[RefereeRow], observed: Observed) -> Outcome {
+    if referee.len() != case.literals.len() {
+        return Outcome::Broken(format!(
+            "the server referee returned {} rows for {} literals",
+            referee.len(),
+            case.literals.len()
+        ));
+    }
     let observed = match observed {
         Ok(rows) => rows,
         Err(error) => return Outcome::Fail(vec![error]),

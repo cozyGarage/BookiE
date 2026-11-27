@@ -16,6 +16,26 @@ pub struct Dialect {
     pub param_where: &'static str,
     pub drop_table: &'static str,
     pub schema: Option<&'static str>,
+    pub session_variant: fn(&str, &[String]) -> SessionVariant,
+    pub cast_query: fn(&[String], &str, &str) -> String,
+}
+
+pub struct SessionVariant {
+    pub setup: Vec<String>,
+    pub teardown: Vec<String>,
+    pub login: Option<(String, String)>,
+    pub checks: Vec<SettingCheck>,
+}
+
+pub struct SettingCheck {
+    pub sql: String,
+    pub expected: String,
+    pub through_bookie: bool,
+}
+
+pub fn setting_parts(setting: &str) -> (&str, String) {
+    let (name, value) = setting.split_once('=').unwrap_or((setting, ""));
+    (name.trim(), value.trim().trim_matches('\'').to_string())
 }
 
 impl Dialect {

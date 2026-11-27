@@ -52,7 +52,7 @@ for driver in "${drivers[@]}"; do
   fi
   if [[ -f "tests/data-integrity/tests/$driver.rs" ]]; then
     bash scripts/run-rust-tests.sh --locked -p bookie-data-integrity-tests \
-      --test "$driver" -- --include-ignored --test-threads=1
+      --test "$driver" -- --include-ignored --test-threads=1 --nocapture
   fi
   if [[ "$driver" == oracle ]]; then
     bash scripts/run-rust-tests.sh --locked -p bookie-policy \
