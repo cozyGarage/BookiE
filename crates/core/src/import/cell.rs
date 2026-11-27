@@ -330,7 +330,7 @@ pub(crate) fn row_to_values_for_driver(
             if text
                 .strip_prefix("<undecodable ")
                 .and_then(|value| value.strip_suffix('>'))
-                .is_some_and(|value| !value.is_empty())
+                .is_some()
             {
                 return Err(CsvRowError {
                     line,
