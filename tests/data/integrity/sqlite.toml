@@ -1,0 +1,171 @@
+engine = "sqlite"
+servers = ["sqlite"]
+
+[[case]]
+id = "integer"
+type = "INTEGER"
+literals = ["NULL"]
+literals_from = "integers"
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "real"
+type = "REAL"
+literals = ["NULL", "-0.0", "4.9e-324", "2.2250738585072014e-308", "1.7976931348623157e308", "9e999", "-9e999", "0.30000000000000004", "1"]
+literals_from = "floats"
+carrier = "Float"
+rule = "float"
+note = "The referee prints 17 significant digits, so the server text parses back to the stored double."
+
+[[case]]
+id = "text-contract"
+type = "TEXT"
+literals = ["NULL"]
+literals_from = "texts"
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "text-edges"
+type = "TEXT"
+literals = ["'trailing  '", "'a' || char(0) || 'b'", "'e' || char(769) || ' combining'", "'שלום RTL'", "'👩‍👩‍👧 zwj'", "printf('%.*c', 262145, 'x')", "char(13, 10)"]
+carrier = "Text"
+rule = "exact"
+note = "SQLite TEXT keeps NUL; the referee hex-encodes the stored bytes."
+
+[[case]]
+id = "text-nocase"
+type = "TEXT COLLATE NOCASE"
+literals = ["'Abc'", "'abc'"]
+carrier = "Text"
+rule = "exact"
+
+[[case]]
+id = "blob"
+type = "BLOB"
+literals = ["X'DEADBEEF'", "X''", "zeroblob(4)", "X'00FF00'", "NULL"]
+carrier = "Bytes"
+rule = "bytes"
+
+[[case]]
+id = "numeric-affinity"
+type = "NUMERIC"
+literals = ["'007'", "'1.5'", "'1e3'", "'abc'", "X'00'", "9223372036854775808", "'  12  '"]
+carrier = "Text"
+rule = "exact"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
+note = "NUMERIC affinity converts some text to numbers; the storage class the engine chose (typeof) decides the expected carrier."
+
+[[case]]
+id = "untyped-mixed"
+type = ""
+literals = ["1", "1.5", "'x'", "X'01'", "NULL", "'1'"]
+carrier = "Text"
+rule = "exact"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
+
+[[case]]
+id = "strict-any"
+type = "ANY"
+create = "CREATE TABLE {table} (id INTEGER PRIMARY KEY, v {type}) STRICT"
+literals = ["1", "1.5", "'1'", "X'01'", "NULL"]
+carrier = "Text"
+rule = "exact"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, text = { carrier = "Text", rule = "exact" }, blob = { carrier = "Bytes", rule = "bytes" } }
+note = "A STRICT ANY column keeps the stored kind of each value, including the text '1'."
+
+[[case]]
+id = "strict-integer"
+type = "INTEGER"
+create = "CREATE TABLE {table} (id INTEGER PRIMARY KEY, v {type}) STRICT"
+literals = ["-9223372036854775808", "9223372036854775807", "NULL"]
+carrier = "Int"
+rule = "exact"
+
+[[case]]
+id = "date-text"
+type = "DATE"
+literals = ["'2024-02-29'", "'0001-01-01'", "'9999-12-31'"]
+carrier = "Date"
+rule = "exact"
+param_carrier = "Text"
+note = "SELECT ? has no declared type, so the bound temporal value comes back as text."
+
+[[case]]
+id = "datetime-text"
+type = "DATETIME"
+literals = ["'2024-02-29 13:45:30'", "'2024-02-29 13:45:30.123'", "'1970-01-01 00:00:00'"]
+carrier = "DateTime"
+rule = "temporal"
+param_carrier = "Text"
+note = "SELECT ? has no declared type, so the bound temporal value comes back as text."
+
+[[case]]
+id = "datetime-offset-text"
+type = "DATETIME"
+literals = ["'2024-02-29T13:45:30+05:30'", "'2024-02-29 13:45:30Z'"]
+carrier = "Text"
+rule = "exact"
+note = "Offset-bearing text stays exact: the naive temporal carriers cannot hold the offset."
+
+[[case]]
+id = "datetime-storage-classes"
+type = "DATETIME"
+literals = ["1709214330", "2460369.5", "X'00'"]
+carrier = "Text"
+rule = "exact"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" }, blob = { carrier = "Bytes", rule = "bytes" } }
+note = "A temporal declared type does not decide the value: INTEGER, REAL and BLOB stay their native kinds."
+
+[[case]]
+id = "time-text"
+type = "TIME"
+literals = ["'13:45:30'", "'00:00:00.5'"]
+carrier = "Time"
+rule = "temporal"
+param_carrier = "Text"
+note = "SELECT ? has no declared type, so the bound time comes back as text; the bind spells fractions with three digits, so only trailing zeros may differ."
+
+[[case]]
+id = "boolean-flag"
+type = "BOOLEAN"
+literals = ["true", "false", "NULL"]
+carrier = "Bool"
+rule = "bool"
+param_carrier = "Int"
+param_rule = "exact"
+note = "SQLite stores TRUE and FALSE as 1 and 0; a BOOLEAN column reads them as flags, and SELECT ? returns the bound integer."
+
+[[case]]
+id = "boolean-other"
+type = "BOOLEAN"
+literals = ["2", "-1"]
+carrier = "Int"
+rule = "exact"
+note = "A BOOLEAN column holding another integer keeps that integer."
+
+[[case]]
+id = "decimal-declared"
+type = "DECIMAL(10,2)"
+literals = ["'1.50'", "'12345678.90'", "'0.10'"]
+carrier = "Float"
+rule = "float"
+note = "DECIMAL has NUMERIC affinity, so the engine stores a REAL; the stored double is the value, not the declared scale."
+
+[[case]]
+id = "text-invalid-utf8"
+type = "TEXT"
+literals = ["CAST(X'FF' AS TEXT)", "CAST(X'61C3' AS TEXT)", "CAST(X'C328' AS TEXT)"]
+carrier = "Bytes"
+rule = "bytes"
+note = "SQLite TEXT can hold bytes that are not UTF-8; they must stay exact bytes, never replacement characters."
+
+[[case]]
+id = "integer-overflow-to-real"
+type = "INTEGER"
+literals = ["9223372036854775808", "-9223372036854775809", "1"]
+carrier = "Float"
+rule = "float"
+by_type = { integer = { carrier = "Int", rule = "exact" }, real = { carrier = "Float", rule = "float" } }
+note = "A literal past i64 is stored as REAL even in an INTEGER column; the storage class decides the carrier."

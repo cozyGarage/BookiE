@@ -12,6 +12,8 @@ pub enum Route {
     Browse,
     ParamWhere,
     ParamSelect,
+    Command,
+    FullValue,
 }
 
 impl Route {
@@ -23,6 +25,8 @@ impl Route {
             Route::Browse => "browse",
             Route::ParamWhere => "param_where",
             Route::ParamSelect => "param_select",
+            Route::Command => "command",
+            Route::FullValue => "full_value",
         }
     }
 }
@@ -43,7 +47,7 @@ pub struct KnownFailing {
 }
 
 impl KnownFailing {
-    fn covers(&self, case: &str, route: Route, server: &str) -> bool {
+    pub fn covers(&self, case: &str, route: Route, server: &str) -> bool {
         self.route == route
             && (self.servers.is_empty() || self.servers.iter().any(|s| s == server))
             && (self.cases.is_empty() || self.cases.iter().any(|c| c == case))
@@ -76,6 +80,14 @@ fn row_id(detail: &str) -> Option<i64> {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct ExpectedError {
+    pub route: Route,
+    pub expect: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SkippedRoute {
     pub route: Route,
     pub reason: String,
@@ -101,6 +113,13 @@ impl ContractList {
     }
 }
 
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Expectation {
+    pub carrier: Carrier,
+    pub rule: Rule,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Case {
@@ -118,6 +137,10 @@ pub struct Case {
     #[serde(default)]
     pub setup: Vec<String>,
     #[serde(default)]
+    pub by_type: std::collections::BTreeMap<String, Expectation>,
+    #[serde(default)]
+    pub create: Option<String>,
+    #[serde(default)]
     pub session: Option<String>,
     #[serde(default)]
     pub bookie_session: Vec<String>,
@@ -134,10 +157,16 @@ pub struct Case {
     #[serde(default)]
     pub known_failing: Vec<KnownFailing>,
     #[serde(default)]
+    pub expect_error: Vec<ExpectedError>,
+    #[serde(default)]
     pub note: Option<String>,
 }
 
 impl Case {
+    pub fn expected_error(&self, route: Route) -> Option<&ExpectedError> {
+        self.expect_error.iter().find(|expected| expected.route == route)
+    }
+
     pub fn applies_to(&self, server: &str) -> bool {
         self.servers.is_empty() || self.servers.iter().any(|name| name == server)
     }
@@ -153,6 +182,16 @@ impl Case {
             .iter()
             .find(|skipped| skipped.route == route)
             .map(|skipped| skipped.reason.as_str())
+    }
+
+    pub fn expectation(&self, route: Route, type_name: Option<&str>) -> Expectation {
+        if let Some(found) = type_name.and_then(|name| self.by_type.get(name)) {
+            return *found;
+        }
+        Expectation {
+            carrier: self.carrier_for(route),
+            rule: self.rule_for(route),
+        }
     }
 
     pub fn carrier_for(&self, route: Route) -> Carrier {
@@ -223,7 +262,7 @@ impl Corpus {
     }
 }
 
-pub const ENGINES: [&str; 2] = ["postgres", "mysql"];
+pub const ENGINES: [&str; 5] = ["postgres", "mysql", "sqlite", "duckdb", "clickhouse"];
 
 const VALUE_CONTRACT: &str = include_str!("../../data/value-contract.json");
 
@@ -231,6 +270,9 @@ fn corpus_text(engine: &str) -> &'static str {
     match engine {
         "postgres" => include_str!("../../data/integrity/postgres.toml"),
         "mysql" => include_str!("../../data/integrity/mysql.toml"),
+        "sqlite" => include_str!("../../data/integrity/sqlite.toml"),
+        "duckdb" => include_str!("../../data/integrity/duckdb.toml"),
+        "clickhouse" => include_str!("../../data/integrity/clickhouse.toml"),
         other => panic!("no data-integrity corpus for {other}"),
     }
 }
@@ -240,6 +282,10 @@ pub fn source_dir() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| std::env::current_dir().expect("current directory"))
         .join("../data/integrity")
+}
+
+pub fn value_contract() -> serde_json::Value {
+    serde_json::from_str(VALUE_CONTRACT).expect("parse value-contract.json")
 }
 
 pub fn load(engine: &str, quote_text: fn(&str) -> String) -> Corpus {
@@ -387,6 +433,20 @@ fn marker_problems(case: &Case) -> Vec<String> {
                 "{}: route {} is both skipped and known-failing",
                 case.id,
                 known.route.name()
+            ));
+        }
+    }
+    for expected in &case.expect_error {
+        if expected.expect.trim().is_empty() || expected.reason.trim().is_empty() {
+            problems.push(format!("{}: an expected error needs expect and reason", case.id));
+        }
+        if case.skip_reason(expected.route).is_some()
+            || case.known_failing.iter().any(|known| known.route == expected.route)
+        {
+            problems.push(format!(
+                "{}: route {} has an expected error and another marker",
+                case.id,
+                expected.route.name()
             ));
         }
     }

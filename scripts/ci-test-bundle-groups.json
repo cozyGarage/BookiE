@@ -18,7 +18,7 @@
       "test": ["bookie-app-services", "bookie-data-integrity-tests", "bookie-dump", "bookie-driver-mssql", "bookie-driver-mysql", "bookie-driver-postgres"]
     },
     "driver-analytics": {
-      "test": ["bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
+      "test": ["bookie-data-integrity-tests", "bookie-driver-clickhouse", "bookie-driver-mongodb", "bookie-driver-redis"]
     },
     "driver-extended": {
       "test": ["bookie-driver-cassandra", "bookie-driver-duckdb", "bookie-driver-oracle", "bookie-policy"]
