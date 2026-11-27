@@ -405,15 +405,9 @@ mod interaction_tests {
                 });
             });
         });
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-        loop {
-            cx.run_until_parked();
-            if view.read_with(cx, |view, cx| view.sql_input.read(cx).completion_menu_state().open) {
-                break;
-            }
-            assert!(std::time::Instant::now() < deadline, "completion did not open");
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
+        crate::ui_tests::test_kit::until_with_context(&view, cx, "completion menu", |view, app| {
+            view.sql_input.read(app).completion_menu_state().open
+        });
         view.read_with(cx, |view, cx| {
             let editor = view.sql_input.read(cx);
             let menu = editor.completion_menu_state();
@@ -434,15 +428,9 @@ mod interaction_tests {
                     .update(cx, |editor, cx| editor.show_completions(window, cx))
             })
         });
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
-        loop {
-            cx.run_until_parked();
-            if view.read_with(cx, |view, cx| view.sql_input.read(cx).completion_menu_state().open) {
-                break;
-            }
-            assert!(std::time::Instant::now() < deadline, "completion did not reopen");
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
+        crate::ui_tests::test_kit::until_with_context(&view, cx, "completion menu to reopen", |view, app| {
+            view.sql_input.read(app).completion_menu_state().open
+        });
         cx.simulate_keystrokes("enter");
         cx.run_until_parked();
         view.read_with(cx, |view, cx| {
