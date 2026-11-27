@@ -280,6 +280,12 @@ impl GridView {
         result: Result<usize, String>,
         saved: Result<Vec<bookie_app_services::read_session::ConnectionSummary>, String>,
     ) {
+        use crate::notifications::NoticeKind;
+        let kind = if result.is_ok() && saved.is_ok() {
+            NoticeKind::Success
+        } else {
+            NoticeKind::Error
+        };
         match (result, saved) {
             (Ok(count), Ok(connections)) => {
                 self.connections = connections;
@@ -294,6 +300,7 @@ impl GridView {
                 self.status = "Connections were imported, but the list could not be refreshed".into()
             }
         }
+        self.notices.push(self.status.clone(), kind);
     }
 
     pub(crate) fn pick_connection_export(&mut self, cx: &mut Context<Self>) {
