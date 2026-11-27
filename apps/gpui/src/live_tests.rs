@@ -284,6 +284,43 @@ fn value_search_does_not_supersede_an_independent_query() {
 }
 
 #[test]
+fn value_search_does_not_supersede_an_in_flight_query() {
+    use std::future::{Future, poll_fn};
+    use std::task::Poll;
+
+    let session = LiveSession::open(&fixture()).unwrap();
+    let query_epoch = session.next_epoch();
+    let source = BridgeSource(&session);
+    let target = TableTarget {
+        schema: None,
+        name: "orders".into(),
+    };
+    let control = OperationControl::with_timeout(Duration::from_secs(5));
+    let cancel = CancellationToken::new();
+    session.runtime.block_on(async {
+        let query = query_pages(
+            &session.sessions,
+            session.session_id,
+            ("SELECT id FROM orders", &[]),
+            100,
+            &cancel,
+            query_epoch,
+            &session.epoch,
+        );
+        tokio::pin!(query);
+        poll_fn(|cx| match query.as_mut().poll(cx) {
+            Poll::Pending => Poll::Ready(()),
+            Poll::Ready(_) => panic!("query completed before it could overlap"),
+        })
+        .await;
+        let columns = source.columns(&target, &control).await.unwrap();
+        assert!(columns.iter().any(|column| column.name == "id"));
+        let (result, _) = query.await.unwrap();
+        assert!(!result.rows.is_empty());
+    });
+}
+
+#[test]
 fn cancelled_value_search_bridge_requests_do_not_run() {
     let session = LiveSession::open(&fixture()).unwrap();
     let source = BridgeSource(&session);
