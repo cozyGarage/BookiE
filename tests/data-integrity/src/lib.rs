@@ -1,3 +1,4 @@
+pub mod artefact;
 pub mod clickhouse;
 pub mod corpus;
 pub mod duckdb;
@@ -7,6 +8,7 @@ pub mod postgres;
 pub mod redis;
 pub mod redis_reply;
 pub mod report;
+pub mod routes;
 pub mod rules;
 pub mod runner;
 pub mod server;
