@@ -622,3 +622,51 @@ async fn optimistic_update_matches_offset_timestamp_text_without_changing_storag
         ]]
     );
 }
+
+#[tokio::test]
+async fn a_time_text_read_and_written_back_keeps_its_stored_spelling() {
+    let connection = SqliteDriver.connect(memory_options()).await.unwrap();
+    connection
+        .execute("CREATE TABLE clocks (id INTEGER PRIMARY KEY, clock TIME)")
+        .await
+        .unwrap();
+    let stored = ["00:00:00.5", "13:45:30", "23:59:59.999999", "00:00:00.500", "13:45"];
+    for (id, text) in stored.iter().enumerate() {
+        connection
+            .execute(&format!("INSERT INTO clocks VALUES ({id}, '{text}')"))
+            .await
+            .unwrap();
+    }
+    let read = connection.query("SELECT clock FROM clocks ORDER BY id").await.unwrap();
+    let values: Vec<Value> = read.rows.iter().map(|row| row[0].clone()).collect();
+    let time = |text: &str| Value::Time(text.parse().unwrap());
+    assert_eq!(
+        values,
+        vec![
+            time("00:00:00.5"),
+            time("13:45:30"),
+            time("23:59:59.999999"),
+            Value::Text("00:00:00.500".into()),
+            Value::Text("13:45".into()),
+        ]
+    );
+    for (id, value) in values.iter().enumerate() {
+        let id = i64::try_from(id).unwrap();
+        connection
+            .execute_params(
+                "UPDATE clocks SET clock = ? WHERE id = ?",
+                &[value.clone(), Value::Int(id)],
+            )
+            .await
+            .unwrap();
+    }
+    let written = connection
+        .query("SELECT CAST(clock AS TEXT), typeof(clock) FROM clocks ORDER BY id")
+        .await
+        .unwrap();
+    let expected: Vec<Vec<Value>> = stored
+        .iter()
+        .map(|text| vec![Value::Text((*text).into()), Value::Text("text".into())])
+        .collect();
+    assert_eq!(written.rows, expected);
+}
