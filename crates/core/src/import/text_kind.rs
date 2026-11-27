@@ -7,7 +7,8 @@ pub(crate) fn column_kind_for(column: &ColumnInfo, driver_id: &str) -> ColumnKin
     }
     let lowered = column.data_type.trim().to_ascii_lowercase();
     let is_range = lowered.ends_with("range") || lowered.contains("multirange");
-    let is_bit_string = driver_id == "postgres" && lowered.starts_with("bit");
+    let is_bit_string =
+        (driver_id == "postgres" && lowered.starts_with("bit")) || (driver_id == "duckdb" && lowered == "bit");
     if is_range || is_bit_string {
         return ColumnKind::Text;
     }

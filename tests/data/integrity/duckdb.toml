@@ -263,17 +263,6 @@ type = "BIT"
 literals = ["'101010'", "'0'"]
 carrier = "Text"
 rule = "exact"
-known_failing = [
-    { route = "query", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "browse", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_where", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "param_select", issue = 4214, ids = [1, 2], expect = "expected carrier Text, BookiE has Bytes", reason = "binding the internal bytes back stores a different bit string" },
-    { route = "copy_tsv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_csv", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_json_lines", issue = 4214, expect = "server", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-    { route = "export_sql", issue = 4214, expect = "server stored", reason = "BIT reads as DuckDB's internal bitstring bytes" },
-]
 
 [[case]]
 id = "smallint"
@@ -344,20 +333,9 @@ rule = "exact"
 id = "timetz"
 type = "TIMETZ"
 literals = ["'13:45:30+05:30'", "'00:00:00-12'"]
-carrier = "Text"
-rule = "exact"
-known_failing = [
-    { route = "query", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
-    { route = "browse", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
-    { route = "param_where", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
-    { route = "param_select", issue = 4238, expect = "expected carrier Text, BookiE has Time(", reason = "TIMETZ loses its offset" },
-    { route = "copy_tsv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
-    { route = "export_csv", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
-    { route = "export_json", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
-    { route = "export_json_lines", issue = 4238, expect = "server", reason = "TIMETZ loses its offset" },
-    { route = "export_sql", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
-    { route = "import_xlsx", issue = 4238, expect = "server stored", reason = "TIMETZ loses its offset" },
-]
+carrier = "Undecodable"
+rule = "refusal"
+expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
 
 [[case]]
 id = "fixed-array"

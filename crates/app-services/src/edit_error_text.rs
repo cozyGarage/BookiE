@@ -8,6 +8,7 @@ pub fn value_input_message(error: &ValueInputError) -> String {
         Error::InvalidEnumMetadata => crate::tr!("Could not safely read ENUM or SET members"),
         Error::UndeclaredEnumMember => crate::tr!("Value is not a declared ENUM or SET member"),
         Error::InvalidBoolean => crate::tr!("Invalid boolean. Use true/false, yes/no, or 1/0."),
+        Error::InvalidBitString => crate::tr!("Invalid bit string. Use only 0 and 1."),
         Error::InvalidInteger => crate::tr!("Invalid integer"),
         Error::InvalidNumber => crate::tr!("Invalid number"),
         Error::InvalidDecimal => crate::tr!("Invalid decimal"),

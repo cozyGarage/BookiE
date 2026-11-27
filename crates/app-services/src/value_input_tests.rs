@@ -126,12 +126,32 @@ fn duckdb_hooks() -> ParseHooks {
     hooks_with(
         bookie_core::EnumInputStyle::SqlQuotedLabel,
         bookie_core::DriverValueInputCapabilities {
+            bit_string_input: true,
             extended_calendar_dates: true,
             timestamp_with_timezone: true,
             temporal_fraction_precision: true,
             ..bookie_core::DriverValueInputCapabilities::default()
         },
     )
+}
+
+#[test]
+fn duckdb_bit_input_stays_text_for_edit_and_paste() {
+    let column = column("BIT");
+    for text in ["0", "1", "101010"] {
+        assert_eq!(
+            parse_input_for_driver_with_style(text, Some(&column), &duckdb_hooks()),
+            Ok(Value::Text(text.into()))
+        );
+        assert_eq!(
+            parse_pasted_cell_with_style(Some(text), Some(&column), &duckdb_hooks(), None),
+            Ok(Value::Text(text.into()))
+        );
+    }
+    assert_eq!(
+        parse_input_for_driver_with_style("1012", Some(&column), &duckdb_hooks()),
+        Err(ValueInputError::InvalidBitString)
+    );
 }
 
 fn sqlite_hooks() -> ParseHooks {
