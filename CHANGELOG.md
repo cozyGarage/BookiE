@@ -58,6 +58,8 @@ GTK remains the supported Linux application. The GPUI Linux x86_64 artifact is a
 
 ### Fixed
 
+- Preserve ClickHouse Float32 values when importing files.
+- Refuse ambiguous blank workbook text cells instead of silently changing NULL to empty text.
 - Reject dates that cannot be stored in ClickHouse Date columns.
 - Fixed ClickHouse Date32 values being clamped when written back.
 - Fixed ClickHouse floating-point values overflowing when written back.
