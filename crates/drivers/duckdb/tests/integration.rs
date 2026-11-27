@@ -173,6 +173,15 @@ async fn native_connection() -> Box<dyn Connection> {
 }
 
 #[tokio::test]
+async fn json_columns_preserve_exact_json_text_without_changing_varchar() {
+    let connection = native_connection().await;
+    let result = connection.query("SELECT '{\"b\":1,\"a\":2}'::JSON, '{\"b\":1,\"a\":2}'::VARCHAR, NULL::JSON").await.unwrap();
+    assert_eq!(result.rows[0][0], Value::JsonText("{\"b\":1,\"a\":2}".into()));
+    assert_eq!(result.rows[0][1], Value::Text("{\"b\":1,\"a\":2}".into()));
+    assert_eq!(result.rows[0][2], Value::Null);
+}
+
+#[tokio::test]
 async fn value_contract_native_temporals_round_trip_parameters_and_sql() {
     let connection = native_connection().await;
     for (kind, text) in [
