@@ -11,6 +11,7 @@ use gpui::{
     Context, Decorations, Div, MouseDownEvent, ScrollStrategy, Stateful, Window, WindowControls, div, prelude::*, px,
     rgb, uniform_list,
 };
+use gpui_kit::TestSupportExt as _;
 
 use crate::GridView;
 use crate::assets::icon;
