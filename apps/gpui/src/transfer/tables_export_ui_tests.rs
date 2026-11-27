@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bookie_app_services::export_tables::{TableOutcome, TableResult};
 use bookie_gpui::messages::MessageKind;
 
-use super::{export_folder, export_report, row_limit};
+use super::{export_folder, export_report, export_summary, row_limit};
 
 fn scratch(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("bookie-tables-export-{}-{name}", std::process::id()))
@@ -62,6 +62,7 @@ fn the_report_has_one_line_per_table_and_marks_failures_and_limits() {
         },
     ];
     let lines = export_report(&results);
+    assert_eq!(export_summary(&results), "Exported 2 of 4 table(s); see Messages");
     assert_eq!(lines.len(), 4);
     assert_eq!(
         lines[0],

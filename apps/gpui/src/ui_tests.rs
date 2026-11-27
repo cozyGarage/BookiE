@@ -233,10 +233,8 @@ fn query_controls_and_result_views_fit_at_narrow_widths_in_both_themes(cx: &mut 
             for id in toolbar_ids {
                 let label = match *id {
                     "query-run-options" => "Run options",
-                    "sql-editor-tools" if compact => "Editor tools",
-                    "sql-editor-tools" => "Tools",
-                    "query-file-menu" if compact => "File actions",
-                    "query-file-menu" => "Import / Export",
+                    "sql-editor-tools" => "SQL editor tools",
+                    "query-file-menu" => "Open or save SQL files, export results or import a file",
                     "query-context-menu" => "Connection and database context",
                     _ => id,
                 };
@@ -862,7 +860,7 @@ fn go_to_column_in_the_columns_menu_opens_the_column_picker(cx: &mut TestAppCont
     let button = cx.update(|window, _| window.find_by_label("Columns").bounds());
     cx.simulate_click(button.center(), Default::default());
     cx.run_until_parked();
-    let jump = cx.update(|window, _| window.find_by_label("Jump to column").bounds());
+    let jump = cx.update(|window, _| window.find_by_label("Jump to column…").bounds());
     cx.simulate_click(jump.center(), Default::default());
     cx.run_until_parked();
     view.read_with(cx, |view, _| {
@@ -965,7 +963,7 @@ fn the_shortcut_list_shows_every_command_with_its_keys_and_runs_the_chosen_one(c
             .into_iter()
             .map(|item| (item.title, item.subtitle))
             .collect();
-        assert_eq!(rows, [("Jump to column".to_string(), "Ctrl+Shift+J".to_string())]);
+        assert_eq!(rows, [("Jump to column…".to_string(), "Ctrl+Shift+J".to_string())]);
     });
     cx.simulate_keystrokes("enter");
     view.read_with(cx, |view, _| {
@@ -1249,7 +1247,7 @@ fn the_overflow_menu_lists_commands_by_group_and_runs_them(cx: &mut TestAppConte
     });
     let ids: Vec<Vec<&str>> = groups
         .iter()
-        .map(|group| group.iter().map(|(id, _, _)| *id).collect())
+        .map(|group| group.iter().map(|entry| entry.id).collect())
         .collect();
     assert_eq!(ids[0], ["query", "run", "explain", "data-dictionary"]);
     assert!(ids.iter().flatten().any(|id| *id == "settings"));

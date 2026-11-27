@@ -49,6 +49,14 @@ pub(crate) fn export_report(results: &[TableResult]) -> Vec<(MessageKind, String
         .collect()
 }
 
+fn export_summary(results: &[TableResult]) -> String {
+    let written = results
+        .iter()
+        .filter(|result| matches!(result.outcome, TableOutcome::Written { .. }))
+        .count();
+    format!("Exported {written} of {} table(s); see Messages", results.len())
+}
+
 #[derive(Default)]
 pub(crate) struct TablesExportState {
     pub open: bool,
@@ -161,7 +169,16 @@ impl GridView {
                         this.sync_grid_owner();
                         this.panel.view = ResultView::Messages;
                         this.panel.open = true;
-                        this.status = format!("Exported {} table(s); see Messages", results.len());
+                        this.status = export_summary(&results);
+                        let kind = if results
+                            .iter()
+                            .all(|result| matches!(result.outcome, TableOutcome::Written { .. }))
+                        {
+                            crate::notifications::NoticeKind::Success
+                        } else {
+                            crate::notifications::NoticeKind::Error
+                        };
+                        this.notices.push(this.status.clone(), kind);
                     }
                     Err(message) => this.report_failure("export the tables", &message),
                 }
