@@ -1,1 +1,0 @@
-GPUI opens a menu when a sidebar table is right-clicked: open its data or structure, show its CREATE statement, start a SELECT query, copy its name, export it, and on writable connections empty or drop it after review.

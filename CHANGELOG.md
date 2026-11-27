@@ -2,6 +2,135 @@
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-11-27
+
+GTK remains the supported Linux application. The GPUI Linux x86_64 artifact is an unsupported preview; its accessibility and platform acceptance are not complete.
+
+### Added
+
+- GPUI toggles boolean cells with Space, Enter or a double-click, and edits enum and set cells by picking a declared value from a menu.
+- GPUI can save and open a new connection from the form and switch saved connections from the sidebar.
+- GPUI compares the rows of two tables on the same connection, shows what differs and copies a script that makes the chosen table match.
+- GPUI can draft a foreign key from a schema diagram by pairing columns and reviewing the generated SQL before applying it.
+- GPUI can draft tables and add columns from the schema diagram, with a review of the generated SQL before applying it.
+- GPUI adds an unread notice with Commit and Roll back when a transaction has been idle for five minutes, and removes it once the transaction ends.
+- GPUI's file import lets you choose the separator or keep auto-detect, and the text that means NULL.
+- GPUI offers the database's declared choices when editing a PostgreSQL enum cell.
+- GPUI schema diagrams support schema selection, table search, relationship focus, movable and resizable cards, saved arrangements, and quick access to Data and Structure.
+- GPUI opens a menu when a sidebar table is right-clicked: open its data or structure, show its CREATE statement, start a SELECT query, copy its name, export it, and on writable connections empty or drop it after review.
+- GPUI adds SQL suggestions, an editor Find and Replace panel, snippets, statement markers, inline database errors, and a Stop control for running reads.
+
+### Changed
+
+- GPUI finds and filters loaded live results directly without writing or rereading a temporary copy of the rows.
+- GPUI asks before it cancels a server process: a centred dialog names the process and shows the statement, and Escape leaves it running.
+- GPUI records a stopped transaction statement like a stopped query: it gets a cancelled result tab and a Messages entry.
+- GPUI asks before closing the window over pending edits: a centred dialog offers Discard and close or Keep editing, and Escape keeps the window open.
+- GPUI SQL completion lists matching columns and tables before keywords and shows each column's type and table.
+- GPUI asks in a centred dialog that names the connection before deleting it, instead of a second click on the same button.
+- GPUI marks Dev connections in green instead of the link blue.
+- GPUI dialogs share one keyboard rule: Escape cancels without changing anything, and Enter runs the main action where it is safe, never a destructive one.
+- GPUI dropdown controls now show consistent carets and provide clearer accessible names.
+- GPUI: Avoid repeated SQL parsing when moving the cursor in large scripts.
+- GPUI's export dialog is a form: choose the rows (current page, selection, loaded rows or the whole table), the format and, for CSV, the separator, the text written for NULL and whether to include column names.
+- GPUI lists failed exports, connection imports and exports, filters, sorts, row counts and searches in the notification centre as unread, not only in the status line.
+- GPUI shows sort direction beside the column name and adds Fit visible columns to the Columns menu.
+- GPUI: Home opens from a house button at the left of the top bar instead of a permanent first tab, so the tab strip only holds work tabs; Home shows when no tab is open.
+- GPUI's top-bar Import / Export menu is for connections only; the query editor has its own Import / Export menu for SQL files, exporting results and importing a file.
+- GPUI menus show each command's shortcut, a check for the current choice and destructive commands in red at the end; toolbars use icons with tooltips, one name per command, and narrow grids keep Add row, Compare and Show hidden columns in the More menu.
+- GPUI result columns keep their fitted or resized widths when the window grows, and pinning lives in the column menu.
+- GPUI notification centre marks unread notices with a dot and bold text, and shows an idle open transaction as a warning instead of an error.
+- GPUI opens structure changes, Set cells, outcome resolution, backup and restore, SQL files, export of all tables and connection import reviews as centred dialogs instead of bars that push the grid down.
+- GPUI shows pending edits as a slim marker in the grid strip with the count, Save and Discard, so the grid no longer moves down while edits wait.
+- GPUI messages count rows, changes, cells, tables and connections in singular or plural instead of writing "(s)".
+- GPUI places paging below the result grid, opens table filters on demand, and uses compact connection color swatches.
+- GPUI bounds retained query results and skips hidden or manually sized columns when growing widths during scrolling.
+- GPUI: Saved SQL snippets load without blocking the editor.
+- GPUI cuts long names, statements and labels on one line with the full text in a tooltip, shows shortcuts as keycaps without "None", and draws list rows, chips, empty states and grouped settings the same way everywhere; closing notifications returns focus to where it was.
+- - GPUI: SQL completion ranks referenced columns and functions ahead of unrelated tables and keywords.
+- GPUI stops a running query from the command palette or with Escape in the SQL editor, shows a stopped run as cancelled instead of failed, and labels the elapsed time as Running.
+- GPUI: the release binary is stripped of symbols, making it about a quarter smaller.
+- MySQL and MariaDB statements need about three fewer network round trips: the session settings are restored in one trip when a connection is taken from the pool, and the connection id used for cancelling is read in one trip.
+- CSV and Excel imports into PostgreSQL, MySQL and SQLite send each batch as one multi-row INSERT instead of one statement per row, so a 100,000-row import takes about 4 s instead of 22 s on PostgreSQL, 6 s instead of 12 s on MySQL and 2 s instead of 7.5 s on SQLite.
+- PostgreSQL CSV imports sync the identity or serial sequences once when the import finishes instead of after every batch, and a failed sync is shown in the import report.
+- A slow INSERT, UPDATE, DELETE or schema change that you run is no longer cancelled by the query timeout; Stop still cancels it, and a statement whose timeout had already passed before it started is still refused.
+- PostgreSQL queries that read table columns need one fewer network round trip, and the session reset between statements uses one simple-protocol trip instead of two.
+
+### Fixed
+
+- Reject dates that cannot be stored in ClickHouse Date columns.
+- Fixed ClickHouse Date32 values being clamped when written back.
+- Fixed ClickHouse floating-point values overflowing when written back.
+- Fixed DuckDB BIT values being displayed and written back as internal bytes.
+- Fixed DuckDB JSON results being treated as plain text.
+- DuckDB operations that time out while waiting for a busy connection no longer run after the timeout.
+- DuckDB time-with-time-zone values are marked unsupported instead of losing their offsets.
+- Pasting an empty value into an ENUM, SET or BIT VARYING column stores the empty value instead of NULL.
+- Refresh saved connections in the background after saving, deleting or importing a profile.
+- GPUI keeps a running query alive when a sidebar catalog section is expanded.
+- GPUI refuses to close the window while a save is running or changes are pending, and says what to do first.
+- GPUI SQL completion offers the columns of tables changed by a committed transaction instead of stale cached ones.
+- GPUI reports connection import results in notifications, including when the connection list cannot refresh, and reports partial table exports accurately.
+- GPUI gives connection test results a full-width row so the message and dialog actions stay readable at compact widths.
+- GPUI: Invalid connection details focus the field that needs attention.
+- GPUI shows the confirm button of a review that deletes rows or drops or empties data in the destructive style.
+- GPUI lists a table created from the schema diagram in the sidebar, quick switcher and completion without a manual reconnect.
+- GPUI's create table and add columns form puts Review SQL before Cancel, uses one choice for nullable, not null and primary key, and explains the structure change in the review.
+- GPUI keeps a running query alive while the schema diagram reads columns for a change review.
+- GPUI command palette now ranks opening the schema diagram ahead of export for diagram searches.
+- GPUI reviews foreign keys in the schema diagram without switching tables or interrupting a running query.
+- GPUI no longer runs window shortcuts such as Close tab, New query or the command palette behind an open dialog.
+- GPUI keeps statement and bracket marks in the SQL editor in step with text replaced by formatting, favorites, history and drafts.
+- GPUI no longer rewrites an unchanged NaN cell on save, and an edit that only changes a number's sign of zero or decimal scale is no longer discarded.
+- GPUI preserves fractional seconds from Excel timestamps and keeps numeric cells that match the CSV NULL marker.
+- GPUI imports Excel worksheet columns correctly even when a CSV separator is selected.
+- GPUI no longer cancels an unrelated query when results are hidden after an Explain is blocked or replaced.
+- GPUI result and schema diagram exports now record completion or failure notices.
+- GPUI: Show favorite save, delete and storage failures in notifications.
+- GPUI measures only the selected column when fitting it, so wide results can sample more of that column’s values.
+- GPUI discards pending foreign-key navigation when the originating database connection or table changes.
+- GPUI hides the CSV separator choice when importing an Excel file.
+- GPUI table, dictionary, and subscription reads no longer interrupt an unrelated query.
+- GPUI keeps the query text when the window is closed or you disconnect, and brings it back with Reopen closed tab.
+- GPUI: Reduced repeated SQL mark work while editing large queries.
+- GPUI result grids keep more room when the sidebar and details panel are open in a narrow window.
+- GPUI Choose font in the top bar's more menu now opens the font list.
+- GPUI keeps queries on the chosen schema, preserves script results, and submits the pending SQL selection when confirming parameters.
+- GPUI replaces the running status when a query finishes while another result or tab is shown.
+- GPUI keeps query actions and result views accessible in narrow windows while keeping transaction controls visible.
+- GPUI no longer replaces the table grid with a filter, health or data dictionary result, or switches table tabs, when the switch is refused because of pending work.
+- GPUI row details no longer keep the foreign-key links of the previous connection when a new database has a table with the same name.
+- GPUI shows the query plan for the selected result and clears it when no result remains.
+- GPUI marks the current choice in the compact result view menu.
+- GPUI Run all names the statement that failed in a multi-statement script and stops there.
+- GPUI no longer warns that a saved cell was changed by the database when a decimal only gained trailing zeros, such as 99.5 stored as 99.50.
+- GPUI no longer reports a false save verification error when the table could not be reloaded after a save, and keeps cells locked until the reload finishes.
+- GPUI schema diagram exports honor cancellation before publishing and preserve existing files.
+- GPUI selection statistics stop counting saved edits once the table reloads, even when the reload fails.
+- GPUI forgets the previous connection's query plan and closed tab history after switching connections.
+- GPUI names the hidden-columns button Show all with the hidden count, so the grid strip no longer shows two Columns controls.
+- GPUI keeps long sidebar labels within the panel and shows SQLite file names, with the full path on hover.
+- GPUI keeps the query toolbar's Tools and Import / Export buttons in place while a query runs or the run label changes.
+- GPUI keeps the status message, such as a transaction rollback or a run summary, after switching to the Query results instead of clearing it on the next frame.
+- GPUI no longer cancels a running query or table load when you switch to the Home or Settings tab.
+- GPUI no longer cancels a running query, a save reload or a transaction statement when you switch to the History, Audit log or Schema diagram tab.
+- GPUI keeps the transaction badge on one line with its details in the tooltip, and folds Commit and Roll back into a menu in narrow query toolbars.
+- GPUI keeps a failed commit, a transaction rolled back by the server and an unknown commit outcome in the notification centre until dismissed, so a later click no longer hides them.
+- GPUI refuses grid saves, deletes, inserts, imports and structure changes while a transaction is open, and no longer starts a transaction while a save waits for review.
+- GPUI can stop a statement running inside a transaction, and an unrelated table load no longer cancels or drops its result.
+- GPUI value searches no longer invalidate an unrelated running query.
+- GPUI checks whether a database view can be edited before offering Save, Delete or Add row, and shows a view that cannot be edited as read-only with the reason.
+- Writes to PostgreSQL json, MySQL JSON and DuckDB JSON columns store the document text as entered instead of a re-serialized copy that dropped duplicate keys, spacing and number spelling.
+- MySQL and MariaDB YEAR 0000 is no longer written back as 2000 by an edit, paste, new row or CSV import.
+- PostgreSQL imports that set explicit values for an identity or serial column are accepted by the policy check as one INSERT instead of being refused.
+- SQLite edits keep the storage class of values in columns with no declared type, and TIME text written back keeps its stored spelling.
+- Editing, copying or pasting a TIME or TIMESTAMPTZ value no longer drops its fractional seconds, and re-entering an unchanged value no longer truncates what is stored.
+- Refuse importing undecodable export markers as database values.
+
+### Security
+
+- Query history CSV export neutralises cells that a spreadsheet would run as formulas, like result exports already do.
+
 ## [0.2.10] - 2026-11-25
 
 ### Added
@@ -1270,7 +1399,7 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 - Agentd session reuse after Secret Service or SSH/CA file rotation.
 - Unbounded PostgreSQL and MongoDB SCRAM iteration counts.
 
-[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.10...main
+[Unreleased]: https://github.com/cozyGarage/BookiE/compare/linux-v0.2.11...main
 [0.1.5]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.1.5
 [0.2.0]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.0
 [0.2.2]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.2
@@ -1279,3 +1408,4 @@ Source version **0.2.0** (`Cargo.toml`, inherited by every workspace crate). Thi
 [0.2.8]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.8
 [0.2.9]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.9
 [0.2.10]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.10
+[0.2.11]: https://github.com/cozyGarage/BookiE/releases/tag/linux-v0.2.11
