@@ -3,10 +3,11 @@ use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::chrome::{STATUS_HEIGHT, one_line};
+use crate::chrome::STATUS_HEIGHT;
 use crate::surfaces::{
     ButtonKind, ListState, button, card, compact_button, icon_button, list_state, section_header, tip, truncated,
 };
+use bookie_gpui::messages::{MAX_STATEMENT_CHARS, one_line_sql};
 use bookie_gpui::shell::table_label;
 use bookie_gpui::theme::{Theme, size};
 
@@ -197,7 +198,11 @@ impl GridView {
                 .iter()
                 .map(|row| {
                     (
-                        format!("{} · {}", row.connection_name, one_line(&row.query)),
+                        format!(
+                            "{} · {}",
+                            row.connection_name,
+                            one_line_sql(&row.query, MAX_STATEMENT_CHARS)
+                        ),
                         row.succeeded,
                     )
                 })
@@ -360,7 +365,7 @@ mod footer_status_tests {
 }
 
 fn footer_columns(columns: usize) -> String {
-    format!("{columns} {}", if columns == 1 { "column" } else { "columns" })
+    bookie_gpui::messages::plural(columns, "column", "columns")
 }
 
 #[cfg(test)]

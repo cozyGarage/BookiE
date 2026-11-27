@@ -422,8 +422,8 @@ impl GridView {
         if !evictions.is_empty() {
             self.notices.push(
                 format!(
-                    "Closed {} older result tab(s) to stay within the retention limit",
-                    evictions.len()
+                    "Closed {} to stay within the retention limit",
+                    bookie_gpui::messages::plural(evictions.len(), "older result tab", "older result tabs")
                 ),
                 notifications::NoticeKind::Success,
             );

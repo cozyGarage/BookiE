@@ -59,7 +59,7 @@ fn simple_op(op: Op) -> SimpleOp {
 
 impl GridView {
     fn saved_filter_target(&self) -> Option<(Uuid, Option<String>, String)> {
-        let (id, _) = self.live.as_ref()?.saved.as_ref()?;
+        let (id, _) = self.saved_connection()?;
         (!self.grid_is_query).then(|| {
             (
                 *id,

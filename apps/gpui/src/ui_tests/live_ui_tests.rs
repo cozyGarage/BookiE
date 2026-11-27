@@ -1745,6 +1745,39 @@ fn the_palette_stop_command_cancels_the_run_and_marks_it_cancelled_not_failed(cx
 }
 
 #[gpui::test]
+fn diagram_palette_prefers_opening_the_diagram_to_exporting_it(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    cx.simulate_keystrokes("ctrl-shift-p");
+    cx.simulate_input("diagram");
+    view.read_with(cx, |view, cx| {
+        let actions = view.palette_actions();
+        let ids: Vec<_> = view
+            .palette_shown(cx)
+            .into_iter()
+            .map(|index| actions[index].id)
+            .collect();
+        let show = ids
+            .iter()
+            .position(|id| *id == "show-schema-diagram")
+            .expect("show action");
+        let export = ids
+            .iter()
+            .position(|id| *id == "export-schema-diagram")
+            .expect("export action");
+        assert!(show < export, "{ids:?}");
+    });
+    cx.update(|_, cx| {
+        let input = view.read(cx).palette.input.clone();
+        input.update(cx, |input, cx| input.set_content("export diagram", cx));
+    });
+    view.read_with(cx, |view, cx| {
+        let actions = view.palette_actions();
+        let first = view.palette_shown(cx).into_iter().next().expect("an export action");
+        assert_eq!(actions[first].id, "export-schema-diagram");
+    });
+}
+
+#[gpui::test]
 fn a_typed_host_and_port_offers_a_tcp_check_that_lands_in_messages(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -3149,4 +3182,30 @@ fn the_top_bar_menu_is_for_connections_and_the_editor_has_the_file_menu(cx: &mut
         cx.debug_bounds("query-file-menu").is_some(),
         "the editor toolbar has Import / Export"
     );
+}
+
+#[gpui::test]
+fn the_session_helpers_are_off_without_a_live_table(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.read_with(cx, |view, _| {
+        assert!(!view.is_writable());
+        assert!(!view.shows_live_table());
+        assert_eq!(view.saved_connection_id(), None);
+        assert!(!view.row_change_enabled());
+    });
+}
+
+#[gpui::test]
+fn the_session_helpers_follow_the_live_table_and_its_saved_connection(cx: &mut TestAppContext) {
+    let (view, cx, _orders) = open_live(cx);
+    view.update(cx, |view, _| {
+        assert!(view.shows_live_table());
+        assert!(
+            view.saved_connection_id().is_some(),
+            "a file connection has a stable saved id"
+        );
+        assert_eq!(view.row_change_enabled(), view.is_writable() && view.source.editable());
+        view.grid_is_query = true;
+        assert!(!view.shows_live_table(), "a query result is not a table");
+    });
 }

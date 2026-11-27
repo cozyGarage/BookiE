@@ -138,7 +138,10 @@ impl GridView {
                     this.status = if incomplete {
                         format!("Wrote a partial diagram ({tables} of {total} tables) to {shown}")
                     } else {
-                        format!("Wrote the diagram of {tables} table(s) to {shown}")
+                        format!(
+                            "Wrote the diagram of {} to {shown}",
+                            bookie_gpui::messages::plural(tables, "table", "tables")
+                        )
                     };
                 }
                 Err(message) => this.status = format!("Could not export the diagram: {message}"),

@@ -5,6 +5,7 @@ use bookie_app_services::cell_save_plan::{
 };
 use bookie_app_services::csv_import_plan::plan_csv_import;
 use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
+use bookie_gpui::messages::plural;
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 use bookie_gpui::source::ViewAccess;
 
@@ -100,7 +101,7 @@ impl GridView {
     }
 
     pub(crate) fn can_save_edits(&self) -> bool {
-        self.live.as_ref().is_some_and(|live| live.writable.is_some()) && self.source.editable()
+        self.is_writable() && self.source.editable()
     }
 
     pub(crate) fn view_edit_refusal(&self) -> Option<String> {
@@ -146,7 +147,7 @@ impl GridView {
             self.status = "Finish or cancel the open form first".into();
             return;
         }
-        if self.cell_edit.edits.is_empty() && self.live.as_ref().is_some_and(|live| live.writable.is_some()) {
+        if self.cell_edit.edits.is_empty() && self.is_writable() {
             self.status = "No changes to save".into();
             return;
         }
@@ -156,9 +157,9 @@ impl GridView {
         let changes = self.pending_changes();
         let count = changes.len();
         let labels = ReviewLabels {
-            title: format!("Save {count} change(s) to {}?", live.driver_id),
-            done: format!("Saved {count} change(s)"),
-            review: format!("Review {count} change(s), then save or cancel"),
+            title: format!("Save {} to {}?", plural(count, "change", "changes"), live.driver_id),
+            done: format!("Saved {}", plural(count, "change", "changes")),
+            review: format!("Review {}, then save or cancel", plural(count, "change", "changes")),
             confirm: "Save",
             destructive: false,
             note: None,
@@ -201,9 +202,16 @@ impl GridView {
         let rows = self.selected_rows(selection);
         let count = rows.len();
         let labels = ReviewLabels {
-            title: format!("Delete {count} row(s) from {}?", self.catalog.grid_table.name),
-            done: format!("Deleted {count} row(s)"),
-            review: format!("Review the {count} row(s) to delete, then delete or cancel"),
+            title: format!(
+                "Delete {} from {}?",
+                plural(count, "row", "rows"),
+                self.catalog.grid_table.name
+            ),
+            done: format!("Deleted {}", plural(count, "row", "rows")),
+            review: format!(
+                "Review the {} to delete, then delete or cancel",
+                plural(count, "row", "rows")
+            ),
             confirm: "Delete",
             destructive: true,
             note: Some("Rows that depend on these (foreign keys, triggers) may be affected too"),

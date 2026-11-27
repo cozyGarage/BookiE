@@ -54,7 +54,10 @@ fn export_summary(results: &[TableResult]) -> String {
         .iter()
         .filter(|result| matches!(result.outcome, TableOutcome::Written { .. }))
         .count();
-    format!("Exported {written} of {} table(s); see Messages", results.len())
+    format!(
+        "Exported {written} of {}; see Messages",
+        bookie_gpui::messages::plural(results.len(), "table", "tables")
+    )
 }
 
 #[derive(Default)]

@@ -53,6 +53,7 @@ impl GridView {
             .chain(self.activity_actions())
             .chain(self.health_actions())
             .chain(self.value_search_actions())
+            .chain(self.diagram_actions())
             .chain(self.schema_diagram_actions())
             .chain(self.schema_compare_actions())
             .chain(self.data_compare_actions())
@@ -60,7 +61,6 @@ impl GridView {
             .chain(self.paste_actions())
             .chain(self.filter_rule_actions())
             .chain(self.server_filter_actions())
-            .chain(self.diagram_actions())
             .chain(self.update_actions())
             .chain(self.backup_actions())
             .chain(self.refresh_actions())
@@ -345,21 +345,13 @@ impl GridView {
                 "Save changes…",
                 self.can_save_edits() && !self.cell_edit.edits.is_empty(),
             ),
-            action(
-                "import-csv",
-                "Import file…",
-                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
-            ),
+            action("import-csv", "Import file…", self.row_change_enabled()),
             action(
                 "resolve-outcome",
                 "Resolve unknown write outcome…",
                 self.resolve_enabled(),
             ),
-            action(
-                "insert-row",
-                "Add row…",
-                self.can_save_edits() && self.cell_edit.edits.is_empty() && self.compare.is_none() && !self.form_open(),
-            ),
+            action("insert-row", "Add row…", self.row_change_enabled()),
             action(
                 "delete-rows",
                 "Delete rows…",
@@ -416,18 +408,18 @@ impl GridView {
                 "Show CREATE statement",
                 self.structure_info_enabled(),
             ),
-            action("empty-table", "Empty table…", self.structure_change_enabled()),
-            action("drop-table", "Drop table…", self.structure_change_enabled()),
+            action("empty-table", "Empty table…", self.row_change_enabled()),
+            action("drop-table", "Drop table…", self.row_change_enabled()),
             action("go-to-reference", "Go to the referenced row", self.fk_nav_enabled()),
             action("peek-foreign-key", "Peek referenced row", self.fk_nav_enabled()),
             action("show-referencing", "Show referencing rows", self.fk_nav_enabled()),
             action("show-structure", "Structure", self.structure_info_enabled()),
-            action("add-column", "Add a column…", self.structure_change_enabled()),
-            action("rename-column", "Rename a column…", self.structure_change_enabled()),
-            action("drop-column", "Drop a column…", self.structure_change_enabled()),
-            action("add-index", "Create an index…", self.structure_change_enabled()),
-            action("drop-index", "Drop an index…", self.structure_change_enabled()),
-            action("rename-table", "Rename the table…", self.structure_change_enabled()),
+            action("add-column", "Add a column…", self.row_change_enabled()),
+            action("rename-column", "Rename a column…", self.row_change_enabled()),
+            action("drop-column", "Drop a column…", self.row_change_enabled()),
+            action("add-index", "Create an index…", self.row_change_enabled()),
+            action("drop-index", "Drop an index…", self.row_change_enabled()),
+            action("rename-table", "Rename the table…", self.row_change_enabled()),
             action(
                 "add-foreign-key",
                 "Add a foreign key…",
@@ -500,11 +492,7 @@ impl GridView {
                 !self.catalog.tables.is_empty(),
             ),
         ];
-        if self
-            .live
-            .as_ref()
-            .is_some_and(|session| bookie_app_services::schema_context::supports_schema_context(&session.driver_id))
-        {
+        if self.supports_schema_context() {
             actions.push(action("schema-context", &schema_context, true));
         }
         actions

@@ -117,7 +117,10 @@ impl GridView {
                 }
                 self.edits_changed();
                 self.close_set_cells_bar();
-                self.status = format!("{count} cell(s) set; review and save to apply");
+                self.status = format!(
+                    "{} set; review and save to apply",
+                    bookie_gpui::messages::plural(count, "cell", "cells")
+                );
             }
             Err(reason) => self.status = format!("No cells were changed: {reason}"),
         }
@@ -130,8 +133,12 @@ impl GridView {
             return None;
         }
         let rows = self.selection.map_or(0, |selection| selection.count());
+        let title = format!(
+            "Set {}",
+            bookie_gpui::messages::plural(rows, "selected row", "selected rows")
+        );
         Some(
-            task_bar(format!("Set {rows} selected row(s)"), theme)
+            task_bar(title, theme)
                 .child(div().flex_1().min_w_0().child(input))
                 .child(
                     button(ButtonKind::Ghost, "apply-set-null", "Set NULL", theme)
