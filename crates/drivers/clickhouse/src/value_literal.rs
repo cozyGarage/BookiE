@@ -14,7 +14,7 @@ pub(super) fn literal(value: &Value) -> Result<String, DriverError> {
             } else if f.is_infinite() {
                 if f.is_sign_negative() { "-inf" } else { "inf" }.into()
             } else {
-                format!("{f:e}")
+                format!("toFloat64({f:e})")
             }
         }
         Value::Text(s) => format!("'{}'", escape_str(s)),
@@ -87,8 +87,9 @@ mod tests {
     fn finite_float_literals_round_trip_and_use_exponents() {
         for number in [f64::MAX, f64::MIN, f64::MIN_POSITIVE, f64::from_bits(1), -0.0, 0.3] {
             let rendered = literal(&Value::Float(number)).unwrap();
-            assert!(rendered.contains('e'), "{rendered}");
-            assert_eq!(rendered.parse::<f64>().unwrap().to_bits(), number.to_bits());
+            let inner = rendered.strip_prefix("toFloat64(").unwrap().strip_suffix(')').unwrap();
+            assert!(inner.contains('e'), "{rendered}");
+            assert_eq!(inner.parse::<f64>().unwrap().to_bits(), number.to_bits());
         }
     }
 
