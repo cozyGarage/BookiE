@@ -260,7 +260,14 @@ impl GridView {
                             plan_row_deletes(target, &grid_columns, &rows).map_err(|error| error.to_string())
                         }
                         SaveRequest::Insert(named) => {
-                            plan_row_insert_named(target, &named).map_err(|error| error.to_string())
+                            let driver = drivers_registry::default_registry()
+                                .get(&live.driver_id)
+                                .ok_or_else(|| "The database driver is unavailable".to_string())?;
+                            let hooks = bookie_app_services::value_input::ParseHooks::new(
+                                driver.capabilities().enum_input_style,
+                                driver.value_input_capabilities(),
+                            );
+                            plan_row_insert_named(target, &named, &hooks).map_err(|error| error.to_string())
                         }
                         SaveRequest::Import(file, choices) => {
                             plan_file_import(target, &live.driver_id, &file, &choices)
