@@ -1,7 +1,9 @@
-use gpui::{Context, Div, Stateful, div, prelude::*, px, rgb};
+use gpui::{Context, Div, FocusHandle, Stateful, Window, div, prelude::*, px, rgb};
 
 use crate::GridView;
-use crate::surfaces::{ButtonKind, ListState, compact_button, compact_icon_button, list_state, section_header};
+use crate::surfaces::{
+    ButtonKind, ListState, compact_button, compact_icon_button, list_row, list_state, section_header,
+};
 use bookie_gpui::theme::{Theme, size};
 
 const KEEP: usize = 50;
@@ -27,6 +29,8 @@ pub(crate) struct Notices {
     pub items: Vec<Notice>,
     pub open: bool,
     next_id: u64,
+    return_focus: Option<FocusHandle>,
+    refocus: bool,
 }
 
 impl Notices {
@@ -77,9 +81,29 @@ impl GridView {
         self.notices.push(text, NoticeKind::Error);
     }
 
-    pub(crate) fn toggle_notifications(&mut self, cx: &mut Context<Self>) {
-        self.notices.open = !self.notices.open;
+    pub(crate) fn toggle_notifications(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.notices.open {
+            self.close_notifications(cx);
+            return;
+        }
+        self.notices.open = true;
+        self.notices.return_focus = window.focused(cx);
         cx.notify();
+    }
+
+    pub(crate) fn close_notifications(&mut self, cx: &mut Context<Self>) {
+        self.notices.open = false;
+        self.notices.refocus = true;
+        cx.notify();
+    }
+
+    pub(crate) fn restore_notifications_focus(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !std::mem::take(&mut self.notices.refocus) {
+            return;
+        }
+        if let Some(target) = self.notices.return_focus.take() {
+            window.focus(&target, cx);
+        }
     }
 
     pub(crate) fn dismiss_notice(&mut self, id: u64, cx: &mut Context<Self>) {
@@ -111,14 +135,14 @@ impl GridView {
                         .child(unread.to_string()),
                 )
             })
-            .on_click(cx.listener(|this, _, _, cx| this.toggle_notifications(cx)))
+            .on_click(cx.listener(|this, _, window, cx| this.toggle_notifications(window, cx)))
     }
 
     pub(crate) fn notifications_list(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Stateful<Div>> {
         if !self.notices.open {
             return None;
         }
-        let rows: Vec<Div> = self
+        let rows: Vec<Stateful<Div>> = self
             .notices
             .items
             .iter()
@@ -158,7 +182,7 @@ impl GridView {
                                 }))
                                 .child(
                                     compact_icon_button("close-notifications", "x", "Close", theme)
-                                        .on_click(cx.listener(|this, _, _, cx| this.toggle_notifications(cx))),
+                                        .on_click(cx.listener(|this, _, _, cx| this.close_notifications(cx))),
                                 ),
                         )
                         .child(
@@ -174,7 +198,7 @@ impl GridView {
         )
     }
 
-    fn notice_row(&self, notice: &Notice, theme: Theme, cx: &mut Context<Self>) -> Div {
+    fn notice_row(&self, notice: &Notice, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
         let id = notice.id;
         let colour = notice_colour(notice, theme);
         let resolve = (notice.kind == NoticeKind::UnknownOutcome).then(|| {
@@ -185,7 +209,7 @@ impl GridView {
                 theme,
             )
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.notices.open = false;
+                this.close_notifications(cx);
                 this.open_resolve_panel(cx);
                 cx.notify();
             }))
@@ -197,7 +221,7 @@ impl GridView {
                 .child(
                     compact_button(ButtonKind::Ghost, ("commit-notice", id as usize), "Commit", theme).on_click(
                         cx.listener(|this, _, _, cx| {
-                            this.notices.open = false;
+                            this.close_notifications(cx);
                             this.end_transaction(true, cx);
                             cx.notify();
                         }),
@@ -206,22 +230,17 @@ impl GridView {
                 .child(
                     compact_button(ButtonKind::Ghost, ("rollback-notice", id as usize), "Roll back", theme).on_click(
                         cx.listener(|this, _, _, cx| {
-                            this.notices.open = false;
+                            this.close_notifications(cx);
                             this.end_transaction(false, cx);
                             cx.notify();
                         }),
                     ),
                 )
         });
-        div()
+        list_row(("notice", id as usize), false, theme)
             .debug_selector(move || format!("notice-{id}"))
-            .flex()
             .items_start()
-            .gap_2()
-            .px_3()
             .py_2()
-            .border_b_1()
-            .border_color(rgb(theme.border))
             .child(unread_dot(notice, colour, theme))
             .child(
                 div()

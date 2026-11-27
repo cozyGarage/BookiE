@@ -5,7 +5,7 @@ use gpui::{Context, Div, Entity, Focusable, Stateful, Window, div, prelude::*, p
 use secrecy::SecretString;
 
 use crate::GridView;
-use crate::surfaces::{ButtonKind, button, section_header, segment, segmented, unavailable_button};
+use crate::surfaces::{ButtonKind, button, group, group_rows, segment, segmented, unavailable_button};
 use crate::text_input::TextInput;
 use bookie_gpui::theme::{Theme, size};
 
@@ -186,37 +186,11 @@ pub(crate) fn field(theme: Theme, label: impl Into<gpui::SharedString>, input: &
         .gap_2()
         .child(
             div()
-                .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                .w(px(size::FORM_LABEL_WIDTH))
                 .text_color(rgb(theme.muted_foreground))
                 .child(gpui::SharedString::from(label.into())),
         )
         .child(div().flex_1().h(px(size::FORM_CONTROL)).child(input.clone()))
-}
-
-pub(crate) fn section(theme: Theme, caption: &str, rows: Vec<Div>) -> Div {
-    let last = rows.len().saturating_sub(1);
-    div()
-        .flex()
-        .flex_col()
-        .gap_1()
-        .child(section_header(caption.to_string(), theme))
-        .child(
-            div()
-                .flex()
-                .flex_col()
-                .rounded(px(size::SURFACE_RADIUS))
-                .border_1()
-                .border_color(rgb(theme.border))
-                .bg(rgb(theme.background))
-                .children(rows.into_iter().enumerate().map(|(index, row)| {
-                    let row = row.px_3().py_2();
-                    if index < last {
-                        row.border_b_1().border_color(rgb(theme.border))
-                    } else {
-                        row
-                    }
-                })),
-        )
 }
 
 pub(crate) fn collapsible_section(
@@ -244,25 +218,7 @@ pub(crate) fn collapsible_section(
         .child(div().font_weight(gpui::FontWeight::MEDIUM).child(caption.to_string()))
         .child(div().child(format!("· {summary}")))
         .on_click(on_toggle);
-    let body = rows.map(|rows| {
-        let last = rows.len().saturating_sub(1);
-        div()
-            .debug_selector(move || format!("{id}-fields"))
-            .flex()
-            .flex_col()
-            .rounded(px(size::SURFACE_RADIUS))
-            .border_1()
-            .border_color(rgb(theme.border))
-            .bg(rgb(theme.background))
-            .children(rows.into_iter().enumerate().map(|(index, row)| {
-                let row = row.px_3().py_2();
-                if index < last {
-                    row.border_b_1().border_color(rgb(theme.border))
-                } else {
-                    row
-                }
-            }))
-    });
+    let body = rows.map(|rows| group_rows(rows, theme).debug_selector(move || format!("{id}-fields")));
     div().flex().flex_col().gap_1().child(header).children(body)
 }
 
@@ -273,7 +229,7 @@ pub(crate) fn labelled_row(theme: Theme, label: impl Into<gpui::SharedString>, c
         .gap_2()
         .child(
             div()
-                .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                .w(px(size::FORM_LABEL_WIDTH))
                 .text_color(rgb(theme.muted_foreground))
                 .child(gpui::SharedString::from(label.into())),
         )
@@ -346,12 +302,12 @@ impl GridView {
             connection.extend(self.network_fields(theme, cx));
         }
         connection.push(form.validation_field(theme, if file_based { "File" } else { "Database" }, &form.database, cx));
-        let mut sections = vec![section(theme, "Behavior", self.behaviour_fields(theme, cx))];
+        let mut sections = vec![group("Behavior", self.behaviour_fields(theme, cx), theme)];
         if !file_based {
             sections.push(self.security_section(theme, cx));
             sections.push(self.ssh_section(theme, cx));
         }
-        crate::surfaces::dialog_surface(size::HOME_WIDTH * 1.5, theme)
+        crate::surfaces::dialog_surface(size::CONNECTION_DIALOG_WIDTH, theme)
             .id("connection-dialog")
             .debug_selector(|| "connection-dialog".into())
             .max_h_full()
@@ -406,15 +362,15 @@ impl GridView {
                             .child(
                                 div()
                                     .debug_selector(|| "connection-main-section".into())
-                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .w(px(size::CONNECTION_COLUMN_WIDTH))
                                     .max_w_full()
                                     .flex_grow(1.0)
-                                    .child(section(theme, "Connection", connection)),
+                                    .child(group("Connection", connection, theme)),
                             )
                             .child(
                                 div()
                                     .debug_selector(|| "connection-options-section".into())
-                                    .w(px(size::HOME_WIDTH / 2.0))
+                                    .w(px(size::CONNECTION_COLUMN_WIDTH))
                                     .max_w_full()
                                     .flex_grow(1.0)
                                     .flex()
@@ -620,7 +576,7 @@ impl GridView {
                 .gap_2()
                 .child(
                     div()
-                        .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                        .w(px(size::FORM_LABEL_WIDTH))
                         .text_color(rgb(theme.muted_foreground))
                         .child("Access"),
                 )
@@ -644,7 +600,7 @@ impl GridView {
             .gap_2()
             .child(
                 div()
-                    .w(px(size::SIDE_PANEL_WIDTH / 2.0))
+                    .w(px(size::FORM_LABEL_WIDTH))
                     .text_color(rgb(theme.muted_foreground))
                     .child("Color"),
             )

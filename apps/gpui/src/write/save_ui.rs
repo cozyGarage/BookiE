@@ -8,7 +8,7 @@ use bookie_gpui::live::{LiveSession, SaveFailure, WriteSession};
 use bookie_gpui::save_check::{CellCheck, cell_checks, key_columns, verify};
 use bookie_gpui::source::ViewAccess;
 
-use crate::chrome::tip;
+use crate::surfaces::tip;
 use crate::surfaces::{ButtonKind, button, compact_button, sql_preview, task_bar_frame, task_title};
 use crate::*;
 

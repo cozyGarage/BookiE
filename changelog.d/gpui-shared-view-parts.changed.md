@@ -1,0 +1,1 @@
+GPUI cuts long names, statements and labels on one line with the full text in a tooltip, shows shortcuts as keycaps without "None", and draws list rows, chips, empty states and grouped settings the same way everywhere; closing notifications returns focus to where it was.
