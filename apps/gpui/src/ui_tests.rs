@@ -1981,6 +1981,32 @@ fn closing_query_from_home_discards_its_pending_result(cx: &mut TestAppContext) 
 }
 
 #[gpui::test]
+fn switching_connections_cancels_the_previous_load_and_discards_its_callback(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.begin_background(
+                Work::Load,
+                cx,
+                |_| (),
+                |view, ()| view.status = "stale load result".into(),
+            );
+            let cancel = view.loads.cancel.clone();
+            view.connect(
+                bookie_gpui::live::Origin::File("/nonexistent/bookie-switch.sqlite".into()),
+                cx,
+            );
+            assert!(
+                cancel.is_cancelled(),
+                "switching connection must cancel the previous load"
+            );
+        });
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, _| assert_ne!(view.status, "stale load result"));
+}
+
+#[gpui::test]
 fn the_command_palette_can_close_the_current_result(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("ctrl-t ctrl-shift-p");
