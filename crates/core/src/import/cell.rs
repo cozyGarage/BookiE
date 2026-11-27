@@ -43,6 +43,8 @@ pub enum CellError {
     InvalidSqliteAnyCsvValue,
     #[error("an undecodable export marker cannot be imported as a value")]
     UndecodableMarker,
+    #[error("ClickHouse Date requires a date between 1970-01-01 and 2149-06-06")]
+    ClickhouseDateOutOfRange,
 }
 
 /// A field that could not become a value, named well enough for the user
@@ -340,6 +342,11 @@ pub(crate) fn row_to_values_for_driver(
             }
             row.native_value(*index, column, driver_id)
                 .unwrap_or_else(|| value_for(text, column, options, driver_id))
+                .and_then(|value| {
+                    crate::sql_dialect::validate_write_value(driver_id, column, &value)
+                        .map_err(|_| CellError::ClickhouseDateOutOfRange)?;
+                    Ok(value)
+                })
                 .map_err(|reason| CsvRowError {
                     line,
                     column: column.name.clone(),

@@ -2,6 +2,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum BuildSqlError {
+    #[error("column {column} requires a ClickHouse Date between 1970-01-01 and 2149-06-06")]
+    ClickhouseDateOutOfRange { column: String },
     #[error("table has no primary key")]
     NoPrimaryKey,
 
