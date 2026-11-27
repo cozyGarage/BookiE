@@ -4,7 +4,7 @@ use gpui::{Div, Stateful, div, prelude::*, px, relative, rgb};
 use gpui_component::checkbox::Checkbox;
 
 use crate::GridView;
-use crate::surfaces::{section_header, segment, segmented};
+use crate::surfaces::{ListState, list_state, section_header, segment, segmented};
 use bookie_gpui::model::{Cell, ColumnMeta};
 
 const MONO: &str = "monospace";
@@ -99,21 +99,19 @@ impl GridView {
             return None;
         }
         let (header, detail) = match self.detail_target() {
-            None => (
-                div().text_color(rgb(theme.muted_foreground)).child("No cell selected"),
-                None,
+            None => (None, None),
+            Some((name, detail)) => (
+                Some(div().text_color(rgb(theme.muted_foreground)).child(name)),
+                Some(detail),
             ),
-            Some((name, detail)) => {
-                let header = div().text_color(rgb(theme.muted_foreground)).child(name);
-                (header, Some(detail))
-            }
         };
         let truncated = matches!(&detail, Some(Detail::TruncatedText(_)));
         let body = detail.map_or_else(
             || {
-                div()
-                    .text_color(rgb(theme.muted_foreground))
-                    .child("Select a cell to view its contents")
+                list_state(
+                    ListState::Empty("No cell selected. Select a cell to view its contents"),
+                    theme,
+                )
             },
             |detail| detail_body(detail, theme),
         );
@@ -142,7 +140,7 @@ impl GridView {
                 .min_h_0()
                 .p_2()
                 .overflow_y_scroll()
-                .child(header)
+                .children(header)
                 .child(body)
                 .children(preview_note),
         )
@@ -156,17 +154,14 @@ impl GridView {
         let json = self.row_inspector.json;
         let fields_body = (!json).then(|| {
             self.row_detail_target(&filter, self.row_detail_hide_null).map_or_else(
-                || {
-                    div()
-                        .text_color(rgb(theme.muted_foreground))
-                        .child("Select a row to view its values")
-                },
+                || list_state(ListState::Empty("Select a row to view its values"), theme),
                 |fields| {
                     if fields.is_empty() {
-                        return div()
-                            .debug_selector(|| "row-detail-empty".into())
-                            .text_color(rgb(theme.muted_foreground))
-                            .child("No fields to show. Clear the filter or turn off Hide NULL fields");
+                        return list_state(
+                            ListState::Empty("No fields to show. Clear the filter or turn off Hide NULL fields"),
+                            theme,
+                        )
+                        .debug_selector(|| "row-detail-empty".into());
                     }
                     div()
                         .flex()
@@ -270,7 +265,7 @@ impl GridView {
                 .flex_col()
                 .child(section_header("Referenced by", theme).pb_1())
                 .when(rows.is_empty(), |section| {
-                    section.child(div().text_color(rgb(theme.muted_foreground)).child("Counting…"))
+                    section.child(list_state(ListState::Loading("Counting…"), theme))
                 })
                 .children(rows.iter().enumerate().map(|(index, reference)| {
                     let clickable = reference.count.is_ok() && !reference.sql.is_empty();
@@ -287,13 +282,7 @@ impl GridView {
                             row.cursor_pointer()
                                 .text_color(rgb(crate::surfaces::link_colour(theme)))
                         })
-                        .child(
-                            div()
-                                .min_w_0()
-                                .overflow_hidden()
-                                .text_ellipsis()
-                                .child(reference.label.clone()),
-                        )
+                        .child(crate::surfaces::truncated("label", reference.label.clone()))
                         .child(
                             div()
                                 .flex_none()

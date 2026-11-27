@@ -73,6 +73,12 @@ In `apps/gpui`, these jobs have exactly one constructor in `surfaces.rs`. A view
 | Task content | `task_bar(title)` | Fields, then the primary action, then Cancel, always in that order. One-shot steps put it inside a dialog. |
 | Section caption | `section_header(caption)` | Sentence case, muted, small. |
 | Empty, loading, failed | `list_state(...)` | One sentence, at most one action. Errors use the destructive colour; warnings use warning. |
+| Tooltip | `tip(text)` | The one tooltip builder. Views never call the library tooltip directly. |
+| Fixed-width text | `truncated(id, text)` | One line, an ellipsis and `min_w_0`. The full text is always the tooltip, except for blank text, because the layout decides whether it is cut. |
+| List row | `list_row(id, selected)` | Compact padding and the control radius. Selected rows take the selection fill; other rows take it on hover. Callers add the height and content. |
+| Clickable chip | `picker_chip(id, icon, label, tooltip)`; `badge(text, colour)` for a fact that is not clickable | Small control height, thin border, muted text, the label truncated. The tooltip names the current value and is the accessible name. |
+| Shortcut | `shortcut(keys)` | A keycap from the keymap label. No binding draws nothing, never the word "None". |
+| Card and grouped rows | `card()`; `group(caption, rows)` | Surface radius and a border. `group` puts a section caption above rows split by thin dividers. |
 
 - **One primary per bar or dialog**, and it comes before Cancel.
 - **One height per bar.** Every control in a bar has the bar's control height. A bar is its control height plus padding from the scale.
