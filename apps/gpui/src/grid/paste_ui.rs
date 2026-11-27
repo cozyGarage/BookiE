@@ -1,6 +1,7 @@
 use bookie_app_services::clipboard_grid::{parse_clipboard_grid, paste_plan};
 use bookie_gpui::edit::{is_editable, parse_edit};
 use bookie_gpui::model::{Cell, CellText};
+use bookie_results::value_exact::exact_equal;
 
 use crate::*;
 
@@ -24,7 +25,7 @@ pub(crate) fn staged_paste(targets: &[PasteTarget]) -> StagedPaste {
                 parse_edit(target.current.kind(), text).map_err(|reason| format!("row {}: {reason}", index + 1))?
             }
         };
-        if value != target.current {
+        if !exact_equal(&value, &target.current) {
             staged.push(((target.row, target.column), value));
         }
     }

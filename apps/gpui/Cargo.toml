@@ -39,7 +39,7 @@ lsp-types = "=0.97.0"
 
 [dev-dependencies]
 async-trait = "0.1"
-bookie-app-services = { path = "../../crates/app-services", features = ["test-support"] }
+bookie-app-services = { path = "../../crates/app-services", features = ["test-support", "isolated-test-state"] }
 gpui = { package = "gpui-pre", version = "=0.3.12", features = ["test-support"] }
 gpui-kit = { version = "=0.10.0", features = ["test-support"] }
 rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs", "ring", "std", "tls12"] }

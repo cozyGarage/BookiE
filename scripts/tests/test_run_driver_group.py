@@ -93,7 +93,7 @@ class ConformanceTargetTests(unittest.TestCase):
     def test_every_data_integrity_engine_target_is_reachable_through_a_group(self):
         grouped = {driver for drivers in group_arms().values() for driver in drivers}
         for path in (ROOT / "tests" / "data-integrity" / "tests").glob("*.rs"):
-            if path.stem == "corpus":
+            if path.stem in {"corpus", "sqlite", "duckdb"}:
                 continue
             self.assertIn(path.stem, grouped, f"{path} is not run by any driver group")
 

@@ -1,6 +1,7 @@
 use bookie_app_services::set_cells::MAX_SET_CELLS;
 use bookie_gpui::edit::{is_editable, parse_edit};
 use bookie_gpui::model::{Cell, CellText};
+use bookie_results::value_exact::exact_equal;
 
 use crate::surfaces::{ButtonKind, button, task_bar};
 use crate::*;
@@ -25,7 +26,7 @@ pub(crate) fn staged_values(cells: &[(u64, Cell)], text: Option<&str>) -> Result
             None => Cell::Null,
             Some(text) => parse_edit(current.kind(), text)?,
         };
-        if &value != current {
+        if !exact_equal(&value, current) {
             staged.push((*row, value));
         }
     }

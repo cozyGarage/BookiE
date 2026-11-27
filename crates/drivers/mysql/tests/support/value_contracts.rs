@@ -133,6 +133,51 @@ async fn native_time_zero_date_and_year_values_survive_reads_parameters_and_expo
     }
 }
 
+async fn assert_year_values_written_back_keep_their_year(conn: &dyn Connection, server: &str) {
+    conn.execute("CREATE TABLE year_write_back (id INT PRIMARY KEY, y YEAR)")
+        .await
+        .unwrap();
+    conn.execute("INSERT INTO year_write_back VALUES (1, 0), (2, 1901), (3, 2155)")
+        .await
+        .unwrap();
+    let read = conn
+        .query("SELECT id, y FROM year_write_back ORDER BY id")
+        .await
+        .unwrap();
+    for row in &read.rows {
+        let Value::Int(id) = row[0] else {
+            panic!("{server}: id {row:?}");
+        };
+        conn.execute_params(
+            "INSERT INTO year_write_back VALUES (?, ?)",
+            &[Value::Int(id + 10), row[1].clone()],
+        )
+        .await
+        .unwrap();
+    }
+    let stored = conn
+        .query("SELECT CAST(y AS CHAR) FROM year_write_back ORDER BY id")
+        .await
+        .unwrap();
+    let years: Vec<Value> = ["0000", "1901", "2155", "0000", "1901", "2155"]
+        .into_iter()
+        .map(text)
+        .collect();
+    let found: Vec<Value> = stored.rows.iter().map(|row| row[0].clone()).collect();
+    assert_eq!(found, years, "{server}");
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn a_year_read_and_written_back_keeps_year_0000_on_mysql_and_mariadb() {
+    let (_mysql, options) = start_mysql().await;
+    let mysql = connect(options).await;
+    assert_year_values_written_back_keep_their_year(mysql.as_ref(), "MySQL").await;
+    let (_mariadb, options) = start_mariadb().await;
+    let mariadb = connect(options).await;
+    assert_year_values_written_back_keep_their_year(mariadb.as_ref(), "MariaDB").await;
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn strict_zero_date_modes_refuse_invalid_dates_without_writing() {

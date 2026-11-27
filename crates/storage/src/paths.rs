@@ -27,6 +27,9 @@ pub fn connections_config_path() -> Result<PathBuf, StorageError> {
 }
 
 pub fn data_path(filename: &str) -> Result<PathBuf, StorageError> {
+    if let Some(dir) = crate::isolated_test_state_dir() {
+        return Ok(dir.join("data").join(storage_dir_name()).join(filename));
+    }
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")))
@@ -35,6 +38,9 @@ pub fn data_path(filename: &str) -> Result<PathBuf, StorageError> {
 }
 
 fn config_dir() -> Result<PathBuf, StorageError> {
+    if let Some(dir) = crate::isolated_test_state_dir() {
+        return Ok(dir.join("config").join(storage_dir_name()));
+    }
     let base = std::env::var_os("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
