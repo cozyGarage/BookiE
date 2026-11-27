@@ -1,1 +1,1 @@
-GPUI keeps long saved connection names legible in a narrow sidebar.
+GPUI keeps long sidebar labels within the panel and shows SQLite file names, with the full path on hover.

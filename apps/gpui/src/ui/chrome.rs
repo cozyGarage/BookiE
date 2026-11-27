@@ -541,16 +541,23 @@ impl GridView {
     fn sidebar_connection_switcher(&self, theme: Theme, cx: &mut Context<Self>) -> impl IntoElement {
         use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 
-        let active = self.live.as_deref().and_then(|live| live.saved.as_ref());
-        let active_id = active.map(|(id, _)| *id);
-        let name = active.map_or("Connections", |(_, name)| name.as_str());
+        let active = self.live.as_deref().and_then(|live| {
+            live.saved
+                .as_ref()
+                .map(|(id, name)| (live.driver_id == "sqlite", *id, name.as_str()))
+        });
+        let active_id = active.map(|(_, id, _)| id);
+        let full_name = active.map_or("Connections", |(_, _, name)| name);
+        let name = active.map_or("Connections", |(is_sqlite, _, name)| {
+            connection_display_name(is_sqlite, name)
+        });
         let connected = self.live.is_some();
         let status = connection_status(connected);
         let owner = cx.entity().downgrade();
         let entries: Vec<_> = self
             .connections
             .iter()
-            .map(|saved| (saved.id, saved.name.clone()))
+            .map(|saved| (saved.id, saved.driver_id == "sqlite", saved.name.clone()))
             .collect();
 
         crate::surfaces::menu_button(
@@ -565,20 +572,24 @@ impl GridView {
             ),
             Some(connection_status_dot(connected, theme).into_any_element()),
             format!("{name}, {status}. Choose connection"),
-            format!("{name} · {status}"),
+            format!("{full_name} · {status}"),
             true,
         )
         .debug_selector(|| "sidebar-connection-switcher".into())
         .w_full()
         .dropdown_menu(move |mut menu, _, _| {
-            for (id, name) in &entries {
+            for (id, is_sqlite, full_name) in &entries {
                 let (id, owner) = (*id, owner.clone());
+                let name = connection_display_name(*is_sqlite, full_name);
                 let connected = active_id == Some(id);
                 let label = format!("{name} · {}", connection_status(connected));
+                let full_name = full_name.clone();
                 menu = menu.item(
                     PopupMenuItem::element(move |_, _| {
                         div()
+                            .id(format!("sidebar-connection-entry-{id}"))
                             .debug_selector(|| "sidebar-connection-entry".into())
+                            .tooltip(tip(full_name.clone()))
                             .flex()
                             .items_center()
                             .gap_2()
@@ -1192,6 +1203,16 @@ fn connection_status(connected: bool) -> &'static str {
     if connected { "Connected" } else { "Disconnected" }
 }
 
+fn connection_display_name(is_sqlite: bool, name: &str) -> &str {
+    if !is_sqlite {
+        return name;
+    }
+    name.rsplit(['/', '\\'])
+        .next()
+        .filter(|file_name| !file_name.is_empty())
+        .unwrap_or(name)
+}
+
 fn connection_status_dot(connected: bool, theme: Theme) -> Div {
     let color = if connected {
         theme.success
@@ -1215,6 +1236,20 @@ pub(crate) fn connection_dot(color: u32, selector: &'static str) -> Div {
         .size(px(size::SM))
         .rounded_full()
         .bg(rgb(color))
+}
+
+#[cfg(test)]
+mod connection_display_name_tests {
+    use super::connection_display_name;
+
+    #[test]
+    fn only_sqlite_paths_are_reduced_to_a_nonempty_file_name() {
+        assert_eq!(connection_display_name(true, "/tmp/orders.sqlite"), "orders.sqlite");
+        assert_eq!(connection_display_name(true, r"C:\data\orders.sqlite"), "orders.sqlite");
+        assert_eq!(connection_display_name(true, "orders.sqlite"), "orders.sqlite");
+        assert_eq!(connection_display_name(true, "/tmp/"), "/tmp/");
+        assert_eq!(connection_display_name(false, "/db/orders"), "/db/orders");
+    }
 }
 
 enum SidebarLine {
