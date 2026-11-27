@@ -189,6 +189,43 @@ mod atomic_write_tests {
     }
 
     #[test]
+    fn cancellation_while_staging_prevents_publication() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("diagram.mmd");
+        let cancelled = std::sync::atomic::AtomicBool::new(false);
+        let (started, wait_started) = std::sync::mpsc::sync_channel(0);
+        let (resume, wait_resume) = std::sync::mpsc::sync_channel(0);
+        std::thread::scope(|scope| {
+            let path = &path;
+            let cancel = &cancelled;
+            let worker = scope.spawn(move || {
+                write_atomically_no_replace_checked(
+                    path,
+                    |writer| {
+                        writer.write_all(b"staged")?;
+                        started.send(()).unwrap();
+                        wait_resume.recv().unwrap();
+                        Ok(())
+                    },
+                    || {
+                        if cancel.load(std::sync::atomic::Ordering::Acquire) {
+                            Err(io::Error::other("cancelled"))
+                        } else {
+                            Ok(())
+                        }
+                    },
+                )
+            });
+            wait_started.recv().unwrap();
+            cancelled.store(true, std::sync::atomic::Ordering::Release);
+            resume.send(()).unwrap();
+            assert!(worker.join().unwrap().is_err());
+        });
+        assert!(!path.exists());
+        assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    #[test]
     fn overlapping_exports_publish_complete_independent_files() {
         let directory = tempfile::tempdir().expect("temp dir");
         let path = directory.path().join("page.csv");
