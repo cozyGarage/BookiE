@@ -15,7 +15,9 @@ use gpui_kit::TestSupportExt as _;
 
 use crate::GridView;
 use crate::assets::icon;
-use crate::surfaces::{Bar, ButtonKind, badge, button, compact_icon_button, icon_button, tip, toggle_icon_button};
+use crate::surfaces::{
+    Bar, Button, ButtonKind, badge, button, compact_icon_button, icon_button, tip, toggle_icon_button,
+};
 use crate::ui_theme::ThemeExt;
 use bookie_gpui::theme::{Theme, size};
 
@@ -23,7 +25,7 @@ pub(crate) const TOOLBAR_HEIGHT: f32 = 36.0;
 pub(crate) const TAB_HEIGHT: f32 = 28.0;
 pub(crate) const STATUS_HEIGHT: f32 = 24.0;
 
-fn expand_sidebar_button(tooltip: String, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
+fn expand_sidebar_button(tooltip: String, theme: Theme, cx: &mut Context<GridView>) -> Button {
     icon_button("sidebar-open-top-left", "chevrons-right", tooltip, theme).on_click(cx.listener(|this, _, _, cx| {
         this.sidebar.open = true;
         cx.notify();
@@ -38,7 +40,7 @@ fn sidebar_toggle(
     theme: Theme,
     cx: &mut Context<GridView>,
     on_click: impl Fn(&mut GridView, &mut Context<GridView>) + 'static,
-) -> Stateful<Div> {
+) -> Button {
     toggle_icon_button(id, name, tooltip, on, Bar::Compact, theme).on_click(cx.listener(move |this, _, _, cx| {
         on_click(this, cx);
         cx.notify();
@@ -184,7 +186,7 @@ impl GridView {
         name: &'static str,
         theme: Theme,
         cx: &mut Context<Self>,
-    ) -> Stateful<Div> {
+    ) -> Button {
         let label = bookie_gpui::palette::menu_label(id).unwrap_or(id);
         let tooltip =
             Command::for_action(id).map_or_else(|| label.to_string(), |command| self.labelled_tip(label, command));
@@ -750,7 +752,7 @@ impl GridView {
         self.status = format!("Located {label}");
     }
 
-    fn home_button(&self, theme: Theme, cx: &mut Context<Self>) -> Stateful<Div> {
+    fn home_button(&self, theme: Theme, cx: &mut Context<Self>) -> Button {
         let on_home = self.tabs.current() == &Tab::Home;
         toggle_icon_button("home-button", "house", "Open home", on_home, Bar::Small, theme)
             .debug_selector(|| "home-button".into())
@@ -801,16 +803,13 @@ fn tab_icon_name(tab: &Tab) -> &'static str {
     }
 }
 
-fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> Stateful<Div> {
-    compact_icon_button(("close", index), "x", "Close tab", theme).on_mouse_down(
-        gpui::MouseButton::Left,
-        cx.listener(move |this, _: &MouseDownEvent, window, cx| {
-            this.close_tab(index, cx);
-            this.show_current_table(window, cx);
-            cx.stop_propagation();
-            cx.notify();
-        }),
-    )
+fn tab_close_button(index: usize, theme: Theme, cx: &mut Context<GridView>) -> Button {
+    compact_icon_button(("close", index), "x", "Close tab", theme).on_click(cx.listener(move |this, _, window, cx| {
+        this.close_tab(index, cx);
+        this.show_current_table(window, cx);
+        cx.stop_propagation();
+        cx.notify();
+    }))
 }
 
 impl GridView {

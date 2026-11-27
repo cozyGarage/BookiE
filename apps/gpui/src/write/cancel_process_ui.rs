@@ -37,7 +37,7 @@ impl GridView {
             body: "The server stops what this process is running. A Prod connection asks for approval first.".into(),
             sql: Some(sql.clone().into()),
         };
-        let actions = [
+        let actions = vec![
             button(
                 ButtonKind::Destructive,
                 "confirm-cancel-process",

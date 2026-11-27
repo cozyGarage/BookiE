@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use gpui::{Entity, VisualTestContext};
+use std::{cell::RefCell, rc::Rc};
+
+use gpui::{AppContext, Entity, TestAppContext, VisualTestContext};
 
 use crate::GridView;
 use crate::sidebar_state::SidebarState;
@@ -9,6 +11,22 @@ use crate::sidebar_state::SidebarState;
 pub(crate) const NARROW: f32 = SidebarState::NARROW_WINDOW - 60.0;
 pub(crate) const MEDIUM: f32 = 900.0;
 pub(crate) const WIDE: f32 = 1500.0;
+
+pub(crate) fn add_rooted_grid(
+    cx: &mut TestAppContext,
+    build: impl FnOnce(&mut gpui::Window, &mut gpui::Context<GridView>) -> GridView + 'static,
+) -> (Entity<GridView>, &mut VisualTestContext) {
+    cx.update(gpui_kit::init);
+    let view_slot = Rc::new(RefCell::new(None));
+    let capture_view = view_slot.clone();
+    let (_root, cx) = cx.add_window_view(move |window, cx| {
+        let view = cx.new(|cx| build(window, cx));
+        *capture_view.borrow_mut() = Some(view.clone());
+        gpui_kit::base::Root::new(view, window, cx)
+    });
+    let view = view_slot.borrow_mut().take().expect("the grid view was created");
+    (view, cx)
+}
 
 const DEADLINE: Duration = Duration::from_secs(15);
 const CLOCK_STEP: Duration = Duration::from_millis(100);
