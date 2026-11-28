@@ -69,6 +69,62 @@ fn import_rejects_undecodable_export_markers_with_location() {
 }
 
 #[test]
+fn clickhouse_string_import_refuses_ambiguous_binary_export_markers() {
+    let options = CsvImportOptions::default();
+    let string = column("value", "String");
+    for marker in ["\\xdeadbeef", "\\x"] {
+        let error = row_to_values_for_driver(
+            &[marker.into()],
+            &[Some(0)],
+            std::slice::from_ref(&string),
+            &options,
+            2,
+            "clickhouse",
+        )
+        .expect_err("binary export spellings cannot be recovered as text");
+        assert_eq!(error.line, 2);
+        assert_eq!(error.reason, CellError::AmbiguousClickhouseStringBytes);
+    }
+
+    let nullable = column("value", "LowCardinality(Nullable(String))");
+    assert_eq!(
+        row_to_values_for_driver(&["\\x00".into()], &[Some(0)], &[nullable], &options, 2, "clickhouse",)
+            .expect_err("wrapped String types retain the same ambiguity")
+            .reason,
+        CellError::AmbiguousClickhouseStringBytes
+    );
+
+    for (driver, text, column) in [
+        ("clickhouse", "\\xnot-hex", string.clone()),
+        ("postgres", "\\xdeadbeef", string.clone()),
+        ("clickhouse", "\\xdeadbeef", column("value", "FixedString(4)")),
+    ] {
+        assert_eq!(
+            row_to_values_for_driver(&[text.into()], &[Some(0)], &[column], &options, 2, driver,)
+                .expect("ordinary text remains importable"),
+            vec![Value::Text(text.into())]
+        );
+    }
+
+    let null_marker = CsvImportOptions {
+        null_marker: "\\xdeadbeef".into(),
+        ..options
+    };
+    assert_eq!(
+        row_to_values_for_driver(
+            &["\\xdeadbeef".into()],
+            &[Some(0)],
+            &[string],
+            &null_marker,
+            2,
+            "clickhouse",
+        )
+        .expect("an explicit null marker remains unambiguous"),
+        vec![Value::Null]
+    );
+}
+
+#[test]
 fn duckdb_bit_import_keeps_the_exact_bit_string() {
     let bit = column("value", "BIT");
     let options = CsvImportOptions::default();
