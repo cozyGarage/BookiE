@@ -702,7 +702,7 @@ class CiWorkflowTests(unittest.TestCase):
                 self.assertIn("lab-ci / gtk-server", layers[layer]["hosted_gate"])
         self.assertIn("gtk-server", checker.REQUIRED)
         self.assertIn("actions/download-artifact@", github_job)
-        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", github_job)
+        self.assertIn("gtk-safety-binary-${{ github.run_id }}", github_job)
         self.assertIn("python3 scripts/cleanup-testcontainers.py", github_job)
         self.assertNotIn("  e2e:\n", forgejo)
         self.assertIn('python3 scripts/run-test-layer.py "gtk-${{ matrix.server }}"', forgejo_job)
@@ -2131,10 +2131,25 @@ class CiWorkflowTests(unittest.TestCase):
         gtk = re.search(r"(?ms)^  gtk:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
         self.assertIn("bash scripts/build-deb.sh", builder)
         self.assertIn("ci-gtk-artifact.py create --profile dist target/dist/bookie-app target/gtk-safety", builder)
-        self.assertIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", builder)
+        self.assertIn("name: gtk-safety-binary-${{ github.run_id }}", builder)
+        self.assertIn("name: floor-package-${{ github.run_id }}", builder)
+        gtk_upload = builder.split("- name: Upload the source-pinned GTK binary", 1)[1].split("      - name:", 1)[0]
+        floor_upload = builder.split("- name: Upload the source-pinned Debian package", 1)[1]
+        self.assertIn("overwrite: true", gtk_upload)
+        self.assertIn("overwrite: true", floor_upload)
+        self.assertEqual(workflow.count("name: gtk-safety-binary-${{ github.run_id }}"), 6)
+        self.assertEqual(workflow.count("name: floor-package-${{ github.run_id }}"), 2)
+        self.assertNotIn("gtk-safety-binary-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
+        self.assertNotIn("floor-package-${{ github.run_id }}-${{ github.run_attempt }}", workflow)
         self.assertIn("linux-build", gtk)
         self.assertIn("ci-gtk-artifact.py verify --profile dist target/gtk-safety", gtk)
         self.assertNotIn("cargo build", gtk)
+
+        for job_name in ("gtk-followup", "gtk-server", "gtk-server-followup", "gtk-server-final"):
+            job = re.search(rf"(?ms)^  {job_name}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+            self.assertIn("name: gtk-safety-binary-${{ github.run_id }}", job)
+        distro = re.search(r"(?ms)^  distro-floor-scenarios:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", workflow).group(1)
+        self.assertIn("name: floor-package-${{ github.run_id }}", distro)
 
     def test_github_keyring_uses_a_source_pinned_prebuilt_bundle(self):
         workflow = (ROOT / ".github/workflows/build-linux.yml").read_text()
