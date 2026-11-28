@@ -22,6 +22,7 @@ GTK remains the supported Linux application. The GPUI Linux x86_64 artifact is a
 
 ### Changed
 
+- The Arch package no longer labels the public release as an internal candidate.
 - GPUI finds and filters loaded live results directly without writing or rereading a temporary copy of the rows.
 - GPUI asks before it cancels a server process: a centred dialog names the process and shows the statement, and Escape leaves it running.
 - GPUI records a stopped transaction statement like a stopped query: it gets a cancelled result tab and a Messages entry.
@@ -58,6 +59,8 @@ GTK remains the supported Linux application. The GPUI Linux x86_64 artifact is a
 
 ### Fixed
 
+- GPUI: Switching tabs no longer cancels in-flight table loads or background tool results.
+- GPUI dialog controls are keyboard accessible, keep focus inside dialogs, and return it to the opener; Import, Export, and Add Row focus their first field.
 - Preserve ClickHouse Float32 values when importing files.
 - Refuse ambiguous blank workbook text cells instead of silently changing NULL to empty text.
 - Reject dates that cannot be stored in ClickHouse Date columns.
