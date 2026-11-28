@@ -503,26 +503,36 @@ impl GridView {
         }
     }
 
+    fn should_allow_window_close(&mut self, cx: &mut Context<Self>) -> bool {
+        match self.close_blocker() {
+            Some(reason) => {
+                self.status = reason.into();
+                cx.notify();
+                false
+            }
+            None if self.needs_close_confirmation() => {
+                self.close_confirm = true;
+                cx.notify();
+                false
+            }
+            None => {
+                self.remember_open_query_draft(cx);
+                true
+            }
+        }
+    }
+
+    pub(crate) fn request_window_close(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.should_allow_window_close(cx) {
+            window.remove_window();
+        }
+    }
+
     fn guard_transaction_close(window: &mut Window, cx: &mut Context<Self>) {
         let owner = cx.weak_entity();
         window.on_window_should_close(cx, move |_, cx| {
             owner
-                .update(cx, |view, cx| match view.close_blocker() {
-                    Some(reason) => {
-                        view.status = reason.into();
-                        cx.notify();
-                        false
-                    }
-                    None if view.needs_close_confirmation() => {
-                        view.close_confirm = true;
-                        cx.notify();
-                        false
-                    }
-                    None => {
-                        view.remember_open_query_draft(cx);
-                        true
-                    }
-                })
+                .update(cx, |view, cx| view.should_allow_window_close(cx))
                 .unwrap_or(true)
         });
     }

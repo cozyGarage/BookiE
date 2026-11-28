@@ -1835,7 +1835,10 @@ fn a_post_save_reload_survives_tab_switch_and_tool_work(cx: &mut TestAppContext)
             view.sync_grid_owner();
             view.tabs.open_table(&table);
             view.sync_grid_owner();
-            assert!(!reload.is_cancelled(), "switching tabs must leave the post-save reload running");
+            assert!(
+                !reload.is_cancelled(),
+                "switching tabs must leave the post-save reload running"
+            );
             view.begin_background(Work::Tool, cx, |_| (), |_, ()| {});
         })
     });
@@ -2976,6 +2979,45 @@ fn closing_over_pending_edits_asks_and_escape_keeps_the_window(cx: &mut TestAppC
         assert_eq!(view.status, "Kept the window open");
     });
     assert!(cx.debug_bounds("close-confirm-dialog").is_none());
+}
+
+#[gpui::test]
+fn the_in_app_close_control_asks_before_discarding_edits(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| {
+        view.update(cx, |view, _| {
+            view.cell_edit
+                .edits
+                .insert((0, 1), bookie_gpui::model::Cell::Text("Changed".into()));
+        })
+    });
+    cx.update(|window, cx| view.update(cx, |view, cx| view.request_window_close(window, cx)));
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+    assert!(
+        cx.debug_bounds("close-confirm-dialog").is_some(),
+        "the in-app Close control must use the same close guard as the window manager"
+    );
+    view.read_with(cx, |view, _| {
+        assert!(view.close_confirm);
+        assert_eq!(view.cell_edit.edits.len(), 1, "the edits stay until the user chooses");
+    });
+}
+
+#[gpui::test]
+fn the_in_app_close_control_blocks_while_a_save_is_running(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    cx.update(|_, cx| view.update(cx, |view, _| view.save.busy = true));
+    cx.update(|window, cx| view.update(cx, |view, cx| view.request_window_close(window, cx)));
+    view.read_with(cx, |view, _| {
+        assert!(!view.close_confirm);
+        assert_eq!(
+            view.status,
+            "A save is running; wait for it to finish before closing the window"
+        );
+    });
 }
 
 #[gpui::test]
