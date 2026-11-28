@@ -103,6 +103,19 @@ fn value_contract_duckdb_csv_timestamps_refuse_submicrosecond_precision() {
 }
 
 #[test]
+fn value_contract_duckdb_timetz_csv_keeps_the_offset_as_text() {
+    let options = CsvImportOptions::default();
+    for data_type in ["TIMETZ", "TIME WITH TIME ZONE", "TIME(6) WITH TIME ZONE"] {
+        let text = "13:45:30.123456-05:30";
+        assert_eq!(
+            value_for(text, &column("value", data_type), &options, "duckdb"),
+            Ok(Value::Text(text.into())),
+            "{data_type}"
+        );
+    }
+}
+
+#[test]
 fn value_contract_postgres_csv_restores_chrono_year_zero_as_bc_era_text() {
     let date = column("value", "date");
     let values = row_to_values_for_driver(

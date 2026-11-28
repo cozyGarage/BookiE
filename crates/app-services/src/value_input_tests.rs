@@ -55,6 +55,26 @@ fn empty_non_nullable_defaulted_text_remains_empty_text() {
 }
 
 #[test]
+fn time_with_time_zone_edits_remain_exact_text() {
+    for data_type in ["TIMETZ", "TIME WITH TIME ZONE", "TIME(6) WITH TIME ZONE"] {
+        let input = "13:45:30.123456-05:30";
+        assert_eq!(
+            parse_input_for_column(input, Some(&column(data_type))),
+            Ok(Value::Text(input.into())),
+            "{data_type}"
+        );
+    }
+}
+
+#[test]
+fn timestamp_with_time_zone_edits_remain_timestamp_values() {
+    assert!(matches!(
+        parse_input_for_column("2026-11-28T13:45:30+05:30", Some(&column("timestamp with time zone"))),
+        Ok(Value::TimestampTz(_))
+    ));
+}
+
+#[test]
 fn mysql_range_failure_returns_an_engine_specific_error() {
     let hooks = ParseHooks::new(
         bookie_core::EnumInputStyle::RawValue,

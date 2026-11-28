@@ -94,6 +94,7 @@ libc = "0.2"
 regex = "1"
 
 [patch.crates-io]
+duckdb = { path = "vendor/duckdb" }
 sqlx-mysql = { path = "vendor/sqlx-mysql" }
 sqlx-postgres = { path = "vendor/sqlx-postgres" }
 mongodb = { path = "vendor/mongodb" }

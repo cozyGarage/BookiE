@@ -69,7 +69,7 @@ async fn duckdb_json_reads_keep_exact_source_text() {
 }
 
 #[tokio::test]
-async fn duckdb_timetz_corpus_reports_unsupported_values() {
+async fn duckdb_timetz_corpus_preserves_exact_values_across_routes() {
     let mut corpus = load_corpus("duckdb");
     corpus.cases.retain(|case| case.id == "timetz");
     assert_eq!(corpus.cases.len(), 1);

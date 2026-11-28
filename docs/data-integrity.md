@@ -256,7 +256,7 @@ Read routes by type family. "Covered" means every read route passes on every lis
 | Boolean and bits | covered | BIT known-failing [#4214](https://github.com/cozyGarage/BookiE/issues/4214) | covered |
 | Text: Unicode, NUL, padding, 'NULL' vs NULL vs '', collations, large | covered, including TEXT that is not UTF-8 (kept as bytes) | covered | covered (FixedString and LowCardinality(FixedString) keep NUL padding; binary String as bytes; Nullable(String) NULL, '' and 'NULL') |
 | Binary | covered | covered | covered |
-| Temporal | covered (declared temporal TEXT, INTEGER, REAL and BLOB storage) | covered (TIMESTAMP_S, _MS, _NS, infinity, a `TimeZone` session); TIMETZ loses its offset: known-failing [#4238](https://github.com/cozyGarage/BookiE/issues/4238) | covered (Date, Date32, DateTime64 with zones, DateTime on a New York server; DST fold is a refusal); bound Date32 outside 1970-2149 clamps: [#4215](https://github.com/cozyGarage/BookiE/issues/4215); DateTime ignores `session_timezone`: [#4236](https://github.com/cozyGarage/BookiE/issues/4236) |
+| Temporal | covered (declared temporal TEXT, INTEGER, REAL and BLOB storage) | covered (TIMESTAMP_S, _MS, _NS, infinity, a `TimeZone` session, and TIMETZ clock plus signed offset) | covered (Date, Date32, DateTime64 with zones, DateTime on a New York server; DST fold is a refusal); bound Date32 outside 1970-2149 clamps: [#4215](https://github.com/cozyGarage/BookiE/issues/4215); DateTime ignores `session_timezone`: [#4236](https://github.com/cozyGarage/BookiE/issues/4236) |
 | Interval | not applicable | covered (`server_cast`) | not yet |
 | UUID | not applicable | covered | covered |
 | JSON | not applicable | exact text, but read as `Text`: known-failing [#4231](https://github.com/cozyGarage/BookiE/issues/4231) | not yet |
@@ -272,14 +272,14 @@ Engines and routes. "Refused" lists cases where BookiE refuses a value on that r
 
 | Route | PostgreSQL 16 | MySQL 8.4, MariaDB 11 | SQLite | DuckDB | ClickHouse 24.8 | Redis |
 | --- | --- | --- | --- | --- | --- | --- |
-| Read through `PolicyGuard`: query, browse, param_where | covered | covered | covered | covered except #4214, #4231, #4238 | covered except #4235, #4236, #4237 | covered (command, full_value, browse) |
+| Read through `PolicyGuard`: query, browse, param_where | covered | covered | covered | covered except #4214 and #4231 | covered except #4235, #4236, #4237 | covered (command, full_value, browse) |
 | Read through `PolicyGuard`: param_select | covered except [#4206](https://github.com/cozyGarage/BookiE/issues/4206) | covered except MySQL 8.4 binary echo [#4228](https://github.com/cozyGarage/BookiE/issues/4228) | covered | covered except #4214 | covered except #4215; nested values are refused as expected | not applicable |
 | App read session: `cursor_browse` | planned | not applicable | not applicable | not applicable | not applicable | not applicable |
 | Interactive editor session: `session_query` | planned | planned | planned | planned | planned | planned |
-| Copy as TSV and paste back | covered | covered except #4221 | covered except #4221 | covered except #4214, #4238 | covered except #4235, #4236, #4237 | not yet |
-| Export CSV, JSON, JSON Lines, re-read | covered except #4223 (JSON) | covered except #4223 (JSON) | covered | covered except #4214, #4223, #4238 | covered except #4235, #4236, #4237 | not yet |
-| Export SQL INSERT, run into an empty table | covered | covered | covered | covered except #4214, #4238 | covered except #4237 | not applicable |
-| Export to CSV or XLSX, import into an empty table | covered except #4206 | covered | covered except #4220 | covered except #4238 | covered except #4226, #4227, #4237 | not applicable |
+| Copy as TSV and paste back | covered | covered except #4221 | covered except #4221 | covered except #4214 | covered except #4235, #4236, #4237 | not yet |
+| Export CSV, JSON, JSON Lines, re-read | covered except #4223 (JSON) | covered except #4223 (JSON) | covered | covered except #4214, #4223 | covered except #4235, #4236, #4237 | not yet |
+| Export SQL INSERT, run into an empty table | covered | covered | covered | covered except #4214 | covered except #4237 | not applicable |
+| Export to CSV or XLSX, import into an empty table | covered except #4206 | covered | covered except #4220 | covered | covered except #4226, #4227, #4237 | not applicable |
 | Grid edit, paste, set cells, insert row | covered except #4206 | covered | covered; NULL cells store text by rule | covered | not yet (MergeTree rows have no unique key) | not yet |
 | No-op edit, table unchanged | covered | covered | covered | covered | not yet | not yet |
 | GPUI and GTK display formatting | not covered by this suite | not covered | not covered | not covered | not covered | not covered |
