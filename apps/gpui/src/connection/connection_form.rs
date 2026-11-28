@@ -1099,23 +1099,24 @@ impl GridView {
                 if let Some(Ok(connections)) = connections {
                     this.connections = connections;
                 }
-                this.finish_delete(outcome);
+                this.finish_delete(outcome, cx);
                 cx.notify();
             });
         })
         .detach();
     }
 
-    fn finish_delete(&mut self, outcome: Result<connection_save::Deleted, String>) {
+    pub(crate) fn finish_delete(&mut self, outcome: Result<connection_save::Deleted, String>, cx: &mut Context<Self>) {
         self.connection_form.confirm_delete = false;
         match outcome {
             Ok(deleted) => {
-                self.connection_form.editing = None;
-                self.connection_form.status = if deleted.credential_failure {
+                let status = if deleted.credential_failure {
                     "Deleted; some stored credentials could not be removed".into()
                 } else {
                     "Deleted".into()
                 };
+                self.reset_connection_form(cx);
+                self.connection_form.status = status;
             }
             Err(message) => self.connection_form.status = message,
         }

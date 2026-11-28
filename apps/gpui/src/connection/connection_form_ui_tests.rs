@@ -474,6 +474,48 @@ fn new_connection_clears_fields_left_from_the_previous_edit(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn a_successful_delete_clears_the_form_so_save_cannot_reuse_stored_secrets(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let deleted = uuid::Uuid::from_u128(4222);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connection_form.open = true;
+            view.connection_form.editing = Some(deleted);
+            view.connection_form.read_only = false;
+            view.connection_form.ssh_open = true;
+            view.connection_form.ssh.on = true;
+            view.connection_form.ssh.head.stored = true;
+            view.connection_form.ssh.jumps.push(crate::ssh_form::HopForm::new(cx));
+            view.connection_form.ssh.jumps[0].stored = true;
+            set(&view.connection_form.name, "prod-db", cx);
+            set(&view.connection_form.host, "db.example.com", cx);
+            set(&view.connection_form.username, "alice", cx);
+            set(&view.connection_form.ssh.head.host, "bastion.example.com", cx);
+            set(&view.connection_form.ssh.head.user, "jump", cx);
+            view.finish_delete(
+                Ok(bookie_app_services::connection_save::Deleted {
+                    credential_failure: false,
+                }),
+                cx,
+            );
+        })
+    });
+    view.read_with(cx, |view, cx| {
+        let draft = view.connection_form.draft(cx);
+        assert_eq!(view.connection_form.editing, None);
+        assert_eq!(view.connection_form.status, "Deleted");
+        assert_eq!(draft.host, "");
+        assert_eq!(draft.username, "");
+        assert!(draft.ssh.is_none());
+        assert!(!view.connection_form.ssh.on);
+        assert!(!view.connection_form.ssh.head.stored);
+        assert!(view.connection_form.ssh.jumps.is_empty());
+        assert_eq!(view.connection_form.ssh.head.host.read(cx).content(), "");
+        assert_eq!(view.connection_form.ssh.head.user.read(cx).content(), "");
+    });
+}
+
+#[gpui::test]
 fn a_missing_connection_draft_does_not_open_the_edit_dialog(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let previous = uuid::Uuid::from_u128(4220);
