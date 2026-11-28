@@ -474,6 +474,49 @@ fn new_connection_clears_fields_left_from_the_previous_edit(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn a_late_save_result_does_not_close_or_fill_a_new_connection_form(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let request_generation = view.read_with(cx, |view, _| view.connection_form.request_generation);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connection_form.saving = true;
+            view.reset_connection_form(cx);
+            view.open_connection_dialog(cx);
+            view.finish_connection_save_request(
+                request_generation,
+                Ok((uuid::Uuid::from_u128(4223), "old profile".into(), Vec::new(), true)),
+                cx,
+            );
+        })
+    });
+    view.read_with(cx, |view, cx| {
+        assert!(view.connection_form.open);
+        assert_eq!(view.connection_form.editing, None);
+        assert_eq!(view.connection_form.status, "");
+        assert_eq!(view.connection_form.draft(cx).name, "");
+    });
+}
+
+#[gpui::test]
+fn a_late_test_result_does_not_replace_the_new_connection_status(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let request_generation = view.read_with(cx, |view, _| view.connection_form.request_generation);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connection_form.testing = true;
+            view.reset_connection_form(cx);
+            view.open_connection_dialog(cx);
+            view.finish_connection_test_request(request_generation, Ok("Connected".into()), cx);
+        })
+    });
+    view.read_with(cx, |view, _| {
+        assert!(view.connection_form.open);
+        assert!(!view.connection_form.testing);
+        assert_eq!(view.connection_form.status, "");
+    });
+}
+
+#[gpui::test]
 fn a_successful_delete_clears_the_form_so_save_cannot_reuse_stored_secrets(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     let deleted = uuid::Uuid::from_u128(4222);
