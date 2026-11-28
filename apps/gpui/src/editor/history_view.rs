@@ -212,32 +212,37 @@ impl GridView {
         }));
         let delete = icon_button(("history-delete", index), "trash-2", "Delete", theme)
             .on_click(cx.listener(move |this, _, _, cx| this.change_history(statement_history::delete(id), cx)));
-        list_row(("history-row", index), false, theme)
-            .h(px(size::LIST_ROW))
-            .child(icon(if row.succeeded { "circle" } else { "x" }, dot))
-            .child(
-                div()
-                    .id(("history-statement", index))
-                    .cursor_pointer()
-                    .on_click(cx.listener(move |this, _, window, cx| this.reuse_statement(&query, window, cx)))
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .flex()
-                    .flex_col()
-                    .child(
-                        truncated(("history-sql", index), one_line_sql(&row.query, MAX_STATEMENT_CHARS))
-                            .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace"),
-                    )
-                    .child(
-                        truncated(("history-meta", index), meta(row))
-                            .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground)),
-                    ),
-            )
-            .child(pin)
-            .child(delete)
+        list_row(
+            ("history-row", index),
+            one_line_sql(&row.query, MAX_STATEMENT_CHARS),
+            false,
+            theme,
+        )
+        .h(px(size::LIST_ROW))
+        .child(icon(if row.succeeded { "circle" } else { "x" }, dot))
+        .child(
+            div()
+                .id(("history-statement", index))
+                .cursor_pointer()
+                .on_click(cx.listener(move |this, _, window, cx| this.reuse_statement(&query, window, cx)))
+                .flex_1()
+                .min_w_0()
+                .overflow_hidden()
+                .flex()
+                .flex_col()
+                .child(
+                    truncated(("history-sql", index), one_line_sql(&row.query, MAX_STATEMENT_CHARS))
+                        .text_size(px(size::TEXT_SMALL))
+                        .font_family("monospace"),
+                )
+                .child(
+                    truncated(("history-meta", index), meta(row))
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground)),
+                ),
+        )
+        .child(pin)
+        .child(delete)
     }
 
     pub(crate) fn history_page(&mut self, theme: Theme, cx: &mut Context<Self>) -> Div {

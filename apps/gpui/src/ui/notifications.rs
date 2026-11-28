@@ -237,7 +237,7 @@ impl GridView {
                     ),
                 )
         });
-        list_row(("notice", id as usize), false, theme)
+        list_row(("notice", id as usize), notice.text.clone(), false, theme)
             .debug_selector(move || format!("notice-{id}"))
             .items_start()
             .py_2()
