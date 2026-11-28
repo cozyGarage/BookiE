@@ -106,7 +106,9 @@ impl GridView {
         let local_sort = self.local_sort.clone();
         let keep_local_sort = local_sort.clone();
         let current_session = session.clone();
-        self.status = format!("Loading {} from the server…", table_label(&table));
+        let active_tab = self.tabs.current().clone();
+        let loading_status = format!("Loading {} from the server…", table_label(&table));
+        self.status.clone_from(&loading_status);
         self.begin_background(
             Work::Load,
             cx,
@@ -119,6 +121,15 @@ impl GridView {
                 Ok::<_, String>(((identity, source), where_sql, order))
             },
             move |this, result| {
+                if !this.is_current_session(&current_session)
+                    || this.tabs.current() != &active_tab
+                    || this.grid_is_query
+                {
+                    if this.status == loading_status {
+                        this.status.clear();
+                    }
+                    return;
+                }
                 let ((identity, source), where_sql, order) = match result {
                     Ok(loaded) => loaded,
                     Err(message) => {
@@ -126,29 +137,35 @@ impl GridView {
                         return;
                     }
                 };
-                if !this.is_current_session(&current_session)
-                    || this.catalog.grid_table != identity
-                    || this.grid_is_query
-                    || this.reject_view_edits()
-                {
+                if this.catalog.grid_table != identity {
+                    if this.status == loading_status {
+                        this.status.clear();
+                    }
                     return;
                 }
+                if this.reject_view_edits() {
+                    return;
+                }
+                let sort_unchanged = this.local_sort == keep_local_sort;
+                this.show_loaded_table(identity.clone(), source);
                 this.search.server.applied.retain(|(table, _)| *table != identity);
                 if !where_sql.is_empty() {
                     this.search.server.applied.push((identity.clone(), where_sql.clone()));
                 }
-                let sort_unchanged = this.local_sort == keep_local_sort;
-                this.show_loaded_table(identity, source);
                 if let (true, Some(order), Some(sort)) = (sort_unchanged, order, keep_local_sort) {
                     this.local_order = Some(std::sync::Arc::new(order));
                     this.local_sort = Some(sort);
                     this.pager = this.pager.with_total(this.dataset_count());
                 }
-                this.status = if where_sql.is_empty() {
-                    "Showing the table without a WHERE filter".into()
-                } else {
-                    format!("Loaded {} rows WHERE {where_sql}", thousands(this.dataset_count()))
-                };
+                if this.tabs.current() == &active_tab {
+                    this.status = if where_sql.is_empty() {
+                        "Showing the table without a WHERE filter".into()
+                    } else {
+                        format!("Loaded {} rows WHERE {where_sql}", thousands(this.dataset_count()))
+                    };
+                } else if this.status == loading_status {
+                    this.status.clear();
+                }
             },
         );
     }

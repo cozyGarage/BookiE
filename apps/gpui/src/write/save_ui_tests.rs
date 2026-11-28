@@ -1835,7 +1835,10 @@ fn a_post_save_reload_survives_tab_switch_and_tool_work(cx: &mut TestAppContext)
             view.sync_grid_owner();
             view.tabs.open_table(&table);
             view.sync_grid_owner();
-            assert!(!reload.is_cancelled(), "switching tabs must leave the post-save reload running");
+            assert!(
+                !reload.is_cancelled(),
+                "switching tabs must leave the post-save reload running"
+            );
             view.begin_background(Work::Tool, cx, |_| (), |_, ()| {});
         })
     });
@@ -1844,6 +1847,84 @@ fn a_post_save_reload_survives_tab_switch_and_tool_work(cx: &mut TestAppContext)
         assert!(!std::sync::Arc::ptr_eq(&before, &view.table_source));
         assert!(!view.save.busy);
         assert_eq!(view.status, "Saved");
+    });
+}
+
+#[gpui::test]
+fn a_table_load_does_not_activate_its_tab_after_switching_to_query(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    let before_table_source = view.read_with(cx, |view, _| view.table_source.clone());
+    let customers = TableInfo {
+        schema: None,
+        name: "customers".into(),
+    };
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_table_named(&customers, window, cx);
+            view.tabs.open_query();
+            view.sync_grid_owner();
+        })
+    });
+    let query_source = view.read_with(cx, |view, _| view.source.clone());
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Query);
+        assert!(view.grid_is_query);
+        assert_eq!(view.catalog.grid_table, customers);
+        assert!(view.tabs.items.contains(&bookie_gpui::shell::Tab::Table(customers)));
+        assert!(!std::sync::Arc::ptr_eq(&before_table_source, &view.table_source));
+        assert!(bookie_gpui::source::ResultSource::total(view.table_source.as_ref()) > 0);
+        assert!(std::sync::Arc::ptr_eq(&query_source, &view.source));
+    });
+}
+
+#[gpui::test]
+fn a_table_load_does_not_replace_a_different_active_table(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    let before_table_source = view.read_with(cx, |view, _| view.table_source.clone());
+    let customers = TableInfo {
+        schema: None,
+        name: "customers".into(),
+    };
+    let other = bookie_gpui::shell::Tab::Table(TableInfo {
+        schema: None,
+        name: "other_table".into(),
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.open_table_named(&customers, window, cx);
+            view.tabs.items.push(other.clone());
+            view.tabs.active = view.tabs.items.len() - 1;
+            view.sync_grid_owner();
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), other);
+        assert_eq!(view.catalog.grid_table.name, "orders");
+        assert!(std::sync::Arc::ptr_eq(&before_table_source, &view.table_source));
+    });
+}
+
+#[gpui::test]
+fn a_post_save_reload_keeps_home_active_and_refreshes_the_table_source(cx: &mut TestAppContext) {
+    let path = orders();
+    let (view, cx) = saving_view(cx, &path);
+    let before = view.read_with(cx, |view, _| view.table_source.clone());
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.reload_after_save("Saved".into(), cx);
+            view.tabs.open_home();
+            view.sync_grid_owner();
+        })
+    });
+    settle_saving(cx);
+    view.read_with(cx, |view, _| {
+        assert_eq!(*view.tabs.current(), bookie_gpui::shell::Tab::Home);
+        assert!(!view.save.busy);
+        assert!(!std::sync::Arc::ptr_eq(&before, &view.table_source));
     });
 }
 

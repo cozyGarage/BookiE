@@ -71,8 +71,10 @@ impl GridView {
         let current_session = session.clone();
         let current_table = table.clone();
         let requested_sort = sort.clone();
+        let active_tab = self.tabs.current().clone();
         let where_sql = self.table_where(&table);
-        self.status = format!("Sorting {column}…");
+        let sorting_status = format!("Sorting {column}…");
+        self.status.clone_from(&sorting_status);
         self.begin_background(
             Work::Load,
             cx,
@@ -85,7 +87,11 @@ impl GridView {
                 if !this.is_current_session(&current_session)
                     || this.catalog.grid_table != current_table
                     || this.grid_is_query
+                    || this.tabs.current() != &active_tab
                 {
+                    if this.status == sorting_status {
+                        this.status.clear();
+                    }
                     return;
                 }
                 match result {
@@ -476,24 +482,54 @@ impl GridView {
             return;
         }
         self.clear_fk_peek();
-        self.status = format!("Loading {}…", table_label(table));
+        let loading_status = format!("Loading {}…", table_label(table));
+        self.status.clone_from(&loading_status);
         let wanted = table.clone();
         let sort = self.table_sort(&wanted).cloned();
         let where_sql = self.table_where(&wanted);
+        let active_tab = self.tabs.current().clone();
         self.begin_background_with_context(
             Work::Load,
             cx,
             move |cancel| load(&session, &wanted, sort.as_ref(), &where_sql, &cancel),
-            move |this, loaded, cx| match loaded {
-                Ok((name, table)) => {
-                    this.show_loaded_table(name.clone(), table);
-                    if this.catalog.grid_table == name
-                        && matches!(this.tabs.current(), Tab::Table(table) if *table == name)
-                    {
-                        this.complete_table_open(action, cx);
+            move |this, loaded, cx| {
+                let navigation_unchanged = this.tabs.current() == &active_tab;
+                match loaded {
+                    Ok((name, table)) => {
+                        if !navigation_unchanged
+                            && matches!(this.tabs.current(), Tab::Table(current) if current != &name)
+                        {
+                            if this.status == loading_status {
+                                this.status.clear();
+                            }
+                            return;
+                        }
+                        let applied = if navigation_unchanged {
+                            this.show_loaded_table(name.clone(), table)
+                        } else {
+                            this.cache_loaded_table(name.clone(), table);
+                            if this.status == loading_status {
+                                this.status.clear();
+                            }
+                            true
+                        };
+                        if !applied {
+                            return;
+                        }
+                        if this.catalog.grid_table == name
+                            && matches!(this.tabs.current(), Tab::Table(table) if *table == name)
+                        {
+                            this.complete_table_open(action, cx);
+                        }
+                    }
+                    Err(message) => {
+                        if navigation_unchanged {
+                            this.status = message;
+                        } else if this.status == loading_status {
+                            this.status.clear();
+                        }
                     }
                 }
-                Err(message) => this.status = message,
             },
         );
     }
@@ -523,6 +559,7 @@ impl GridView {
         let where_sql = self.table_where(&wanted);
         self.invalidate_load();
         let generation = self.loads.generation;
+        let active_tab = self.tabs.current().clone();
         let cancel = CancellationToken::new();
         self.loads.cancel = cancel.clone();
         cx.spawn(async move |this, cx| {
@@ -533,7 +570,14 @@ impl GridView {
             this.update(cx, |this, cx| {
                 this.save.busy = false;
                 if this.loads.generation == generation {
-                    this.show_reload_after_save(done, &checks, loaded);
+                    if this.tabs.current() == &active_tab {
+                        this.show_reload_after_save(done, &checks, loaded);
+                    } else if let Ok((identity, table)) = loaded
+                        && identity == this.catalog.grid_table
+                        && !matches!(this.tabs.current(), Tab::Table(current) if current != &identity)
+                    {
+                        this.cache_loaded_table(identity, table);
+                    }
                 }
                 cx.notify();
             })
@@ -559,6 +603,21 @@ impl GridView {
                 self.report_save_check(checks);
             }
             Err(message) => self.status = format!("{done}, but the table could not be reloaded: {message}"),
+        }
+    }
+
+    fn cache_loaded_table(&mut self, identity: TableInfo, table: Source) {
+        self.catalog.grid_table = identity.clone();
+        self.table_source = table.clone();
+        if !self.grid_is_query {
+            self.source = table;
+            self.compare = None;
+            self.search.cursor = Default::default();
+            self.sidebar.fields.clear();
+            self.set_mode(Mode::All);
+        }
+        if !self.tabs.items.contains(&Tab::Table(identity.clone())) {
+            self.tabs.items.push(Tab::Table(identity));
         }
     }
 
