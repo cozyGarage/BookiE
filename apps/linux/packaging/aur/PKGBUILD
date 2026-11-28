@@ -3,7 +3,7 @@
 # shellcheck shell=bash disable=SC2034,SC2154,SC2164
 
 pkgname=bookie
-pkgver=0.2.7
+pkgver=0.2.11
 pkgrel=1
 pkgdesc="Native Linux database client"
 arch=('x86_64')
@@ -18,7 +18,7 @@ options=('!lto')
 
 # The tag is followed and the commit it must resolve to is pinned, so a moved tag fails the build.
 _tag="linux-v${pkgver}"
-_commit=e293de78f947931d34d5ceac33cee6056e3aa513
+_commit=9ff961616fc9750e368836be9fe04eca8c104e15
 source=("${pkgname}::git+${url}.git#tag=${_tag}")
 sha256sums=('SKIP')
 
