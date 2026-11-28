@@ -57,6 +57,9 @@ pub type SqlFuture<'a> = Pin<Box<dyn Future<Output = Result<String, String>> + '
 
 pub trait Referee: Send + Sync {
     fn run<'a>(&'a self, sql: &'a str) -> SqlFuture<'a>;
+    fn release(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 pub trait Cli: Send + Sync {

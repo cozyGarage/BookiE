@@ -32,6 +32,12 @@ pub async fn run_reads(server: &Server, corpus: &Corpus) -> Vec<CaseResult> {
         };
         prepared.push((case, referee));
     }
+    if let Err(error) = server.referee.release() {
+        return prepared
+            .iter()
+            .flat_map(|(case, _)| fail_all(&server.label, case, &format!("referee release failed: {error}")))
+            .collect();
+    }
     let reads = read_all(server, &prepared).await;
     let mut results = Vec::new();
     for ((case, referee), routes) in prepared.iter().zip(reads) {
@@ -72,6 +78,9 @@ async fn read_in_session(server: &Server, case: &Case, referee: &[RefereeRow]) -
         if let Err(error) = server.run_sql(statement).await {
             return failed(format!("session setup failed: {error}"));
         }
+    }
+    if let Err(error) = server.referee.release() {
+        return failed(format!("referee release failed: {error}"));
     }
     let mut options = server.options.clone();
     if let Some((username, password)) = &variant.login {

@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use bookie_core::ConnectOptions;
 
 use crate::server::{Dialect, Referee, Server, SessionVariant, SettingCheck, SqlFuture, setting_parts};
@@ -61,19 +59,38 @@ fn join(fields: &[String]) -> String {
 }
 
 struct DuckdbReferee {
-    path: PathBuf,
+    path: std::path::PathBuf,
+    connection: std::sync::Mutex<Option<duckdb::Connection>>,
     _directory: tempfile::TempDir,
 }
 
 impl Referee for DuckdbReferee {
     fn run<'a>(&'a self, sql: &'a str) -> SqlFuture<'a> {
-        let result = run(&self.path, sql);
+        let result = self
+            .connection
+            .lock()
+            .map_err(|error| error.to_string())
+            .and_then(|mut connection| {
+                if connection.is_none() {
+                    *connection = Some(duckdb::Connection::open(&self.path).map_err(|error| error.to_string())?);
+                }
+                connection
+                    .as_ref()
+                    .expect("connection opened")
+                    .try_clone()
+                    .map_err(|error| error.to_string())
+            })
+            .and_then(|connection| run(&connection, sql));
         Box::pin(async move { result })
+    }
+
+    fn release(&self) -> Result<(), String> {
+        self.connection.lock().map_err(|error| error.to_string())?.take();
+        Ok(())
     }
 }
 
-fn run(path: &Path, sql: &str) -> Result<String, String> {
-    let connection = duckdb::Connection::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
+fn run(connection: &duckdb::Connection, sql: &str) -> Result<String, String> {
     let (prefix, last) = match sql.rfind("; SELECT ") {
         Some(at) => (&sql[..at], &sql[at + 2..]),
         None => ("", sql),
@@ -107,7 +124,37 @@ pub fn start(label: &str) -> Server {
         options,
         referee: Box::new(DuckdbReferee {
             path,
+            connection: std::sync::Mutex::new(None),
             _directory: directory,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DuckdbReferee;
+    use crate::server::Referee;
+    use std::sync::Mutex;
+
+    #[test]
+    fn release_reports_a_poisoned_connection_mutex() {
+        let directory = tempfile::tempdir().unwrap();
+        let referee = DuckdbReferee {
+            path: directory.path().join("referee.duckdb"),
+            connection: Mutex::new(None),
+            _directory: directory,
+        };
+
+        std::thread::scope(|scope| {
+            let connection = &referee.connection;
+            let _ = scope
+                .spawn(move || {
+                    let _guard = connection.lock().unwrap();
+                    panic!("poison referee connection mutex");
+                })
+                .join();
+        });
+
+        assert!(referee.release().is_err());
     }
 }
