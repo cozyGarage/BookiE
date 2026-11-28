@@ -274,7 +274,9 @@ def set_editor_text_within(root, sql):
 
 def run_sql_within(root, sql):
     set_editor_text_within(root, sql)
-    invoke(wait_within(root, name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(
+        wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON, root=root)
+    )
 
 
 def find_node_containing(text, role=None):
@@ -377,10 +379,11 @@ def dismiss_release_notes():
             return
 
 
-def wait_for_sensitive_node(name, role=None, timeout=WAIT_SECONDS):
+def wait_for_sensitive_node(name, role=None, timeout=WAIT_SECONDS, root=None):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        for application in desktop_applications():
+        applications = [root] if root is not None else desktop_applications()
+        for application in applications:
             for node in descendants(application):
                 if node_name(node) != name or not role_matches(node, role):
                     continue
@@ -1249,7 +1252,7 @@ def open_editor():
 
 def run_sql(sql):
     set_editor_text(sql)
-    invoke(wait_for_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
+    invoke(wait_for_sensitive_node(name="Run", role=pyatspi.ROLE_PUSH_BUTTON))
 
 
 def run_scenario(binary, scenario):
