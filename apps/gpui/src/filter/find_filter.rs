@@ -61,6 +61,9 @@ impl GridView {
 
     pub(crate) fn apply_filter(&mut self, cx: &mut Context<Self>) {
         let content = self.search.filter.read(cx).content().to_string();
+        if content.trim().is_empty() {
+            return;
+        }
         match parse_predicate(&content, self.source.columns()) {
             Ok(predicate) => self.apply_predicate(predicate, &content, cx),
             Err(message) => self.status = message,
