@@ -11,6 +11,7 @@ use crate::ui_tests::test_kit::{MEDIUM, NARROW, WIDE, add_rooted_grid};
 use crate::ui_theme::ThemeExt;
 use crate::{GridView, Work};
 
+mod accessibility_tree_tests;
 mod failed_runs;
 mod full_value_editor;
 pub(crate) mod icon_tooltip_tests;
