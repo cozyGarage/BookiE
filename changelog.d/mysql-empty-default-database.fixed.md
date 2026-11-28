@@ -1,0 +1,1 @@
+- MySQL profiles without a default database no longer reuse a database selected by an earlier `USE` statement.
