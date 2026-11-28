@@ -91,6 +91,47 @@ async fn assert_parameterised_call_keeps_each_result_set(opts: ConnectOptions) {
     assert_eq!(bounded.result_sets[1].rows, expected_second);
 }
 
+async fn assert_call_keeps_a_prefix_after_byte_overflow(opts: ConnectOptions) {
+    run_raw(
+        &opts,
+        "CREATE PROCEDURE call_byte_prefix_4274() BEGIN \
+         SELECT ordinal, REPEAT( \
+             CASE WHEN ordinal = 8 THEN 'b' WHEN ordinal = 9 THEN 'c' ELSE 'a' END, \
+             CASE WHEN ordinal = 8 THEN 10485760 WHEN ordinal = 9 THEN 1048576 ELSE 8388608 END \
+         ) AS payload FROM ( \
+             SELECT 1 AS ordinal UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL \
+             SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL \
+             SELECT 8 UNION ALL SELECT 9 \
+         ) AS numbered_rows ORDER BY ordinal; \
+         SELECT 99 AS sentinel; \
+         END",
+    )
+    .await;
+    let conn = connect(opts).await;
+    let batch = conn
+        .query_result_sets_controlled("CALL call_byte_prefix_4274()", &[], &control())
+        .await
+        .unwrap();
+
+    assert!(batch.truncated);
+    assert_eq!(batch.result_sets.len(), 2);
+    let result = &batch.result_sets[0];
+    assert!(result.truncated);
+    assert_eq!(
+        result.rows.iter().map(|row| row[0].clone()).collect::<Vec<_>>(),
+        (1..=7).map(Value::Int).collect::<Vec<_>>()
+    );
+    assert!(result.rows.iter().all(|row| {
+        matches!(
+            row.get(1),
+            Some(Value::Text(value)) if value.len() == 8_388_608 && value.starts_with('a')
+        )
+    }));
+    let next_result = &batch.result_sets[1];
+    assert!(!next_result.truncated);
+    assert_eq!(next_result.rows, vec![vec![Value::Int(99)]]);
+}
+
 #[tokio::test]
 #[ignore = "requires docker"]
 async fn mysql_parameterised_call_returns_each_result_set_untruncated() {
@@ -103,4 +144,18 @@ async fn mysql_parameterised_call_returns_each_result_set_untruncated() {
 async fn mariadb_parameterised_call_returns_each_result_set_untruncated() {
     let (_db, opts) = start_mariadb().await;
     assert_parameterised_call_keeps_each_result_set(opts).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mysql_call_byte_overflow_keeps_a_result_prefix() {
+    let (_db, opts) = start_mysql().await;
+    assert_call_keeps_a_prefix_after_byte_overflow(opts).await;
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
+async fn mariadb_call_byte_overflow_keeps_a_result_prefix() {
+    let (_db, opts) = start_mariadb().await;
+    assert_call_keeps_a_prefix_after_byte_overflow(opts).await;
 }

@@ -69,18 +69,25 @@ where
     let mut decoders = Vec::new();
     let mut truncated = false;
     let mut decoded = Vec::new();
+    let mut collect_current_result_set = true;
     while let Some(item) = stream.try_next().await.map_err(crate::map_sqlx_error)? {
         match item {
-            Either::Right(row) => collect_row(
-                row,
-                &mut current,
-                &mut decoders,
-                &result_sets,
-                &mut budget,
-                &mut truncated,
-                &mut decoded,
-            )?,
-            Either::Left(_) => finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated),
+            Either::Right(row) if collect_current_result_set => {
+                collect_current_result_set = collect_row(
+                    row,
+                    &mut current,
+                    &mut decoders,
+                    &result_sets,
+                    &mut budget,
+                    &mut truncated,
+                    &mut decoded,
+                )?;
+            }
+            Either::Right(_) => {}
+            Either::Left(_) => {
+                finish_result_set(&mut current, &mut decoders, &mut result_sets, &mut truncated);
+                collect_current_result_set = true;
+            }
         }
         if truncated && stop_on_truncation {
             break;
@@ -98,10 +105,10 @@ fn collect_row(
     budget: &mut QueryResultBudget,
     truncated: &mut bool,
     decoded: &mut Vec<bookie_core::Value>,
-) -> Result<(), DriverError> {
+) -> Result<bool, DriverError> {
     if current.is_none() && result_sets.len() >= MAX_MYSQL_RESULT_SETS {
         mark_truncated(current, truncated);
-        return Ok(());
+        return Ok(false);
     }
     if current.is_none() {
         *current = Some(QueryResult {
@@ -113,12 +120,12 @@ fn collect_row(
     }
     if !decode_row_into(&row, decoders, budget, decoded)? {
         mark_truncated(current, truncated);
-        return Ok(());
+        return Ok(false);
     }
     if let Some(result_set) = current {
         result_set.rows.push_row(decoded);
     }
-    Ok(())
+    Ok(true)
 }
 
 fn finish_result_set(
