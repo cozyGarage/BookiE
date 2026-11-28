@@ -162,12 +162,29 @@ fn clickhouse_json_row_parser_rejects_malformed_strings_and_surrogates() {
 fn aggregate_states_refuse_each_non_null_cell_without_losing_other_columns() {
     let columns = response_columns(
         vec!["id".into(), "state".into(), "empty".into()],
-        vec!["UInt8".into(), "AggregateFunction(uniq, UInt64)".into(), "Nullable(AggregateFunction(uniq, UInt64))".into()],
-    ).unwrap();
+        vec![
+            "UInt8".into(),
+            "AggregateFunction(uniq, UInt64)".into(),
+            "Nullable(AggregateFunction(uniq, UInt64))".into(),
+        ],
+    )
+    .unwrap();
     for bytes in [b"valid".as_slice(), b"\xff\x00".as_slice()] {
         assert_eq!(
-            response_row(vec![RowCell::Json(serde_json::json!(7)), RowCell::StringBytes(bytes.to_vec()), RowCell::Json(serde_json::Value::Null)], &columns).unwrap(),
-            vec![Value::Int(7), Value::Undecodable("AggregateFunction(uniq, UInt64)".into()), Value::Null]
+            response_row(
+                vec![
+                    RowCell::Json(serde_json::json!(7)),
+                    RowCell::StringBytes(bytes.to_vec()),
+                    RowCell::Json(serde_json::Value::Null)
+                ],
+                &columns
+            )
+            .unwrap(),
+            vec![
+                Value::Int(7),
+                Value::Undecodable("AggregateFunction(uniq, UInt64)".into()),
+                Value::Null
+            ]
         );
     }
 }
