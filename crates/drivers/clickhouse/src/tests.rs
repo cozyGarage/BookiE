@@ -159,6 +159,20 @@ fn clickhouse_json_row_parser_rejects_malformed_strings_and_surrogates() {
 }
 
 #[test]
+fn aggregate_states_refuse_each_non_null_cell_without_losing_other_columns() {
+    let columns = response_columns(
+        vec!["id".into(), "state".into(), "empty".into()],
+        vec!["UInt8".into(), "AggregateFunction(uniq, UInt64)".into(), "Nullable(AggregateFunction(uniq, UInt64))".into()],
+    ).unwrap();
+    for bytes in [b"valid".as_slice(), b"\xff\x00".as_slice()] {
+        assert_eq!(
+            response_row(vec![RowCell::Json(serde_json::json!(7)), RowCell::StringBytes(bytes.to_vec()), RowCell::Json(serde_json::Value::Null)], &columns).unwrap(),
+            vec![Value::Int(7), Value::Undecodable("AggregateFunction(uniq, UInt64)".into()), Value::Null]
+        );
+    }
+}
+
+#[test]
 fn clickhouse_string_types_decode_invalid_utf8_as_bytes_and_valid_utf8_as_text() {
     let string = response_columns(vec!["string".into()], vec!["LowCardinality(Nullable(String))".into()]).unwrap();
     let fixed = response_columns(vec!["fixed".into()], vec!["FixedString(2)".into()]).unwrap();
