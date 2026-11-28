@@ -214,7 +214,10 @@ fn a_transaction_statement_survives_unrelated_load_invalidation(cx: &mut TestApp
             view.sync_grid_owner();
             view.tabs.open_query();
             view.sync_grid_owner();
-            assert!(!cancel.is_cancelled(), "switching tabs must leave the transaction statement running");
+            assert!(
+                !cancel.is_cancelled(),
+                "switching tabs must leave the transaction statement running"
+            );
         })
     });
     until(&view, cx, "the transaction step finishes", |view| {
@@ -563,7 +566,7 @@ fn terminal_commit_outcomes_are_not_reported_as_successful_retries(cx: &mut Test
 }
 
 #[gpui::test]
-fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestAppContext) {
+fn an_idle_transaction_notice_is_removed_when_its_transaction_ends(cx: &mut TestAppContext) {
     let path = orders();
     let (view, cx) = saving_view(cx, &path);
     open_transaction(&view, cx, &path);
@@ -595,13 +598,40 @@ fn a_transaction_idle_for_five_minutes_shows_the_shared_warning(cx: &mut TestApp
     view.read_with(cx, |view, _| {
         assert_eq!(view.notices.unread(), 1, "a status change keeps it")
     });
-    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    cx.simulate_resize(gpui::size(gpui::px(WIDE), gpui::px(800.0)));
+    cx.run_until_parked();
+    let bell = cx
+        .debug_bounds("notifications")
+        .expect("the notification bell is visible");
+    cx.simulate_click(bell.center(), Default::default());
+    cx.run_until_parked();
+    assert!(cx.debug_bounds("notice-1").is_some(), "the idle notice is visible");
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    let rollback = cx
+        .debug_bounds("rollback-transaction")
+        .expect("the toolbar can roll back");
+    cx.simulate_click(rollback.center(), Default::default());
+    cx.run_until_parked();
     until(&view, cx, "the transaction step finishes", |view| {
         view.status == "Transaction rolled back"
     });
-    cx.update(|_, cx| view.update(cx, |view, cx| view.sync_idle_notice(cx)));
-    view.read_with(cx, |view, _| {
-        assert_eq!(view.notices.unread(), 0, "ending the transaction resolves the notice")
+    open_transaction(&view, cx, &path);
+    cx.run_until_parked();
+    let bell = cx
+        .debug_bounds("notifications")
+        .expect("the notification bell is visible");
+    cx.simulate_click(bell.center(), Default::default());
+    cx.run_until_parked();
+    assert!(
+        cx.debug_bounds("notice-1").is_none(),
+        "a later transaction cannot inherit the old notice"
+    );
+    cx.simulate_keystrokes("escape");
+    cx.run_until_parked();
+    cx.update(|_, cx| view.update(cx, |view, cx| view.end_transaction(false, cx)));
+    until(&view, cx, "the later transaction cleanup", |view| {
+        view.transaction.is_none()
     });
 }
 

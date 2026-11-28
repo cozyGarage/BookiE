@@ -156,7 +156,7 @@ impl GridView {
                 })
                 .await;
             this.update(cx, |this, cx| {
-                this.finish_transaction_statement(&owner, &submitted, ran, ended.then_some(cleanup));
+                this.finish_transaction_statement(&owner, &submitted, ran, ended.then_some(cleanup), cx);
                 cx.notify();
             })
             .ok();
@@ -171,6 +171,7 @@ impl GridView {
         sql: &str,
         ran: Result<bookie_gpui::live::LiveTable, String>,
         ended: Option<Option<String>>,
+        cx: &mut Context<Self>,
     ) {
         let Some(transaction) = self.transaction.as_mut().filter(|t| Arc::ptr_eq(&t.shared, owner)) else {
             return;
@@ -185,6 +186,7 @@ impl GridView {
         }
         if let Some(cleanup) = ended {
             self.transaction = None;
+            self.sync_idle_notice(cx);
             self.status = ended_status(ran.as_ref().err().map(String::as_str), cleanup);
             return;
         }
@@ -293,6 +295,7 @@ impl GridView {
                 match result {
                     Ok((outcome, close)) => {
                         this.transaction = None;
+                        this.sync_idle_notice(cx);
                         if let Some(live) = this.live.as_ref().filter(|_| outcome.is_some()) {
                             live.forget_columns();
                         }
@@ -320,6 +323,7 @@ impl GridView {
                     }
                     Err(error) => {
                         this.transaction = None;
+                        this.sync_idle_notice(cx);
                         this.status =
                             format!("Transaction outcome may be unknown: {error}; check the database before retrying");
                         if let Some(cleanup) = cleanup {
