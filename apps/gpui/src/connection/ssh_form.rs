@@ -125,6 +125,13 @@ impl SshForm {
             self.jumps.push(jump);
         }
     }
+
+    pub fn reset(&mut self, cx: &mut Context<GridView>) {
+        self.on = false;
+        self.openssh = false;
+        self.jumps.clear();
+        self.head = HopForm::new(cx);
+    }
 }
 
 #[derive(Clone, Copy)]

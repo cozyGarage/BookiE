@@ -397,6 +397,105 @@ fn editing_a_connection_with_a_tunnel_opens_the_ssh_section(cx: &mut TestAppCont
 }
 
 #[gpui::test]
+fn new_connection_clears_fields_left_from_the_previous_edit(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let previous = uuid::Uuid::from_u128(4219);
+    let default_port = view.read_with(cx, |view, _| {
+        view.connection_form
+            .drivers
+            .iter()
+            .find(|driver| driver.id == "postgres")
+            .map(|driver| driver.port.to_string())
+            .unwrap_or_default()
+    });
+    cx.update(|window, cx| {
+        view.update(cx, |view, cx| {
+            view.connection_form.editing = Some(previous);
+            view.connection_form.read_only = false;
+            view.connection_form.environment = bookie_core::Environment::Prod;
+            view.connection_form.color = Some("teal".into());
+            view.connection_form.kerberos = true;
+            view.connection_form.tls = bookie_core::TlsMode::Require.index();
+            view.connection_form.security_open = true;
+            view.connection_form.ssh_open = true;
+            view.connection_form.ssh.on = true;
+            view.connection_form.ssh.openssh = true;
+            view.connection_form.ssh.jumps.push(crate::ssh_form::HopForm::new(cx));
+            set(&view.connection_form.name, "prod-db", cx);
+            set(&view.connection_form.host, "db.example.com", cx);
+            set(&view.connection_form.port, "3306", cx);
+            set(&view.connection_form.database, "app", cx);
+            set(&view.connection_form.username, "alice", cx);
+            set(&view.connection_form.password, "secret", cx);
+            set(&view.connection_form.tls_root, "/tmp/ca.pem", cx);
+            set(&view.connection_form.tls_cert, "/tmp/client.pem", cx);
+            set(&view.connection_form.tls_key, "/tmp/client.key", cx);
+            set(&view.connection_form.socket, "/var/run/mysqld", cx);
+            set(&view.connection_form.ssh.head.host, "bastion.example.com", cx);
+            set(&view.connection_form.ssh.head.user, "jump", cx);
+            set(&view.connection_form.ssh.head.secret, "hop-secret", cx);
+            view.run_palette_id("new-connection", window, cx);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        let draft = view.connection_form.draft(cx);
+        assert!(view.connection_form.open);
+        assert_eq!(view.connection_form.editing, None);
+        assert!(view.connection_form.read_only);
+        assert_eq!(view.connection_form.environment, bookie_core::Environment::default());
+        assert_eq!(view.connection_form.color, None);
+        assert!(!view.connection_form.kerberos);
+        assert_eq!(view.connection_form.tls, bookie_core::TlsMode::default().index());
+        assert!(!view.connection_form.security_open);
+        assert!(!view.connection_form.ssh_open);
+        assert!(!view.connection_form.ssh.on);
+        assert!(!view.connection_form.ssh.openssh);
+        assert!(view.connection_form.ssh.jumps.is_empty());
+        assert_eq!(draft.name, "");
+        assert_eq!(draft.host, "");
+        assert_eq!(draft.port.to_string(), default_port);
+        assert_eq!(draft.database, "");
+        assert_eq!(draft.username, "");
+        assert!(secrecy::ExposeSecret::expose_secret(&draft.password).is_empty());
+        assert_eq!(draft.tls_root_cert, "");
+        assert_eq!(draft.tls_client_cert, "");
+        assert_eq!(draft.tls_client_key, "");
+        assert_eq!(draft.socket_endpoint, "");
+        assert!(draft.ssh.is_none());
+        assert_eq!(view.connection_form.ssh.head.host.read(cx).content(), "");
+        assert_eq!(view.connection_form.ssh.head.user.read(cx).content(), "");
+        assert_eq!(view.connection_form.ssh.head.secret.read(cx).content(), "");
+        assert_eq!(
+            view.connection_form.selected().map(|driver| driver.id),
+            Some("postgres")
+        );
+    });
+}
+
+#[gpui::test]
+fn a_missing_connection_draft_does_not_open_the_edit_dialog(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    let previous = uuid::Uuid::from_u128(4220);
+    cx.update(|_, cx| {
+        view.update(cx, |view, cx| {
+            view.connection_form.editing = Some(previous);
+            set(&view.connection_form.host, "db.example.com", cx);
+            set(&view.connection_form.username, "alice", cx);
+            view.edit_connection(uuid::Uuid::from_u128(4221), cx);
+        })
+    });
+    cx.run_until_parked();
+    view.read_with(cx, |view, cx| {
+        assert!(!view.connection_form.open, "a failed load must not open Save");
+        assert_eq!(view.status, "That connection no longer exists");
+        assert_eq!(view.connection_form.editing, Some(previous));
+        assert_eq!(view.connection_form.host.read(cx).content(), "db.example.com");
+        assert_eq!(view.connection_form.username.read(cx).content(), "alice");
+    });
+}
+
+#[gpui::test]
 fn the_toolbar_keeps_its_left_actions_icon_only_and_new_connection_opens_the_form(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_resize(gpui::size(gpui::px(1100.0), gpui::px(760.0)));

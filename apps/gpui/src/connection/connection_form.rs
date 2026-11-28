@@ -255,6 +255,49 @@ impl GridView {
         cx.notify();
     }
 
+    pub(crate) fn reset_connection_form(&mut self, cx: &mut Context<Self>) {
+        let form = &mut self.connection_form;
+        form.editing = None;
+        form.read_only = true;
+        form.environment = Environment::default();
+        form.color = None;
+        form.status = String::new();
+        form.validation_error = None;
+        form.saving = false;
+        form.testing = false;
+        form.confirm_delete = false;
+        form.kerberos = false;
+        form.tls = TlsMode::default().index();
+        form.security_open = false;
+        form.ssh_open = false;
+        form.driver = form
+            .drivers
+            .iter()
+            .position(|driver| driver.id == "postgres")
+            .unwrap_or(0);
+        let port = form
+            .drivers
+            .get(form.driver)
+            .filter(|driver| driver.port != 0)
+            .map(|driver| driver.port.to_string())
+            .unwrap_or_default();
+        for (input, text) in [
+            (&form.name, ""),
+            (&form.host, ""),
+            (&form.port, port.as_str()),
+            (&form.database, ""),
+            (&form.username, ""),
+            (&form.password, ""),
+            (&form.tls_root, ""),
+            (&form.tls_cert, ""),
+            (&form.tls_key, ""),
+            (&form.socket, ""),
+        ] {
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        }
+        form.ssh.reset(cx);
+    }
+
     pub(crate) fn close_connection_dialog(&mut self, cx: &mut Context<Self>) {
         if self.connection_form.saving {
             return;
@@ -840,13 +883,19 @@ impl GridView {
                     block_on(connection_save::load_draft(&registry, id))
                 })
                 .await;
-            let _ = this.update(cx, |this, cx| {
-                match draft {
-                    Ok(Some(draft)) => this.fill_connection_form(draft, cx),
-                    Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
-                    Err(error) => this.connection_form.status = error.to_string(),
+            let _ = this.update(cx, |this, cx| match draft {
+                Ok(Some(draft)) => {
+                    this.fill_connection_form(draft, cx);
+                    this.open_connection_dialog(cx);
                 }
-                this.open_connection_dialog(cx);
+                Ok(None) => {
+                    this.status = "That connection no longer exists".into();
+                    cx.notify();
+                }
+                Err(error) => {
+                    this.status = error.to_string();
+                    cx.notify();
+                }
             });
         })
         .detach();
