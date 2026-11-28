@@ -59,6 +59,18 @@ class UiPatternTests(unittest.TestCase):
         self.assertEqual(found.get("gpui-literal-px"), 1)
         self.assertEqual(found.get("gpui-button-new"), 1)
 
+    def test_a_gpui_click_without_an_accessible_name_counts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "apps" / "gpui" / "src" / "view.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                'let a = icon_button("close", "x", "Close", theme).on_click(listener);\n'
+                'let b = div()\n    .id("row")\n    .aria_label("Open")\n    .on_click(listener);\n'
+                'let c = div()\n    .id("bare")\n    .child(icon("x"))\n    .on_click(listener);\n'
+            )
+            found = checker.count(path)
+        self.assertEqual(found.get("gpui-unnamed-click"), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

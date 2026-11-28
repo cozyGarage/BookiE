@@ -25,4 +25,15 @@ apps/linux/app/src/ui/structure_tab/mod.rs hand-built-toolbar 1
 apps/linux/app/src/ui/theme.rs thread_local 1
 apps/linux/app/src/ui/typography.rs thread_local 1
 apps/linux/app/src/ui/welcome_view.rs literal-spacing 2
+apps/gpui/src/chart/chart_ui.rs gpui-unnamed-click 3
+apps/gpui/src/connection/connection_form.rs gpui-unnamed-click 1
 apps/gpui/src/connection/connection_form.rs gpui-button-new 1
+apps/gpui/src/diagram/diagram_ui.rs gpui-unnamed-click 1
+apps/gpui/src/editor/history_view.rs gpui-unnamed-click 1
+apps/gpui/src/editor/query_pane.rs gpui-unnamed-click 1
+apps/gpui/src/grid/detail_panel.rs gpui-unnamed-click 1
+apps/gpui/src/grid/selection_stats_ui.rs gpui-unnamed-click 1
+apps/gpui/src/sidebar/sidebar_catalog.rs gpui-unnamed-click 2
+apps/gpui/src/ui/chrome.rs gpui-unnamed-click 2
+apps/gpui/src/ui/home_page.rs gpui-unnamed-click 3
+apps/gpui/src/ui/render.rs gpui-unnamed-click 4
