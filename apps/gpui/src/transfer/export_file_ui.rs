@@ -138,13 +138,15 @@ impl GridView {
             ));
         }
         let page = self.export_range(ExportScope::CurrentPage);
-        if let Some(range) = page.filter(|range| range.start < range.end) {
+        let page = page.filter(|range| range.start < range.end);
+        if let Some(range) = &page {
             options.push((
                 ExportScope::CurrentPage,
-                row_scope_label("Current page", range_count(&range), false, self.export.limit),
+                row_scope_label("Current page", range_count(range), false, self.export.limit),
             ));
         }
         let loaded = self.dataset_count();
+        let loaded_range = 0..loaded;
         let loaded_label = row_scope_label(
             "Filtered / loaded rows",
             loaded,
@@ -160,7 +162,7 @@ impl GridView {
             && matches!(self.mode, crate::Mode::All)
             && loaded == self.source.total()
             && self.export.file.scope != ExportScope::Loaded;
-        if !same_as_full {
+        if should_offer_loaded_scope(page.as_ref(), &loaded_range, same_as_full) {
             options.push((ExportScope::Loaded, loaded_label));
         }
         if full_available {
@@ -563,6 +565,10 @@ fn row_scope_label(label: &str, count: u64, partial: bool, limit: Option<usize>)
     )
 }
 
+fn should_offer_loaded_scope(current_page: Option<&Range<u64>>, loaded: &Range<u64>, same_as_full: bool) -> bool {
+    !same_as_full && current_page.is_none_or(|page| page != loaded)
+}
+
 fn export_formats(driver_id: &str, rows: u64, has_table: bool) -> Vec<ResultFormat> {
     offered_formats(
         driver_id,
@@ -695,6 +701,26 @@ mod tests {
             "Filtered / loaded rows (first 2 of 3 rows; more may exist)"
         );
         assert!(!full_result_available(true, true, true));
+    }
+
+    #[test]
+    fn loaded_scope_is_omitted_when_it_matches_the_current_page() {
+        let one_page = 0..250;
+        let loaded = 0..250;
+        assert!(!should_offer_loaded_scope(Some(&one_page), &loaded, false));
+
+        let first_page = 0..250;
+        let loaded_multiple_pages = 0..600;
+        assert!(should_offer_loaded_scope(
+            Some(&first_page),
+            &loaded_multiple_pages,
+            false
+        ));
+        assert!(!should_offer_loaded_scope(
+            Some(&first_page),
+            &loaded_multiple_pages,
+            true
+        ));
     }
 
     #[test]
