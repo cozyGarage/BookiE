@@ -3,7 +3,8 @@
 
 Counted per file outside test code: `thread_local!` (UI state is passed in), a margin or spacing number written as a
 literal instead of a `ui::spacing` constant, a hand-built `ToolbarView::new()` (use `dialog_shell` for dialogs), and GPUI
-`Button::new()` calls outside the shared surfaces module.
+`Button::new()` calls outside the shared surfaces module, and GPUI `.on_click(` builder chains with no accessible name
+(no labelled shared part such as `icon_button`, and no `aria_label`, `accessibility_label` or `label`).
 Baselines are in baselines/ui-pattern-baselines.txt; lower a count when you remove one, never raise it.
 """
 
@@ -23,6 +24,11 @@ RAW_COLOUR = re.compile(r"\brgba?\(0x|\bhsla\(")
 TEXT_SIZE_CLASS = re.compile(r"\.text_(?:xs|sm)\(\)")
 EMPTY_LABEL = re.compile(r"\b(?:ghost|button|primary_button)\([^)]*,\s*\"\"")
 SHADOW = re.compile(r"\.shadow_(?:sm|md|lg|xl|2xl)\(\)")
+NAMED = re.compile(
+    r"\b(?:icon_button|compact_icon_button|toggle_icon_button|menu_button|select_button|button|compact_button"
+    r"|unavailable_button|segment|picker_chip|item|destructive_item|PopupMenuItem::new)\(|\.(?:aria_label|accessibility_label|label)\("
+)
+CHAIN_LIMIT = 40
 RAW_COLOUR_ALLOWED = {"type_colors.rs"}
 SHADOW_ALLOWED = {"surfaces.rs"}
 INFO_ALLOWED = {"surfaces.rs", "ui_theme.rs"}
@@ -72,10 +78,32 @@ def without_test_items(lines: list[str]) -> list[str]:
     return kept
 
 
+def click_chain(lines: list[str], index: int) -> list[str]:
+    chain = [lines[index]]
+    unclosed = 0
+    for line in reversed(lines[max(0, index - CHAIN_LIMIT) : index]):
+        chain.append(line)
+        unclosed += sum(line.count(close) - line.count(open) for open, close in ("()", "{}", "[]"))
+        if unclosed <= 0 and not line.strip().startswith((".", ")", "}")):
+            break
+    return chain
+
+
+def unnamed_clicks(lines: list[str]) -> int:
+    return sum(
+        1
+        for index, line in enumerate(lines)
+        if ".on_click(" in line and not any(NAMED.search(part) for part in click_chain(lines, index))
+    )
+
+
 def count(path: Path) -> dict[str, int]:
     found: dict[str, int] = {}
     gpui = "gpui" in path.parts
-    for line in without_test_items(path.read_text().splitlines()):
+    lines = without_test_items(path.read_text().splitlines())
+    if gpui and (unnamed := unnamed_clicks(lines)):
+        found["gpui-unnamed-click"] = unnamed
+    for line in lines:
         for name, matches in PATTERNS.items():
             if matches(line):
                 found[name] = found.get(name, 0) + 1

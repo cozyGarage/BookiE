@@ -103,33 +103,38 @@ impl GridView {
             ("circle", theme.success)
         };
         let status = audit_view::status_text(row.status);
-        list_row(("audit-row", index), false, theme)
-            .items_start()
-            .child(div().pt_1().child(icon(mark, color)))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .flex()
-                    .flex_col()
-                    .child(
-                        truncated(("audit-sql", index), one_line_sql(&row.sql, MAX_STATEMENT_CHARS))
-                            .text_size(px(size::TEXT_SMALL))
-                            .font_family("monospace"),
-                    )
-                    .child(
-                        truncated(("audit-meta", index), format!("{status} · {}", meta(row)))
-                            .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.muted_foreground)),
-                    )
-                    .children(row.error.as_ref().map(|error| {
-                        div()
-                            .text_size(px(size::TEXT_SMALL))
-                            .text_color(rgb(theme.destructive))
-                            .child(one_line_sql(error, MAX_STATEMENT_CHARS))
-                    })),
-            )
+        list_row(
+            ("audit-row", index),
+            format!("{status}: {}", one_line_sql(&row.sql, MAX_STATEMENT_CHARS)),
+            false,
+            theme,
+        )
+        .items_start()
+        .child(div().pt_1().child(icon(mark, color)))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .overflow_hidden()
+                .flex()
+                .flex_col()
+                .child(
+                    truncated(("audit-sql", index), one_line_sql(&row.sql, MAX_STATEMENT_CHARS))
+                        .text_size(px(size::TEXT_SMALL))
+                        .font_family("monospace"),
+                )
+                .child(
+                    truncated(("audit-meta", index), format!("{status} · {}", meta(row)))
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.muted_foreground)),
+                )
+                .children(row.error.as_ref().map(|error| {
+                    div()
+                        .text_size(px(size::TEXT_SMALL))
+                        .text_color(rgb(theme.destructive))
+                        .child(one_line_sql(error, MAX_STATEMENT_CHARS))
+                })),
+        )
     }
 
     pub(crate) fn audit_page(&mut self, theme: Theme, _cx: &mut Context<Self>) -> Div {

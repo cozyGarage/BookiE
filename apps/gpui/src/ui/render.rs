@@ -795,25 +795,30 @@ impl GridView {
             .map(|(index, position)| {
                 let action = &actions[*index];
                 let keys = self.action_shortcut(action.id);
-                list_row(("palette-command-row", position), position == selected, *theme)
-                    .debug_selector(move || format!("palette-command-row-{position}"))
-                    .justify_between()
-                    .cursor_pointer()
-                    .child(truncated(("palette-command-label", position), action.label.clone()).flex_1())
-                    .child(
-                        div()
-                            .flex()
-                            .flex_none()
-                            .items_center()
-                            .gap_2()
-                            .text_color(rgb(theme.muted_foreground))
-                            .child(bookie_gpui::palette::group(action.id))
-                            .children(shortcut(keys, *theme)),
-                    )
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.palette.index = position;
-                        this.run_palette(window, cx);
-                    }))
+                list_row(
+                    ("palette-command-row", position),
+                    action.label.clone(),
+                    position == selected,
+                    *theme,
+                )
+                .debug_selector(move || format!("palette-command-row-{position}"))
+                .justify_between()
+                .cursor_pointer()
+                .child(truncated(("palette-command-label", position), action.label.clone()).flex_1())
+                .child(
+                    div()
+                        .flex()
+                        .flex_none()
+                        .items_center()
+                        .gap_2()
+                        .text_color(rgb(theme.muted_foreground))
+                        .child(bookie_gpui::palette::group(action.id))
+                        .children(shortcut(keys, *theme)),
+                )
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.palette.index = position;
+                    this.run_palette(window, cx);
+                }))
             })
             .collect()
     }
@@ -843,15 +848,20 @@ impl GridView {
                             .into_any_element(),
                     )
                 };
-                list_row(("palette-picker-row", position), position == selected, *theme)
-                    .justify_between()
-                    .cursor_pointer()
-                    .child(truncated(("palette-picker-title", position), item.title.clone()))
-                    .children(detail)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.palette.index = position;
-                        this.run_picker(window, cx);
-                    }))
+                list_row(
+                    ("palette-picker-row", position),
+                    item.title.clone(),
+                    position == selected,
+                    *theme,
+                )
+                .justify_between()
+                .cursor_pointer()
+                .child(truncated(("palette-picker-title", position), item.title.clone()))
+                .children(detail)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.palette.index = position;
+                    this.run_picker(window, cx);
+                }))
             })
             .collect()
     }

@@ -404,8 +404,8 @@ fn a_picker_chip_has_the_small_control_height_and_truncates_its_label(cx: &mut T
 #[test]
 fn a_selected_list_row_uses_the_selection_fill_and_others_stay_flat() {
     for theme in [Theme::light(), Theme::dark()] {
-        let mut selected = list_row("on", true, theme);
-        let mut other = list_row("off", false, theme);
+        let mut selected = list_row("on", "On", true, theme);
+        let mut other = list_row("off", "Off", false, theme);
         assert_eq!(
             selected.style().background,
             Some(gpui::Fill::from(gpui::Hsla::from(rgb(theme.accent))))

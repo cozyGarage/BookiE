@@ -613,9 +613,17 @@ pub(crate) fn picker_chip(
         .child(div().min_w_0().truncate().child(label.into()))
 }
 
-pub(crate) fn list_row(id: impl Into<ElementId>, selected: bool, theme: Theme) -> Stateful<Div> {
+pub(crate) fn list_row(
+    id: impl Into<ElementId>,
+    name: impl Into<SharedString>,
+    selected: bool,
+    theme: Theme,
+) -> Stateful<Div> {
     div()
         .id(id)
+        .role(Role::ListItem)
+        .aria_label(name)
+        .aria_selected(selected)
         .flex()
         .items_center()
         .gap_2()
