@@ -6,7 +6,7 @@
 pkgname=bookie
 pkgver="${BOOKIE_RC_VERSION:?Build through scripts/build-arch-rc.sh}"
 pkgrel="${BOOKIE_RC_PKGREL:-1}"
-pkgdesc="Native Linux database client (internal release candidate)"
+pkgdesc="Native Linux database client"
 arch=('x86_64')
 conflicts=('tablepro')
 replaces=('tablepro')
