@@ -248,6 +248,16 @@ class LookupTests(unittest.TestCase):
         self.assertNotIn("s3cret", err.getvalue())
         self.assertIn("unavailable", err.getvalue())
 
+    def test_a_missing_api_degrades_without_making_a_request(self):
+        def unexpected_fetch(url, token):
+            self.fail("lookup must not make a request without an API URL")
+
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            result = planner.lookup_last_green(None, {}, unexpected_fetch)
+        self.assertIsNone(result)
+        self.assertIn("FORGEJO_API is not configured", err.getvalue())
+
     def test_the_token_comes_from_forgejo_token_then_the_workflow_token(self):
         seen = []
 
@@ -338,6 +348,15 @@ class CommandLineTests(unittest.TestCase):
         self.assertFalse(data["skip"])
         self.assertEqual(data["drivers"], ["postgres", "mysql"])
         self.assertIn("unknown", data["reason"])
+
+    def test_lookup_without_api_runs_the_full_weekday_rotation(self):
+        result = self.run_cli("--weekday", "Mon", "--lookup", env={"FORGEJO_API": ""})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        data = json.loads(result.stdout)
+        self.assertFalse(data["skip"])
+        self.assertEqual(data["drivers"], ["postgres", "mysql"])
+        self.assertIn("unknown", data["reason"])
+        self.assertIn("FORGEJO_API is not configured", result.stderr)
 
     def test_the_default_weekday_is_a_real_one(self):
         data = json.loads(self.run_cli().stdout)
