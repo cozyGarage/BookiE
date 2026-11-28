@@ -11,12 +11,12 @@ fn a_redis_select_switches_databases_and_is_not_a_read() {
         "SELECT '2'",
         "SELECT db",
         "FLUSHDB",
-        "GET key",
     ] {
         let facts = classify(command, "redis");
         assert_eq!(facts.class, StatementClass::Unparseable, "{command}");
         assert!(facts.writes(), "{command}");
     }
+    assert_eq!(classify("GET key", "redis").class, StatementClass::Select);
 }
 
 #[test]

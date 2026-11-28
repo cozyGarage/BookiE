@@ -1,6 +1,41 @@
 use super::*;
 
 #[test]
+fn redis_only_classifies_known_read_commands_as_reads() {
+    assert_eq!(
+        classify("SELECT \"Value\" FROM \"db12\" WHERE \"Key\" = ?", "redis").class,
+        StatementClass::Select
+    );
+    assert!(classify("SELECT 1", "redis").writes());
+    for command in [
+        "GET k",
+        "MGET a b",
+        "TYPE k",
+        "TTL k",
+        "HGET h f",
+        "HGETALL h",
+        "LRANGE l 0 -1",
+        "SMEMBERS s",
+        "ZRANGE z 0 -1",
+        "XRANGE x - +",
+        "SCAN 0",
+        "PING",
+    ] {
+        assert_eq!(classify(command, "redis").class, StatementClass::Select, "{command}");
+    }
+    for command in [
+        "SET k v",
+        "DEL k",
+        "EVAL 'return 1' 0",
+        "UNKNOWN k",
+        "GET\"SET\" k",
+        "GET \"unterminated",
+    ] {
+        assert!(classify(command, "redis").writes(), "{command}");
+    }
+}
+
+#[test]
 fn select_is_read() {
     let f = classify("SELECT * FROM users WHERE id = 1", "postgres");
     assert!(!f.writes());

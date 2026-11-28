@@ -24,6 +24,7 @@ mod pg_health;
 mod protobuf_wire;
 mod query;
 mod query_rows;
+pub mod redis_command;
 mod registry;
 mod routine;
 mod server_message;
