@@ -2886,6 +2886,38 @@ fn the_export_bar_opens_as_a_dialog_and_the_grid_does_not_move(cx: &mut TestAppC
 }
 
 #[gpui::test]
+fn export_scope_choices_wrap_inside_the_dialog_at_narrow_width(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    cx.simulate_resize(gpui::size(gpui::px(900.0), gpui::px(760.0)));
+    view.update(cx, |view, cx| {
+        view.tabs.open_table(&view.catalog.grid_table);
+        view.sync_grid_owner();
+        view.grid_is_query = true;
+        view.continuous = false;
+        view.set_mode(crate::Mode::Filtered {
+            kept: Arc::new((0_u32..40_951).collect()),
+            label: "acceptance filter".into(),
+        });
+        view.open_export_file_bar(cx);
+        cx.notify();
+    });
+    cx.run_until_parked();
+    cx.update(|window, cx| window.render_frame(cx));
+
+    let rows = cx.debug_bounds("export-rows").expect("export scopes are shown");
+    let dialog = cx.debug_bounds("bar-dialog").expect("export dialog is shown");
+    assert!(rows.origin.x >= dialog.origin.x, "rows start outside the dialog: {rows:?} {dialog:?}");
+    assert!(
+        rows.origin.x + rows.size.width <= dialog.origin.x + dialog.size.width,
+        "rows extend outside the dialog: {rows:?} {dialog:?}"
+    );
+    assert!(
+        rows.size.height >= gpui::px(40.0),
+        "three long scope choices should wrap to another line, not clip: {rows:?}"
+    );
+}
+
+#[gpui::test]
 fn narrow_grid_toolbar_keeps_actions_inside_window(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     view.update(cx, |view, cx| {

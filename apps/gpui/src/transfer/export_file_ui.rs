@@ -432,8 +432,16 @@ impl GridView {
                         ),
                 )
                 .child(
-                    labelled_row(theme, "Rows", segmented(scope_segments, theme).flex_wrap().h_auto())
-                        .debug_selector(|| "export-rows".into()),
+                    labelled_row(
+                        theme,
+                        "Rows",
+                        segmented(scope_segments, theme)
+                            .flex_shrink(1.0)
+                            .min_w_0()
+                            .flex_wrap()
+                            .h_auto(),
+                    )
+                    .debug_selector(|| "export-rows".into()),
                 )
                 .child(labelled_row(theme, "Format", format_menu).debug_selector(|| "export-format-row".into()))
                 .children((self.export.file.format == ResultFormat::Csv).then(|| self.csv_export_rows(theme, cx)))
