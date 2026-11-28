@@ -432,8 +432,8 @@ literals = ["arrayReduce('uniqState', [toUInt64(1)])"]
 carrier = "Undecodable"
 rule = "refusal"
 referee = "hex({v})"
+expect_error = [{ route = "param_select", expect = "cannot write back an undecodable", reason = "an aggregate state cannot be bound back as a parameter" }]
 note = "An aggregate state has no value form a client can show; BookiE must refuse it."
-
 
 [[case]]
 id = "datetime-server-zone"
