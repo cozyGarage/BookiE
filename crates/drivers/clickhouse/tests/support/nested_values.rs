@@ -3,6 +3,38 @@ use bookie_core::Value;
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn nested_64_bit_integers_remain_json_numbers() {
+    let (_container, opts) = start_clickhouse().await;
+    let connection = connect(opts).await;
+    let result = connection
+        .query(
+            "SELECT map('max', 9223372036854775807, 'big', 9007199254740993, 'neg', -1) AS map_value, \
+             [9223372036854775807, 9007199254740993, -1] AS array_value, \
+             tuple(9223372036854775807, 'value') AS tuple_value",
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        result.rows,
+        vec![vec![
+            Value::Json(Box::new(serde_json::json!({
+                "max": 9_223_372_036_854_775_807_i64,
+                "big": 9_007_199_254_740_993_i64,
+                "neg": -1_i64,
+            }))),
+            Value::Json(Box::new(serde_json::json!([
+                9_223_372_036_854_775_807_i64,
+                9_007_199_254_740_993_i64,
+                -1_i64,
+            ]))),
+            Value::Json(Box::new(serde_json::json!([9_223_372_036_854_775_807_i64, "value",]))),
+        ]]
+    );
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn value_contract_nested_collections_keep_exact_json_and_refuse_lossy_consumers() {
     let (_container, opts) = start_clickhouse().await;
     let connection = connect(opts).await;

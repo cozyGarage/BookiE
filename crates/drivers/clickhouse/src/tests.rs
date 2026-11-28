@@ -87,6 +87,29 @@ fn clickhouse_response_rejects_row_width_mismatch_instead_of_inventing_nulls() {
 }
 
 #[test]
+fn nested_64_bit_values_are_text_when_output_settings_are_forbidden() {
+    let value = response_cell(
+        RowCell::StringBytes(br#"{"id":"9007199254740993"}"#.to_vec()),
+        "Map(String, Int64)",
+        true,
+    )
+    .unwrap();
+
+    assert_eq!(value, Value::Text(r#"{"id":"9007199254740993"}"#.into()));
+    assert_eq!(
+        response_cell(
+            RowCell::Json(serde_json::json!({"id": "9007199254740993"})),
+            "Map(String, Int64)",
+            true,
+        )
+        .unwrap(),
+        Value::Text(r#"{"id":"9007199254740993"}"#.into())
+    );
+    assert!(!nested_has_64_bit_integer("Array(DateTime64(3))"));
+    assert!(!nested_has_64_bit_integer("Int64"));
+}
+
+#[test]
 fn clickhouse_terminal_exception_row_is_an_error_not_partial_success() {
     let exception =
         "Code: 394. DB::Exception: Query was cancelled. (QUERY_WAS_CANCELLED) (version 24.8.14.39 (official build))";
