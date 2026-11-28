@@ -10,6 +10,14 @@ APPIMAGE_PLUGIN_URL=https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/r
 APPIMAGE_PLUGIN_SHA256=992d502a248e14ab185448ddf6f6e7d25558cb84d4623c354c3af350c25fccb3
 GTK_PLUGIN_URL=https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/7a3fbc31a9e5075073ff8790f26effbac5f84453/linuxdeploy-plugin-gtk.sh
 GTK_PLUGIN_SHA256=b0f4cbc684a0103a9651f0955b635eaea0096b3a66c0f5a2c2aa337960375171
+source_dir=""
+extract_dir=""
+
+cleanup() {
+  [[ -z "$source_dir" ]] || rm -rf -- "$source_dir"
+  [[ -z "$extract_dir" ]] || rm -rf -- "$extract_dir"
+}
+trap cleanup EXIT
 
 fetch() {
   local url="$1" sha="$2" target="$3"
@@ -39,7 +47,6 @@ if [[ -n "$release_inputs_dir" ]]; then
   vendor_archive="$release_inputs_dir/bookie-vendor-$release_version-$release_commit.tar.gz"
   release_metadata="$release_inputs_dir/bookie-$release_version-$release_commit-inputs.json"
   source_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookie-appimage-source.XXXXXX")"
-  trap 'rm -rf -- "$source_dir"' EXIT
   tar -xzf "$source_archive" -C "$source_dir"
   tar -xzf "$vendor_archive" -C "$source_dir"
   SOURCE_ROOT="$source_dir/BookiE-$release_commit"
@@ -108,6 +115,12 @@ for module in "$APPDIR"/usr/lib/gtk-4.0/*/immodules/*.so; do
 done
 APPIMAGE_GLIBC_FLOOR="$(tr -d '[:space:]' < "$SOURCE_ROOT/scripts/appimage-glibc-floor.txt")"
 python3 "$SOURCE_ROOT/scripts/check-appimage-glibc-floor.py" "$APPDIR" --max "$APPIMAGE_GLIBC_FLOOR"
+python3 "$SOURCE_ROOT/scripts/update-appimage-native-notices.py" --appdir "$APPDIR"
 "$TOOLS/linuxdeploy-x86_64.AppImage" --appdir "$APPDIR" --output appimage
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
+extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/bookie-appimage-verify.XXXXXX")"
+(cd "$extract_dir" && env -u APPIMAGE_EXTRACT_AND_RUN "$OUT/$OUTPUT" --appimage-extract >/dev/null)
+diff -r \
+  "$APPDIR/usr/share/doc/bookie/appimage-native-notices" \
+  "$extract_dir/squashfs-root/usr/share/doc/bookie/appimage-native-notices"
 echo "Wrote $OUT/$OUTPUT"

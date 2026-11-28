@@ -21,7 +21,6 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_API = "http://10.61.0.11:3000/api/v1/repos/Bookie/bookie"
 WORKFLOW_FILE = "nightly.yml"
 GREEN_MARKER_JOB = "coverage"
 FULL_WEEKDAY = 6
@@ -258,6 +257,9 @@ def find_last_green(api, token=None, fetch=http_get_json, pages=6, candidates=10
 def lookup_last_green(api, environ=None, fetch=http_get_json):
     environ = os.environ if environ is None else environ
     token = environ.get("FORGEJO_TOKEN") or environ.get("GITHUB_TOKEN") or None
+    if not api:
+        print("last green lookup unavailable: FORGEJO_API is not configured", file=sys.stderr)
+        return None
     try:
         return find_last_green(api, token, fetch)
     except Exception as error:
@@ -314,7 +316,7 @@ def build_parser():
     parser.add_argument("--weekday")
     parser.add_argument("--last-green", default="")
     parser.add_argument("--lookup", action="store_true")
-    parser.add_argument("--api", default=os.environ.get("FORGEJO_API", DEFAULT_API))
+    parser.add_argument("--api", default=os.environ.get("FORGEJO_API") or None)
     parser.add_argument("--changed-file")
     parser.add_argument("--changed-from-git", action="store_true")
     parser.add_argument("--force", "--full", dest="force", action="store_true")
