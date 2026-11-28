@@ -85,7 +85,7 @@ impl Referee for DuckdbReferee {
     }
 
     fn release(&self) {
-        self.connection.lock().expect("referee lock").take();
+        self.connection.lock().unwrap_or_else(|error| error.into_inner()).take();
     }
 }
 
