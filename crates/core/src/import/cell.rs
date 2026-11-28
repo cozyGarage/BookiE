@@ -45,6 +45,8 @@ pub enum CellError {
     UndecodableMarker,
     #[error("ClickHouse Date requires a date between 1970-01-01 and 2149-06-06")]
     ClickhouseDateOutOfRange,
+    #[error("ClickHouse String value matches the binary export marker; import was refused")]
+    AmbiguousClickhouseStringBytes,
     #[error(
         "blank workbook cell is ambiguous between NULL and empty text; choose a non-empty NULL marker to import it as empty text"
     )]
@@ -363,6 +365,17 @@ pub(crate) fn row_to_values_for_driver(
                     reason: CellError::UndecodableMarker,
                 });
             }
+            if text != options.null_marker
+                && driver_id == "clickhouse"
+                && is_clickhouse_string_type(&column.data_type)
+                && is_clickhouse_bytes_spelling(text)
+            {
+                return Err(CsvRowError {
+                    line,
+                    column: column.name.clone(),
+                    reason: CellError::AmbiguousClickhouseStringBytes,
+                });
+            }
             row.native_value(*index, column, driver_id)
                 .unwrap_or_else(|| value_for(text, column, options, driver_id))
                 .and_then(|value| {
@@ -377,6 +390,27 @@ pub(crate) fn row_to_values_for_driver(
                 })
         })
         .collect()
+}
+
+fn is_clickhouse_string_type(data_type: &str) -> bool {
+    let mut data_type = data_type.trim();
+    loop {
+        let inner = data_type.strip_suffix(')').and_then(|without_close| {
+            let open = without_close.find('(')?;
+            let wrapper = without_close[..open].trim();
+            (wrapper.eq_ignore_ascii_case("nullable") || wrapper.eq_ignore_ascii_case("lowcardinality"))
+                .then(|| without_close[open + 1..].trim())
+        });
+        match inner {
+            Some(inner) => data_type = inner,
+            None => return data_type.eq_ignore_ascii_case("string"),
+        }
+    }
+}
+
+fn is_clickhouse_bytes_spelling(text: &str) -> bool {
+    text.strip_prefix("\\x")
+        .is_some_and(|hex| hex.len().is_multiple_of(2) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
 fn value_for(text: &str, column: &ColumnInfo, options: &CsvImportOptions, driver_id: &str) -> Result<Value, CellError> {

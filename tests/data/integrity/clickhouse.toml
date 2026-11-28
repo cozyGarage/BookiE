@@ -150,11 +150,7 @@ type = "String"
 literals = ["unhex('DEADBEEF')", "unhex('00FF')"]
 carrier = "Bytes"
 rule = "bytes"
-note = "ClickHouse String is a byte string; non-UTF-8 bytes stay bytes."
-known_failing = [
-    { route = "import_csv", issue = 4227, expect = "server stored", reason = "binary String values are imported as their export spelling" },
-    { route = "import_xlsx", issue = 4227, expect = "server stored", reason = "binary String values are imported as their export spelling" },
-]
+note = "ClickHouse String is a byte string; non-UTF-8 bytes stay bytes, and imports refuse ambiguous binary markers."
 
 [[case]]
 id = "fixed-string"
