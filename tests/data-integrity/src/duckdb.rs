@@ -59,7 +59,8 @@ fn join(fields: &[String]) -> String {
 }
 
 struct DuckdbReferee {
-    connection: std::sync::Mutex<duckdb::Connection>,
+    path: std::path::PathBuf,
+    connection: std::sync::Mutex<Option<duckdb::Connection>>,
     _directory: tempfile::TempDir,
 }
 
@@ -69,9 +70,22 @@ impl Referee for DuckdbReferee {
             .connection
             .lock()
             .map_err(|error| error.to_string())
-            .and_then(|connection| connection.try_clone().map_err(|error| error.to_string()))
+            .and_then(|mut connection| {
+                if connection.is_none() {
+                    *connection = Some(duckdb::Connection::open(&self.path).map_err(|error| error.to_string())?);
+                }
+                connection
+                    .as_ref()
+                    .expect("connection opened")
+                    .try_clone()
+                    .map_err(|error| error.to_string())
+            })
             .and_then(|connection| run(&connection, sql));
         Box::pin(async move { result })
+    }
+
+    fn release(&self) {
+        self.connection.lock().expect("referee lock").take();
     }
 }
 
@@ -108,7 +122,8 @@ pub fn start(label: &str) -> Server {
         dialect: &DIALECT,
         options,
         referee: Box::new(DuckdbReferee {
-            connection: std::sync::Mutex::new(duckdb::Connection::open(&path).expect("open referee database")),
+            path,
+            connection: std::sync::Mutex::new(None),
             _directory: directory,
         }),
     }

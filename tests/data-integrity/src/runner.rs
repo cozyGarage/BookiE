@@ -32,6 +32,7 @@ pub async fn run_reads(server: &Server, corpus: &Corpus) -> Vec<CaseResult> {
         };
         prepared.push((case, referee));
     }
+    server.referee.release();
     let reads = read_all(server, &prepared).await;
     let mut results = Vec::new();
     for ((case, referee), routes) in prepared.iter().zip(reads) {
@@ -73,6 +74,7 @@ async fn read_in_session(server: &Server, case: &Case, referee: &[RefereeRow]) -
             return failed(format!("session setup failed: {error}"));
         }
     }
+    server.referee.release();
     let mut options = server.options.clone();
     if let Some((username, password)) = &variant.login {
         options.username.clone_from(username);
