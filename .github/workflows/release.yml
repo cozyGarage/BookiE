@@ -14,6 +14,7 @@ on:
       - "scripts/check-release-version.py"
       - "scripts/tests/test_release_version.py"
       - "scripts/build-appimage.sh"
+      - "scripts/update-appimage-native-notices.py"
       - "scripts/build-deb.sh"
       - "apps/gpui/Cargo.toml"
       - "apps/gpui/Cargo.lock"
