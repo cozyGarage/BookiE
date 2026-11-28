@@ -47,6 +47,7 @@ pub(crate) struct ConnectionForm {
     pub focus_on_open: bool,
     pub focus_validation: Option<gpui::FocusHandle>,
     pub restore_focus: bool,
+    pub request_generation: u64,
 }
 
 impl ConnectionForm {
@@ -104,6 +105,7 @@ impl ConnectionForm {
             focus_on_open: false,
             focus_validation: None,
             restore_focus: false,
+            request_generation: 0,
             tls_root: input("CA certificate file (optional)", cx),
             tls_cert: input("Client certificate file (optional)", cx),
             tls_key: input("Client key file (optional)", cx),
@@ -114,6 +116,15 @@ impl ConnectionForm {
 
     pub fn selected(&self) -> Option<&DriverChoice> {
         self.drivers.get(self.driver)
+    }
+
+    pub(crate) fn next_request_generation(&mut self) -> u64 {
+        self.request_generation = self.request_generation.wrapping_add(1);
+        self.request_generation
+    }
+
+    pub(crate) fn is_current_request(&self, generation: u64) -> bool {
+        self.request_generation == generation
     }
 
     pub(crate) fn validation_field(
@@ -253,6 +264,50 @@ impl GridView {
         self.connection_form.open = true;
         self.connection_form.focus_on_open = true;
         cx.notify();
+    }
+
+    pub(crate) fn reset_connection_form(&mut self, cx: &mut Context<Self>) {
+        let form = &mut self.connection_form;
+        form.next_request_generation();
+        form.editing = None;
+        form.read_only = true;
+        form.environment = Environment::default();
+        form.color = None;
+        form.status = String::new();
+        form.validation_error = None;
+        form.saving = false;
+        form.testing = false;
+        form.confirm_delete = false;
+        form.kerberos = false;
+        form.tls = TlsMode::default().index();
+        form.security_open = false;
+        form.ssh_open = false;
+        form.driver = form
+            .drivers
+            .iter()
+            .position(|driver| driver.id == "postgres")
+            .unwrap_or(0);
+        let port = form
+            .drivers
+            .get(form.driver)
+            .filter(|driver| driver.port != 0)
+            .map(|driver| driver.port.to_string())
+            .unwrap_or_default();
+        for (input, text) in [
+            (&form.name, ""),
+            (&form.host, ""),
+            (&form.port, port.as_str()),
+            (&form.database, ""),
+            (&form.username, ""),
+            (&form.password, ""),
+            (&form.tls_root, ""),
+            (&form.tls_cert, ""),
+            (&form.tls_key, ""),
+            (&form.socket, ""),
+        ] {
+            input.update(cx, |input, cx| input.set_content(text, cx));
+        }
+        form.ssh.reset(cx);
     }
 
     pub(crate) fn close_connection_dialog(&mut self, cx: &mut Context<Self>) {
@@ -832,6 +887,7 @@ impl GridView {
     }
 
     pub(crate) fn edit_connection(&mut self, id: uuid::Uuid, cx: &mut Context<Self>) {
+        let generation = self.connection_form.next_request_generation();
         cx.spawn(async move |this, cx| {
             let draft = cx
                 .background_executor()
@@ -841,12 +897,23 @@ impl GridView {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                match draft {
-                    Ok(Some(draft)) => this.fill_connection_form(draft, cx),
-                    Ok(None) => this.connection_form.status = "That connection no longer exists".into(),
-                    Err(error) => this.connection_form.status = error.to_string(),
+                if !this.connection_form.is_current_request(generation) {
+                    return;
                 }
-                this.open_connection_dialog(cx);
+                match draft {
+                    Ok(Some(draft)) => {
+                        this.fill_connection_form(draft, cx);
+                        this.open_connection_dialog(cx);
+                    }
+                    Ok(None) => {
+                        this.status = "That connection no longer exists".into();
+                        cx.notify();
+                    }
+                    Err(error) => {
+                        this.status = error.to_string();
+                        cx.notify();
+                    }
+                }
             });
         })
         .detach();
@@ -993,6 +1060,7 @@ impl GridView {
         }
         self.connection_form.testing = true;
         self.connection_form.status = "Testing…".into();
+        let generation = self.connection_form.request_generation;
         cx.notify();
         cx.spawn(async move |this, cx| {
             let outcome = cx
@@ -1010,12 +1078,24 @@ impl GridView {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.connection_form.testing = false;
-                this.connection_form.status = outcome.unwrap_or_else(|error| error.to_string());
-                cx.notify();
+                this.finish_connection_test_request(generation, outcome, cx)
             });
         })
         .detach();
+    }
+
+    pub(crate) fn finish_connection_test_request(
+        &mut self,
+        generation: u64,
+        outcome: Result<String, String>,
+        cx: &mut Context<Self>,
+    ) {
+        if !self.connection_form.is_current_request(generation) {
+            return;
+        }
+        self.connection_form.testing = false;
+        self.connection_form.status = outcome.unwrap_or_else(|error| error.to_string());
+        cx.notify();
     }
 
     pub(crate) fn ask_delete_connection(&mut self, cx: &mut Context<Self>) {
@@ -1037,6 +1117,7 @@ impl GridView {
         if !std::mem::take(&mut self.connection_form.confirm_delete) {
             return;
         }
+        let generation = self.connection_form.request_generation;
         cx.spawn(async move |this, cx| {
             let (outcome, connections) = cx
                 .background_executor()
@@ -1050,23 +1131,41 @@ impl GridView {
                 if let Some(Ok(connections)) = connections {
                     this.connections = connections;
                 }
-                this.finish_delete(outcome);
+                this.finish_delete_request(generation, outcome, cx);
                 cx.notify();
             });
         })
         .detach();
     }
 
-    fn finish_delete(&mut self, outcome: Result<connection_save::Deleted, String>) {
+    fn finish_delete_request(
+        &mut self,
+        generation: u64,
+        outcome: Result<connection_save::Deleted, String>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.connection_form.is_current_request(generation) {
+            self.finish_delete(outcome, cx);
+            return;
+        }
+        self.status = match outcome {
+            Ok(deleted) if deleted.credential_failure => "Deleted; some stored credentials could not be removed".into(),
+            Ok(_) => "Deleted".into(),
+            Err(message) => message,
+        };
+    }
+
+    pub(crate) fn finish_delete(&mut self, outcome: Result<connection_save::Deleted, String>, cx: &mut Context<Self>) {
         self.connection_form.confirm_delete = false;
         match outcome {
             Ok(deleted) => {
-                self.connection_form.editing = None;
-                self.connection_form.status = if deleted.credential_failure {
+                let status = if deleted.credential_failure {
                     "Deleted; some stored credentials could not be removed".into()
                 } else {
                     "Deleted".into()
                 };
+                self.reset_connection_form(cx);
+                self.connection_form.status = status;
             }
             Err(message) => self.connection_form.status = message,
         }
@@ -1087,6 +1186,7 @@ impl GridView {
         let color = self.connection_form.color.clone();
         self.connection_form.saving = true;
         self.connection_form.status = "Saving…".into();
+        let generation = self.connection_form.request_generation;
         cx.notify();
         cx.spawn(async move |this, cx| {
             let (result, connections) = cx
@@ -1114,7 +1214,7 @@ impl GridView {
                 if let Some(Ok(connections)) = connections {
                     this.connections = connections;
                 }
-                let saved = this.finish_connection_save(result, cx);
+                let saved = this.finish_connection_save_request(generation, result, cx);
                 if let Some(id) = saved.filter(|_| open) {
                     this.connect(bookie_gpui::live::Origin::Saved(id.to_string()), cx);
                 }
@@ -1122,6 +1222,23 @@ impl GridView {
             });
         })
         .detach();
+    }
+
+    pub(crate) fn finish_connection_save_request(
+        &mut self,
+        generation: u64,
+        result: Result<(uuid::Uuid, String, Vec<uuid::Uuid>, bool), String>,
+        cx: &mut Context<Self>,
+    ) -> Option<uuid::Uuid> {
+        if !self.connection_form.is_current_request(generation) {
+            self.status = match result {
+                Ok((_, name, _, true)) => format!("Saved {name}"),
+                Ok((_, name, _, false)) => format!("Saved {name}, but the color was not saved. Try saving again"),
+                Err(message) => message,
+            };
+            return None;
+        }
+        self.finish_connection_save(result, cx)
     }
 
     pub(crate) fn finish_connection_save(

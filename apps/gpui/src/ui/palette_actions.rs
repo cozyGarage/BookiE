@@ -755,7 +755,7 @@ impl GridView {
             "import-connections" => self.pick_connection_import(cx),
             "export-connections" => self.pick_connection_export(cx),
             "new-connection" => {
-                self.connection_form.editing = None;
+                self.reset_connection_form(cx);
                 self.open_connection_dialog(cx);
                 self.sync_grid_owner();
             }

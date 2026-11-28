@@ -256,11 +256,11 @@ impl GridView {
                 )
             })
             .when(controls.close, |this| {
-                this.child(
-                    icon_button("win-close", "x", "Close", theme).on_click(cx.listener(|_, _, window, _| {
-                        window.remove_window();
-                    })),
-                )
+                this.child(icon_button("win-close", "x", "Close", theme).on_click(cx.listener(
+                    |this, _, window, cx| {
+                        this.request_window_close(window, cx);
+                    },
+                )))
             })
     }
 
