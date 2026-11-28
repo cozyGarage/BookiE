@@ -84,8 +84,9 @@ impl Referee for DuckdbReferee {
         Box::pin(async move { result })
     }
 
-    fn release(&self) {
-        self.connection.lock().unwrap_or_else(|error| error.into_inner()).take();
+    fn release(&self) -> Result<(), String> {
+        self.connection.lock().map_err(|error| error.to_string())?.take();
+        Ok(())
     }
 }
 
@@ -126,5 +127,34 @@ pub fn start(label: &str) -> Server {
             connection: std::sync::Mutex::new(None),
             _directory: directory,
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DuckdbReferee;
+    use crate::server::Referee;
+    use std::sync::Mutex;
+
+    #[test]
+    fn release_reports_a_poisoned_connection_mutex() {
+        let directory = tempfile::tempdir().unwrap();
+        let referee = DuckdbReferee {
+            path: directory.path().join("referee.duckdb"),
+            connection: Mutex::new(None),
+            _directory: directory,
+        };
+
+        std::thread::scope(|scope| {
+            let connection = &referee.connection;
+            let _ = scope
+                .spawn(move || {
+                    let _guard = connection.lock().unwrap();
+                    panic!("poison referee connection mutex");
+                })
+                .join();
+        });
+
+        assert!(referee.release().is_err());
     }
 }

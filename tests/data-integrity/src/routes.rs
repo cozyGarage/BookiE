@@ -70,7 +70,12 @@ pub async fn run_routes(server: &Server, corpus: &Corpus, edits: bool) -> Vec<Ca
             Err(error) => results.extend(broken(server, case, &error)),
         }
     }
-    server.referee.release();
+    if let Err(error) = server.referee.release() {
+        for item in &prepared {
+            results.extend(broken(server, item.case, &format!("referee release failed: {error}")));
+        }
+        return results;
+    }
     let governed = governed::open_writable(server.dialect.driver_id, server.options.clone()).await;
     let mut work = Vec::new();
     for item in &prepared {
