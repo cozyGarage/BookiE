@@ -4,6 +4,17 @@ use bookie_data_integrity::{clickhouse, judge_and_report, load_corpus, routes, r
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn clickhouse_aggregate_states_are_refused_without_failing_reads() {
+    let mut corpus = load_corpus("clickhouse");
+    corpus.cases.retain(|case| case.id == "aggregate-function");
+    assert_eq!(corpus.cases.len(), 1);
+    let server = clickhouse::start("clickhouse-24.8", None).await;
+    let results = routes::run_routes(&server, &corpus, false).await;
+    judge_and_report(&corpus, &results).assert_clean();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn clickhouse_float32_imports_preserve_server_values() {
     let mut corpus = load_corpus("clickhouse");
     corpus.cases.retain(|case| case.id == "float32");
