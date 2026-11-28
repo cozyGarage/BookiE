@@ -215,6 +215,24 @@ fn only_a_guard_that_masks_results_analyzes_their_projection() {
 }
 
 #[tokio::test]
+async fn redis_agent_read_masks_results_without_projection_metadata() {
+    let mut guard_context = context(
+        agent(),
+        Environment::Local,
+        PolicyConfig::default(),
+        Arc::new(AutoApproveSink),
+        Arc::new(SequenceAuditSink::new(vec![])),
+        Arc::new(AuditState::new()),
+    );
+    guard_context.driver_id = "redis".into();
+    guard_context.read_only = true;
+    let guard = PolicyGuard::new(Arc::new(ProjectionResultConnection), guard_context);
+    let result = guard.query("GET password").await.expect("read is allowed");
+    assert_ne!(result.rows[0][0], Value::Text("1".into()));
+    assert_ne!(result.rows[0][1], Value::Text("canary-secret".into()));
+}
+
+#[tokio::test]
 async fn clickhouse_policy_projection_masks_only_the_sensitive_result_column() {
     let mut guard_context = context(
         agent(),

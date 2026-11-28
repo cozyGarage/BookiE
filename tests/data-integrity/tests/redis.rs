@@ -11,6 +11,10 @@ async fn redis_read_only_commands_pass_the_guard_without_permitting_writes() {
     let writer = governed::open_confirming("redis", server.options.clone()).await;
     writer.guard.execute("SET sample original").await.unwrap();
     writer.guard.execute("HSET hash field value").await.unwrap();
+    writer.guard.execute("LPUSH list item").await.unwrap();
+    writer.guard.execute("SADD members item").await.unwrap();
+    writer.guard.execute("ZADD ranked 1 item").await.unwrap();
+    writer.guard.execute("XADD stream * field value").await.unwrap();
     writer.close().await;
     let reader = governed::open("redis", server.options.clone(), true).await;
     let result = reader.guard.query("GET sample").await.unwrap();
@@ -21,6 +25,10 @@ async fn redis_read_only_commands_pass_the_guard_without_permitting_writes() {
         "TTL sample",
         "HGET hash field",
         "HGETALL hash",
+        "LRANGE list 0 -1",
+        "SMEMBERS members",
+        "ZRANGE ranked 0 -1",
+        "XRANGE stream - +",
         "SCAN 0",
         "PING",
     ] {
