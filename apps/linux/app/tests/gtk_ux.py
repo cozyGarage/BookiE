@@ -2792,10 +2792,11 @@ GLib.MainLoop().run()
             "BOOKIE_FIXTURE_HOST",
             os.environ.get("BOOKIE_GTK_FIXTURE_HOST", "127.0.0.1"),
         )
+        toxiproxy = os.environ.get("BOOKIE_FIXTURE_TOXIPROXY", f"{fixture_host}:8474")
 
         def set_bastion_enabled(enabled):
             request = urllib.request.Request(
-                f"http://{fixture_host}:8474/proxies/bastion",
+                f"http://{toxiproxy}/proxies/bastion",
                 data=json.dumps({"enabled": enabled}).encode(),
                 headers={"Content-Type": "application/json"},
                 method="POST",
