@@ -1,5 +1,3 @@
-use std::path::{Path, PathBuf};
-
 use bookie_core::ConnectOptions;
 
 use crate::server::{Dialect, Referee, Server, SessionVariant, SettingCheck, SqlFuture, setting_parts};
@@ -61,19 +59,23 @@ fn join(fields: &[String]) -> String {
 }
 
 struct DuckdbReferee {
-    path: PathBuf,
+    connection: std::sync::Mutex<duckdb::Connection>,
     _directory: tempfile::TempDir,
 }
 
 impl Referee for DuckdbReferee {
     fn run<'a>(&'a self, sql: &'a str) -> SqlFuture<'a> {
-        let result = run(&self.path, sql);
+        let result = self
+            .connection
+            .lock()
+            .map_err(|error| error.to_string())
+            .and_then(|connection| connection.try_clone().map_err(|error| error.to_string()))
+            .and_then(|connection| run(&connection, sql));
         Box::pin(async move { result })
     }
 }
 
-fn run(path: &Path, sql: &str) -> Result<String, String> {
-    let connection = duckdb::Connection::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
+fn run(connection: &duckdb::Connection, sql: &str) -> Result<String, String> {
     let (prefix, last) = match sql.rfind("; SELECT ") {
         Some(at) => (&sql[..at], &sql[at + 2..]),
         None => ("", sql),
@@ -106,7 +108,7 @@ pub fn start(label: &str) -> Server {
         dialect: &DIALECT,
         options,
         referee: Box::new(DuckdbReferee {
-            path,
+            connection: std::sync::Mutex::new(duckdb::Connection::open(&path).expect("open referee database")),
             _directory: directory,
         }),
     }
