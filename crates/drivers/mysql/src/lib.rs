@@ -137,6 +137,7 @@ impl DatabaseDriver for MysqlDriver {
         let session_options = mysql_opts.clone();
         let read_only = opts.read_only;
         let database: std::sync::Arc<str> = opts.database.as_str().into();
+        let empty_default_database = opts.database.is_empty();
         let acquire_timeout = opts.pool_acquire_timeout();
         let pool = MySqlPoolOptions::new()
             .max_connections(4)
@@ -182,6 +183,7 @@ impl DatabaseDriver for MysqlDriver {
             cancellation_pool,
             session_options,
             read_only,
+            empty_default_database,
         }))
     }
 }
@@ -207,6 +209,7 @@ struct MysqlConnection {
     cancellation_pool: Pool<MySql>,
     session_options: MySqlConnectOptions,
     read_only: bool,
+    empty_default_database: bool,
 }
 
 impl MysqlConnection {
@@ -410,6 +413,7 @@ impl Connection for MysqlConnection {
             control,
         )
         .await;
+        retire_after_unscoped_use(&mut connection, sql, self.empty_default_database);
         release_connection(connection, &result).await;
         result.map(QueryResultBatch::into_first)
     }
@@ -431,6 +435,7 @@ impl Connection for MysqlConnection {
             control,
         )
         .await;
+        retire_after_unscoped_use(&mut connection, sql, self.empty_default_database);
         release_connection(connection, &result).await;
         result
     }
@@ -476,6 +481,7 @@ impl Connection for MysqlConnection {
             )
             .await;
         }
+        retire_after_unscoped_use(&mut connection, sql, self.empty_default_database);
         if result.is_err() {
             connection.close_on_drop();
         }
@@ -1122,6 +1128,12 @@ async fn retire_if_uncertain(connection: PoolConnection<MySql>, error: DriverErr
 async fn release_connection<T>(connection: PoolConnection<MySql>, result: &Result<T, DriverError>) {
     if matches!(result, Err(DriverError::OperationOutcomeUnknown { .. })) {
         let _ = connection.detach().close_hard().await;
+    }
+}
+
+fn retire_after_unscoped_use(connection: &mut PoolConnection<MySql>, sql: &str, empty_default_database: bool) {
+    if empty_default_database && contains_use_statement(sql) {
+        connection.close_on_drop();
     }
 }
 

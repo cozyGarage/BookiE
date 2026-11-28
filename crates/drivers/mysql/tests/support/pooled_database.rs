@@ -37,6 +37,42 @@ async fn use_on_a_pooled_connection_does_not_change_what_later_catalog_reads_see
 
 #[tokio::test]
 #[ignore = "requires docker"]
+async fn a_profile_without_a_database_does_not_reuse_a_prior_use_selection() {
+    let (_mysql_container, opts) = start_mysql().await;
+    assert_unscoped_use_does_not_leak(opts).await;
+
+    let (_mariadb_container, opts) = start_mariadb().await;
+    assert_unscoped_use_does_not_leak(opts).await;
+}
+
+async fn assert_unscoped_use_does_not_leak(mut opts: bookie_core::ConnectOptions) {
+    let setup = connect(opts.clone()).await;
+    setup.execute("DROP DATABASE IF EXISTS use_leak_guard").await.unwrap();
+    setup.execute("CREATE DATABASE use_leak_guard").await.unwrap();
+    setup
+        .execute("CREATE TABLE use_leak_guard.marker (id INT)")
+        .await
+        .unwrap();
+    setup
+        .execute("INSERT INTO use_leak_guard.marker VALUES (42)")
+        .await
+        .unwrap();
+    opts.database.clear();
+    let connection = connect(opts).await;
+    let control = bookie_core::OperationControl::with_timeout(std::time::Duration::from_secs(5));
+
+    connection
+        .query_controlled("USE use_leak_guard", &control)
+        .await
+        .unwrap();
+    let selected = connection.query("SELECT DATABASE()").await.unwrap();
+    assert_eq!(selected.rows[0][0], bookie_core::Value::Null);
+    assert!(connection.query("SELECT id FROM marker").await.is_err());
+    setup.execute("DROP DATABASE use_leak_guard").await.unwrap();
+}
+
+#[tokio::test]
+#[ignore = "requires docker"]
 async fn a_session_keeps_user_variables_on_its_backend_across_use() {
     let (_container, opts) = start_mysql().await;
     let connection = connect(opts).await;
