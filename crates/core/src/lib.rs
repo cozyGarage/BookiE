@@ -25,6 +25,7 @@ mod protobuf_wire;
 mod query;
 mod query_rows;
 mod registry;
+pub mod redis_command;
 mod routine;
 mod server_message;
 mod session;

@@ -2,6 +2,11 @@ use super::*;
 
 #[test]
 fn redis_only_classifies_known_read_commands_as_reads() {
+    assert_eq!(
+        classify("SELECT \"Value\" FROM \"db12\" WHERE \"Key\" = ?", "redis").class,
+        StatementClass::Select
+    );
+    assert!(classify("SELECT 1", "redis").writes());
     for command in [
         "GET k",
         "MGET a b",

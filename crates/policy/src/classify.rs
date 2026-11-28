@@ -118,6 +118,41 @@ pub(crate) fn analyze_parsed(
     mask_patterns: Option<&SensitivePatterns>,
     include_execution_plans: bool,
 ) -> StatementAnalysis {
+    if driver_id == "redis" {
+        let args = match bookie_core::redis_command::split_redis_cli(parsed.trimmed()) {
+            Ok(args) => args,
+            Err(reason) => return failed_analysis(reason),
+        };
+        let read = args
+            .first()
+            .and_then(|arg| std::str::from_utf8(arg).ok())
+            .is_some_and(|name| {
+                [
+                    "GET", "MGET", "TYPE", "TTL", "HGET", "HGETALL", "LRANGE", "SMEMBERS", "ZRANGE", "XRANGE", "SCAN",
+                    "PING",
+                ]
+                .iter()
+                .any(|allowed| name.eq_ignore_ascii_case(allowed))
+            });
+        if read {
+            return StatementAnalysis {
+                facts: StatementFacts {
+                    class: StatementClass::Select,
+                    effects: Effects::READS,
+                    tables: Vec::new(),
+                    has_where: false,
+                    contains_unscoped_dml: false,
+                    is_multi_statement: false,
+                    parse_error: None,
+                },
+                lexical_mode_ambiguous: false,
+                rolls_back_to_savepoint: false,
+                blast_radius: None,
+                sensitive_positions: None,
+                known_statement_rows: Vec::new(),
+            };
+        }
+    }
     if parsed.lexical_mode_ambiguous() {
         return lexical_mode_ambiguous_analysis();
     }
