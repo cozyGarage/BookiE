@@ -108,7 +108,7 @@ wait_for_ssh_host_key "$fixture_ssh_host" "$ssh_port"
 # 100 bytes, so the isolated runtime dir has to stay short -- the
 # fixture's own state directory, deep under the checked-out repo, is
 # already too long for that once a socket name is appended.
-secret_root="$(mktemp -d "${TMPDIR:-/tmp}/bookie.XXXXXX")"
+secret_root="$(mktemp -d /tmp/bookie.XXXXXX)"
 mkdir -p "$secret_root/home" "$secret_root/data" "$secret_root/cache" "$secret_root/state" "$secret_root/runtime"
 chmod 0700 "$secret_root/runtime"
 
