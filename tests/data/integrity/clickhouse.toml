@@ -284,15 +284,6 @@ carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
 expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
-known_failing = [
-    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-]
 
 [[case]]
 id = "int16"
@@ -393,15 +384,6 @@ rule = "json"
 referee = "toJSONString({v})"
 expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
 note = "The referee prints 64-bit integers as JSON numbers, so an integer carried as a JSON string cannot pass."
-known_failing = [
-    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-]
 
 [[case]]
 id = "int64-array"
@@ -411,15 +393,6 @@ carrier = "Json"
 rule = "json"
 referee = "toJSONString({v})"
 expect_error = [{ route = "param_select", expect = "nested values cannot be edited losslessly", reason = "BookiE refuses to bind a nested value without its native type metadata" }]
-known_failing = [
-    { route = "query", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "browse", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "param_where", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "copy_tsv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_csv", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-    { route = "export_json_lines", issue = 4235, expect = "String(\"", reason = "64-bit integers inside nested values read as JSON strings" },
-]
 
 [[case]]
 id = "aggregate-function"

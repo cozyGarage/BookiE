@@ -778,6 +778,7 @@ async fn fetch_result(
     let mut query = tag_query(client.query(&escape_bind_markers(sql)), query_id);
     if output_settings_allowed {
         query = query
+            .with_setting("output_format_json_quote_64bit_integers", "0")
             .with_setting("output_format_json_quote_denormals", "1")
             .with_setting("output_format_decimal_trailing_zeros", "1");
     }
@@ -873,7 +874,7 @@ fn response_row_into(
     raw: Vec<RowCell>,
     columns: &[ColumnInfo],
     values: &mut Vec<Value>,
-    ambiguous_float_nulls: bool,
+    output_settings_forbidden: bool,
 ) -> Result<(), DriverError> {
     if raw.len() != columns.len() {
         return Err(DriverError::Internal(format!(
@@ -883,23 +884,26 @@ fn response_row_into(
         )));
     }
     for (cell, column) in raw.into_iter().zip(columns) {
-        values.push(response_cell(cell, &column.data_type, ambiguous_float_nulls)?);
+        values.push(response_cell(cell, &column.data_type, output_settings_forbidden)?);
     }
     Ok(())
 }
 
-fn response_cell(cell: RowCell, data_type: &str, ambiguous_float_nulls: bool) -> Result<Value, DriverError> {
+fn response_cell(cell: RowCell, data_type: &str, output_settings_forbidden: bool) -> Result<Value, DriverError> {
     if base_type(data_type) == "AggregateFunction" && !matches!(&cell, RowCell::Json(raw) if raw.is_null()) {
         return Ok(Value::Undecodable(data_type.to_owned()));
     }
     match cell {
         RowCell::Json(raw)
-            if raw.is_null() && ambiguous_float_nulls && matches!(base_type(data_type), "Float32" | "Float64") =>
+            if raw.is_null() && output_settings_forbidden && matches!(base_type(data_type), "Float32" | "Float64") =>
         {
             Ok(Value::Undecodable(
                 "ClickHouse returned an ambiguous null for a floating-point value on a read-only connection".into(),
             ))
         }
+        RowCell::Json(raw) if output_settings_forbidden && nested_has_64_bit_integer(data_type) => Ok(Value::Text(
+            raw.as_str().map(str::to_owned).unwrap_or_else(|| raw.to_string()),
+        )),
         RowCell::Json(raw) => Ok(json_to_value(raw, data_type)),
         RowCell::StringBytes(bytes) if matches!(base_type(data_type), "String" | "FixedString") => {
             Ok(match String::from_utf8(bytes) {
@@ -911,9 +915,21 @@ fn response_cell(cell: RowCell, data_type: &str, ambiguous_float_nulls: bool) ->
             let text = String::from_utf8(bytes).map_err(|_| {
                 DriverError::Internal(format!("clickhouse response string for {data_type} is not UTF-8"))
             })?;
+            if output_settings_forbidden && nested_has_64_bit_integer(data_type) {
+                return Ok(Value::Text(text));
+            }
             Ok(json_to_value(serde_json::Value::String(text), data_type))
         }
     }
+}
+
+fn nested_has_64_bit_integer(type_name: &str) -> bool {
+    matches!(
+        base_type(type_name),
+        "Array" | "Map" | "Tuple" | "Nested" | "JSON" | "Object" | "Variant" | "Dynamic"
+    ) && type_name
+        .split(|character: char| !character.is_ascii_alphanumeric())
+        .any(|part| matches!(part, "Int64" | "UInt64"))
 }
 
 fn empty_result() -> QueryResult {
