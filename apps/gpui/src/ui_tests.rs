@@ -748,6 +748,32 @@ fn changing_filter_text_discards_a_pending_filter(cx: &mut TestAppContext) {
 }
 
 #[gpui::test]
+fn applying_an_empty_loaded_row_filter_is_a_no_op(cx: &mut TestAppContext) {
+    let (view, cx) = open(cx);
+    view.update(cx, |view, cx| {
+        view.search.filter_visible = true;
+        cx.notify();
+    });
+    cx.run_until_parked();
+
+    for text in ["", "   "] {
+        view.update(cx, |view, cx| {
+            view.search.filter.update(cx, |input, cx| input.set_content(text, cx));
+        });
+        cx.run_until_parked();
+        let previous_status = view.read_with(cx, |view, _| view.status.clone());
+        let apply = cx.debug_bounds("apply").expect("Apply button is visible");
+        cx.simulate_click(apply.center(), Default::default());
+        cx.run_until_parked();
+
+        view.read_with(cx, |view, _| {
+            assert_eq!(view.status, previous_status);
+            assert!(matches!(view.mode, crate::Mode::All));
+        });
+    }
+}
+
+#[gpui::test]
 fn the_arrow_keys_move_the_active_cell_and_space_selects_its_row(cx: &mut TestAppContext) {
     let (view, cx) = open(cx);
     cx.simulate_keystrokes("down down right");
