@@ -165,7 +165,13 @@ impl GridView {
         if should_offer_loaded_scope(page.as_ref(), &loaded_range, same_as_full) {
             options.push((ExportScope::Loaded, loaded_label));
         }
-        if full_available {
+        if should_offer_full_scope(
+            page.as_ref(),
+            self.source.total(),
+            full_available,
+            matches!(self.mode, crate::Mode::All),
+            self.local_order.is_some(),
+        ) {
             options.push((
                 ExportScope::Full,
                 row_scope_label("Full result", self.source.total(), false, self.export.limit),
@@ -569,6 +575,18 @@ fn should_offer_loaded_scope(current_page: Option<&Range<u64>>, loaded: &Range<u
     !same_as_full && current_page.is_none_or(|page| page != loaded)
 }
 
+fn should_offer_full_scope(
+    current_page: Option<&Range<u64>>,
+    source_total: u64,
+    full_available: bool,
+    all_rows: bool,
+    has_local_order: bool,
+) -> bool {
+    let current_page_is_full_result =
+        all_rows && !has_local_order && current_page.is_some_and(|page| page.start == 0 && page.end == source_total);
+    full_available && !current_page_is_full_result
+}
+
 fn export_formats(driver_id: &str, rows: u64, has_table: bool) -> Vec<ResultFormat> {
     offered_formats(
         driver_id,
@@ -721,6 +739,16 @@ mod tests {
             &loaded_multiple_pages,
             true
         ));
+    }
+
+    #[test]
+    fn full_scope_is_omitted_when_an_unsorted_single_page_already_covers_it() {
+        let one_page = 0..250;
+        assert!(!should_offer_full_scope(Some(&one_page), 250, true, true, false));
+        assert!(should_offer_full_scope(Some(&one_page), 1_000, true, true, false));
+        assert!(should_offer_full_scope(Some(&one_page), 250, true, false, false));
+        assert!(should_offer_full_scope(Some(&one_page), 250, true, true, true));
+        assert!(should_offer_full_scope(None, 250, true, true, false));
     }
 
     #[test]
