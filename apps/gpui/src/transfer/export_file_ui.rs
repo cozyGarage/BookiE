@@ -138,13 +138,15 @@ impl GridView {
             ));
         }
         let page = self.export_range(ExportScope::CurrentPage);
-        if let Some(range) = page.filter(|range| range.start < range.end) {
+        let page = page.filter(|range| range.start < range.end);
+        if let Some(range) = &page {
             options.push((
                 ExportScope::CurrentPage,
-                row_scope_label("Current page", range_count(&range), false, self.export.limit),
+                row_scope_label("Current page", range_count(range), false, self.export.limit),
             ));
         }
         let loaded = self.dataset_count();
+        let loaded_range = 0..loaded;
         let loaded_label = row_scope_label(
             "Filtered / loaded rows",
             loaded,
@@ -160,10 +162,16 @@ impl GridView {
             && matches!(self.mode, crate::Mode::All)
             && loaded == self.source.total()
             && self.export.file.scope != ExportScope::Loaded;
-        if !same_as_full {
+        if should_offer_loaded_scope(page.as_ref(), &loaded_range, same_as_full) {
             options.push((ExportScope::Loaded, loaded_label));
         }
-        if full_available {
+        if should_offer_full_scope(
+            page.as_ref(),
+            self.source.total(),
+            full_available,
+            matches!(self.mode, crate::Mode::All),
+            self.local_order.is_some(),
+        ) {
             options.push((
                 ExportScope::Full,
                 row_scope_label("Full result", self.source.total(), false, self.export.limit),
@@ -339,6 +347,33 @@ impl GridView {
         export_formats(driver_id, rows, has_table)
     }
 
+    fn export_scope_row(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let scope_segments = self.export_scope_options().into_iter().map(|(scope, label)| {
+            segment(
+                ("export-scope", scope as usize),
+                label,
+                scope == self.export.file.scope,
+                theme,
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if this.export.file.cancel.is_none() {
+                    this.set_export_scope(scope);
+                    cx.notify();
+                }
+            }))
+        });
+        labelled_row(
+            theme,
+            "Rows",
+            segmented(scope_segments, theme)
+                .flex_shrink(1.0)
+                .min_w_0()
+                .flex_wrap()
+                .h_auto(),
+        )
+        .debug_selector(|| "export-rows".into())
+    }
+
     pub(crate) fn export_file_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let input = self.export.file.input.clone()?;
         if !self.export.file.open {
@@ -347,7 +382,6 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
 
         let format_owner = cx.entity().downgrade();
-        let scope_options = self.export_scope_options();
         let has_table = !self.grid_is_query;
         let formats = self.formats_for(self.export_count(self.export.file.scope), has_table);
         let format_label = self.export.file.format.label();
@@ -364,20 +398,6 @@ impl GridView {
             bookie_gpui::messages::noun(rows, "row", "rows"),
             plural(columns, "column", "columns")
         );
-        let scope_segments = scope_options.iter().cloned().map(|(scope, label)| {
-            segment(
-                ("export-scope", scope as usize),
-                label,
-                scope == self.export.file.scope,
-                theme,
-            )
-            .on_click(cx.listener(move |this, _, _, cx| {
-                if this.export.file.cancel.is_none() {
-                    this.set_export_scope(scope);
-                    cx.notify();
-                }
-            }))
-        });
         let current = self.export.file.format;
         let options: Vec<(gpui::SharedString, bookie_core::export::ResultFormat)> =
             formats.iter().map(|format| (format.label().into(), *format)).collect();
@@ -423,10 +443,7 @@ impl GridView {
                                 .child(info),
                         ),
                 )
-                .child(
-                    labelled_row(theme, "Rows", segmented(scope_segments, theme).flex_wrap().h_auto())
-                        .debug_selector(|| "export-rows".into()),
-                )
+                .child(self.export_scope_row(theme, cx))
                 .child(labelled_row(theme, "Format", format_menu).debug_selector(|| "export-format-row".into()))
                 .children((self.export.file.format == ResultFormat::Csv).then(|| self.csv_export_rows(theme, cx)))
                 .child(field(theme, "File", &input))
@@ -563,6 +580,22 @@ fn row_scope_label(label: &str, count: u64, partial: bool, limit: Option<usize>)
     )
 }
 
+fn should_offer_loaded_scope(current_page: Option<&Range<u64>>, loaded: &Range<u64>, same_as_full: bool) -> bool {
+    !same_as_full && current_page.is_none_or(|page| page != loaded)
+}
+
+fn should_offer_full_scope(
+    current_page: Option<&Range<u64>>,
+    source_total: u64,
+    full_available: bool,
+    all_rows: bool,
+    has_local_order: bool,
+) -> bool {
+    let current_page_is_full_result =
+        all_rows && !has_local_order && current_page.is_some_and(|page| page.start == 0 && page.end == source_total);
+    full_available && !current_page_is_full_result
+}
+
 fn export_formats(driver_id: &str, rows: u64, has_table: bool) -> Vec<ResultFormat> {
     offered_formats(
         driver_id,
@@ -695,6 +728,36 @@ mod tests {
             "Filtered / loaded rows (first 2 of 3 rows; more may exist)"
         );
         assert!(!full_result_available(true, true, true));
+    }
+
+    #[test]
+    fn loaded_scope_is_omitted_when_it_matches_the_current_page() {
+        let one_page = 0..250;
+        let loaded = 0..250;
+        assert!(!should_offer_loaded_scope(Some(&one_page), &loaded, false));
+
+        let first_page = 0..250;
+        let loaded_multiple_pages = 0..600;
+        assert!(should_offer_loaded_scope(
+            Some(&first_page),
+            &loaded_multiple_pages,
+            false
+        ));
+        assert!(!should_offer_loaded_scope(
+            Some(&first_page),
+            &loaded_multiple_pages,
+            true
+        ));
+    }
+
+    #[test]
+    fn full_scope_is_omitted_when_an_unsorted_single_page_already_covers_it() {
+        let one_page = 0..250;
+        assert!(!should_offer_full_scope(Some(&one_page), 250, true, true, false));
+        assert!(should_offer_full_scope(Some(&one_page), 1_000, true, true, false));
+        assert!(should_offer_full_scope(Some(&one_page), 250, true, false, false));
+        assert!(should_offer_full_scope(Some(&one_page), 250, true, true, true));
+        assert!(should_offer_full_scope(None, 250, true, true, false));
     }
 
     #[test]
