@@ -48,7 +48,7 @@ impl ConnectionProvider for FixtureProvider {
             name: "postgres-release-fixture".into(),
             driver_id: "postgres".into(),
             host: "localhost".into(),
-            port: 5433,
+            port: Fixture::from_env().proxy_port,
             socket_dir: None,
             socket_path: None,
             database: "bookie".into(),

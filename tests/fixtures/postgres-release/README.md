@@ -18,7 +18,7 @@ Docker with Compose v2, `openssl`, `ssh-keygen`, `dbus-run-session`, `gnome-keyr
 |---|---|
 | `db` | PostgreSQL 16 with TLS enabled and the network alias `db.bookie.test`. No published port. |
 | `bastion` | OpenSSH server with a fixed host key and one public-key user, `tunnel`. No published port. |
-| `toxiproxy` | Publishes the only host entry points: API `8474`, database path `5433`, bastion path `2223`. |
+| `toxiproxy` | Publishes the API, database path and bastion path on separate automatically assigned host ports. |
 
 The database is reachable from the host only through Toxiproxy or through the bastion, so tests can cut either path and observe reconnect behavior.
 

@@ -94,9 +94,15 @@ else
   exit "$startup_status"
 fi
 
-wait_for_port "$fixture_host" 8474 "toxiproxy api"
-wait_for_port "$fixture_host" 5433 "postgres path"
-wait_for_ssh_host_key "$fixture_ssh_host" 2223
+toxiproxy_port="$(compose port toxiproxy 8474)"
+proxy_port="$(compose port toxiproxy 5432)"
+ssh_port="$(compose port toxiproxy 2222)"
+toxiproxy_port="${toxiproxy_port##*:}"
+proxy_port="${proxy_port##*:}"
+ssh_port="${ssh_port##*:}"
+wait_for_port "$fixture_host" "$toxiproxy_port" "toxiproxy api"
+wait_for_port "$fixture_host" "$proxy_port" "postgres path"
+wait_for_ssh_host_key "$fixture_ssh_host" "$ssh_port"
 
 # A forwarded Unix socket's path (under XDG_RUNTIME_DIR) is capped at
 # 100 bytes, so the isolated runtime dir has to stay short -- the
@@ -119,7 +125,9 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
   BOOKIE_FIXTURE_POSTGRES_RELEASE=1 \
   BOOKIE_FIXTURE_PROXY_HOST="$fixture_host" \
   BOOKIE_FIXTURE_SSH_HOST="$fixture_ssh_host" \
-  BOOKIE_FIXTURE_TOXIPROXY="$fixture_host:8474" \
+  BOOKIE_FIXTURE_TOXIPROXY="$fixture_host:$toxiproxy_port" \
+  BOOKIE_FIXTURE_PROXY_PORT="$proxy_port" \
+  BOOKIE_FIXTURE_SSH_PORT="$ssh_port" \
   BOOKIE_FIXTURE_MATERIALS="$FIXTURE/materials" \
   BOOKIE_TARGET_DIR="$target_dir" \
   BOOKIE_GTK_POSTGRES_CONTAINER="$(compose ps -q db)" \
@@ -151,14 +159,14 @@ RUSTUP_HOME="${RUSTUP_HOME:-$HOME/.rustup}" \
       BOOKIE_GTK_POSTGRES_MTLS_PASSWORD=bookie \
       BOOKIE_GTK_BINARY="${BOOKIE_GTK_BINARY:-$BOOKIE_TARGET_DIR/debug/bookie-app}" \
       BOOKIE_GTK_SCENARIO="${BOOKIE_GTK_SCENARIO:-postgres_saved_mtls_connection_authenticates_and_queries,postgres_structure_tabs_keep_backend_count_bounded,postgres_ssh_unknown_host_key_decline_is_durably_audited,postgres_ssh_multihop_trusts_both_hops_and_queries,postgres_ssh_second_hop_decline_does_not_learn_key,postgres_ssh_changed_second_hop_key_is_refused,postgres_ssh_setup_failure_is_durably_audited,postgres_ssh_tunnel_loss_retires_session_and_reconnects}" \
-      BOOKIE_GTK_POSTGRES_MTLS_PORT=5433 \
+      BOOKIE_GTK_POSTGRES_MTLS_PORT="$BOOKIE_FIXTURE_PROXY_PORT" \
       BOOKIE_GTK_POSTGRES_MTLS_HOST="$BOOKIE_FIXTURE_PROXY_HOST" \
       BOOKIE_GTK_POSTGRES_MTLS_DB=bookie \
       BOOKIE_GTK_POSTGRES_MTLS_USER=bookie_mtls \
       BOOKIE_GTK_POSTGRES_MTLS_CA="$BOOKIE_FIXTURE_MATERIALS/ca.crt" \
       BOOKIE_GTK_POSTGRES_MTLS_CERT="$BOOKIE_FIXTURE_MATERIALS/client.crt" \
       BOOKIE_GTK_POSTGRES_MTLS_KEY="$BOOKIE_FIXTURE_MATERIALS/client.key" \
-      BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT=2223 \
+      BOOKIE_GTK_POSTGRES_SSH_AUDIT_PORT="$BOOKIE_FIXTURE_SSH_PORT" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_HOST="$BOOKIE_FIXTURE_SSH_HOST" \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_HOST=relay \
       BOOKIE_GTK_POSTGRES_SSH_AUDIT_JUMP_PORT=22 \
