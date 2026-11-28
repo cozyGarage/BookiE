@@ -432,20 +432,8 @@ literals = ["arrayReduce('uniqState', [toUInt64(1)])"]
 carrier = "Undecodable"
 rule = "refusal"
 referee = "hex({v})"
+expect_error = [{ route = "param_select", expect = "cannot write back an undecodable", reason = "an aggregate state cannot be bound back as a parameter" }]
 note = "An aggregate state has no value form a client can show; BookiE must refuse it."
-known_failing = [
-    { route = "query", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "browse", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "param_where", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "param_select", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "copy_tsv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "export_csv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "export_json", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "export_json_lines", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "export_sql", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "import_csv", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-    { route = "import_xlsx", issue = 4237, expect = "is not UTF-8", reason = "an AggregateFunction column fails the whole read" },
-]
 
 [[case]]
 id = "datetime-server-zone"

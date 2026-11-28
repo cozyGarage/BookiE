@@ -889,6 +889,9 @@ fn response_row_into(
 }
 
 fn response_cell(cell: RowCell, data_type: &str, ambiguous_float_nulls: bool) -> Result<Value, DriverError> {
+    if base_type(data_type) == "AggregateFunction" && !matches!(&cell, RowCell::Json(raw) if raw.is_null()) {
+        return Ok(Value::Undecodable(data_type.to_owned()));
+    }
     match cell {
         RowCell::Json(raw)
             if raw.is_null() && ambiguous_float_nulls && matches!(base_type(data_type), "Float32" | "Float64") =>
