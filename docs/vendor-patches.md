@@ -6,6 +6,7 @@ BookiE maintains patched dependency snapshots under `vendor/`, applied through w
 
 | Dependency | Behavior required by BookiE |
 |---|---|
+| DuckDB | Preserve top-level `TIME_TZ` offsets from the raw fetched chunk before Arrow conversion. |
 | PostgreSQL driver | Bound SCRAM work; recognize multirange metadata for explicit refusal; resolve nested type metadata within a bound; support selected server-formatted text results; support protocol cancellation; ignore an inherited `PGHOSTADDR`; expose session parameters used by SQL lexing; keep a bounded buffer of server notices for display. |
 | MySQL driver | Preserve `ENUM` and `SET` text under binary collation; report `SET` column names; reject a truncated column definition with a protocol error; refuse the in-band RSA password exchange without TLS or a local socket (an SSH-forwarded socket counts as local, so that connection is protected only as far as the SSH server); expose the warning count of the last statement. |
 | SQL Server driver | Keep a bounded buffer of the informational messages the server sends while a statement runs (`PRINT`, `RAISERROR` at severity 10 or below) and expose it to the caller; after an Attention, keep reading until the server's `DONE_ATTN` acknowledgement even when it arrives in a later message than the cancelled request's end. |

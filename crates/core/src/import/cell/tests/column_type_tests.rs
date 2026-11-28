@@ -20,6 +20,9 @@ fn a_catalog_type_name_reads_as_the_value_shape_it_stores() {
     assert_eq!(column_kind("boolean"), ColumnKind::Bool);
     assert_eq!(column_kind("date"), ColumnKind::Date);
     assert_eq!(column_kind("time without time zone"), ColumnKind::Time);
+    assert_eq!(column_kind("TIMETZ"), ColumnKind::Text);
+    assert_eq!(column_kind("TIME WITH TIME ZONE"), ColumnKind::Text);
+    assert_eq!(column_kind("TIME(6) WITH TIME ZONE"), ColumnKind::Text);
     assert_eq!(column_kind("timestamp"), ColumnKind::DateTime);
     assert_eq!(column_kind("timestamp with time zone"), ColumnKind::TimestampTz);
     assert_eq!(column_kind("timestamptz"), ColumnKind::TimestampTz);

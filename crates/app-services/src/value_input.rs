@@ -799,6 +799,11 @@ fn is_json_like(dt: &str) -> bool {
 }
 
 fn classify_temporal(dt: &str) -> Option<TypeKind> {
+    if dt == "timetz"
+        || ((dt == "time" || dt.starts_with("time ") || dt.starts_with("time(")) && dt.contains("with time zone"))
+    {
+        return Some(TypeKind::Text);
+    }
     if dt.contains("timestamptz") || dt.contains("with time zone") {
         return Some(TypeKind::TimestampTz);
     }

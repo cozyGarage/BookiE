@@ -195,15 +195,20 @@ fn duckdb_json_result_exposes_its_logical_alias() {
 }
 
 #[tokio::test]
-async fn timetz_never_returns_a_time_with_a_discarded_offset() {
+async fn timetz_keeps_offsets_and_time_precision_without_changing_null_or_plain_time() {
     let connection = native_connection().await;
     let result = connection
-        .query("SELECT '13:45:30+05:30'::TIMETZ, NULL::TIMETZ, '13:45:30'::TIME")
+        .query(
+            "SELECT '13:45:30+05:30'::TIMETZ, '13:45:30-05:30'::TIMETZ, '01:02:03.123400+05:45:12'::TIMETZ, '24:00:00-15:59:59'::TIMETZ, NULL::TIMETZ, '13:45:30'::TIME",
+        )
         .await
         .unwrap();
-    assert_eq!(result.rows[0][0], Value::Undecodable("TIME WITH TIME ZONE".into()));
-    assert_eq!(result.rows[0][1], Value::Null);
-    assert!(matches!(result.rows[0][2], Value::Time(_)));
+    assert_eq!(result.rows[0][0], Value::Text("13:45:30+05:30".into()));
+    assert_eq!(result.rows[0][1], Value::Text("13:45:30-05:30".into()));
+    assert_eq!(result.rows[0][2], Value::Text("01:02:03.1234+05:45:12".into()));
+    assert_eq!(result.rows[0][3], Value::Text("24:00:00-15:59:59".into()));
+    assert_eq!(result.rows[0][4], Value::Null);
+    assert_eq!(result.rows[0][5], Value::Time("13:45:30".parse().unwrap()));
 }
 
 #[tokio::test]

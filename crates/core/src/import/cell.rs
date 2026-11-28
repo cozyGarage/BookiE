@@ -152,6 +152,9 @@ fn temporal_kind(base: &str, lowered: &str) -> Option<ColumnKind> {
     if base.contains("datetimeoffset") {
         return Some(ColumnKind::Text);
     }
+    if base == "timetz" || ((base == "time" || base.starts_with("time ")) && lowered.contains("with time zone")) {
+        return Some(ColumnKind::Text);
+    }
     if base.contains("timestamptz") || lowered.contains("with time zone") {
         return Some(ColumnKind::TimestampTz);
     }

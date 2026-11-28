@@ -324,10 +324,9 @@ rule = "exact"
 [[case]]
 id = "timetz"
 type = "TIMETZ"
-literals = ["'13:45:30+05:30'", "'00:00:00-12'"]
-carrier = "Undecodable"
-rule = "refusal"
-expect_error = [{ route = "param_select", expect = "cannot be bound", reason = "an undecodable cell cannot be bound back as a parameter" }]
+literals = ["'13:45:30+05:30'", "'13:45:30-05:30'", "'01:02:03.1234+05:45:12'", "'24:00:00-15:59:59'"]
+carrier = "Text"
+rule = "exact"
 
 [[case]]
 id = "fixed-array"
