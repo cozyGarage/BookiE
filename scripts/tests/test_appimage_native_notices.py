@@ -101,6 +101,35 @@ class AppImageNativeNoticeTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no packaged copyright file"):
                 NOTICES.generate(self.appdir, self.root)
 
+    def test_follows_packaged_doc_directory_symlink_to_copyright(self):
+        package_doc = self.root / "usr/share/doc/fixture"
+        self.copyright.unlink()
+        package_doc.rmdir()
+        source_doc = self.root / "usr/share/doc/gcc-base"
+        source_doc.mkdir()
+        (source_doc / "copyright").write_bytes(self.copyright_text)
+        package_doc.symlink_to("gcc-base", target_is_directory=True)
+
+        def shared_doc_directory(args, **kwargs):
+            if args[:2] == ["dpkg-query", "-L"]:
+                return NOTICES.subprocess.CompletedProcess(
+                    args,
+                    0,
+                    "/usr/lib/x86_64-linux-gnu/libfixture.so.1\n/usr/share/doc/fixture\n",
+                    "",
+                )
+            return self.command(args, **kwargs)
+
+        with patch.object(NOTICES.subprocess, "run", side_effect=shared_doc_directory):
+            self.assertEqual(NOTICES.generate(self.appdir, self.root), (1, 1))
+
+        bundle = self.appdir / NOTICES.OUTPUT
+        manifest = json.loads((bundle / "manifest.json").read_text())
+        package = manifest["packages"][0]
+        self.assertEqual(package["notice_texts"][0]["source_path"], "/usr/share/doc/fixture/copyright")
+        notice = bundle / "licenses/fixture_amd64/fixture/copyright"
+        self.assertEqual(notice.read_bytes(), self.copyright_text)
+
     def test_fails_closed_when_a_referenced_common_license_is_missing(self):
         self.common_license.unlink()
         with patch.object(NOTICES.subprocess, "run", side_effect=self.command):

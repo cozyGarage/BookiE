@@ -116,10 +116,19 @@ def package_copyrights(package: str, root: Path) -> tuple[str, list[dict]]:
     if not version:
         raise RuntimeError(f"dpkg-query returned no version for {package}")
     paths = run(["dpkg-query", "-L", package]).splitlines()
-    copyright_paths = sorted(
-        path for path in paths
-        if path.startswith("/usr/share/doc/") and PurePosixPath(path).name in {"copyright", "copyright.gz"}
-    )
+    copyright_paths = set()
+    for path in paths:
+        if not path.startswith("/usr/share/doc/"):
+            continue
+        if PurePosixPath(path).name in {"copyright", "copyright.gz"}:
+            copyright_paths.add(path)
+        else:
+            doc_dir = root / path.lstrip("/")
+            copyright_paths.update(
+                f"{path}/{name}" for name in ("copyright", "copyright.gz")
+                if (doc_dir / name).is_file()
+            )
+    copyright_paths = sorted(copyright_paths)
     if not copyright_paths:
         raise RuntimeError(f"{package} has no packaged copyright file under /usr/share/doc")
     files = []
