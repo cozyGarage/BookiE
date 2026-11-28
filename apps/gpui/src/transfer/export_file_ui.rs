@@ -347,6 +347,33 @@ impl GridView {
         export_formats(driver_id, rows, has_table)
     }
 
+    fn export_scope_row(&self, theme: Theme, cx: &mut Context<Self>) -> Div {
+        let scope_segments = self.export_scope_options().into_iter().map(|(scope, label)| {
+            segment(
+                ("export-scope", scope as usize),
+                label,
+                scope == self.export.file.scope,
+                theme,
+            )
+            .on_click(cx.listener(move |this, _, _, cx| {
+                if this.export.file.cancel.is_none() {
+                    this.set_export_scope(scope);
+                    cx.notify();
+                }
+            }))
+        });
+        labelled_row(
+            theme,
+            "Rows",
+            segmented(scope_segments, theme)
+                .flex_shrink(1.0)
+                .min_w_0()
+                .flex_wrap()
+                .h_auto(),
+        )
+        .debug_selector(|| "export-rows".into())
+    }
+
     pub(crate) fn export_file_bar(&self, theme: Theme, cx: &mut Context<Self>) -> Option<Div> {
         let input = self.export.file.input.clone()?;
         if !self.export.file.open {
@@ -355,7 +382,6 @@ impl GridView {
         use gpui_component::menu::DropdownMenu as _;
 
         let format_owner = cx.entity().downgrade();
-        let scope_options = self.export_scope_options();
         let has_table = !self.grid_is_query;
         let formats = self.formats_for(self.export_count(self.export.file.scope), has_table);
         let format_label = self.export.file.format.label();
@@ -372,20 +398,6 @@ impl GridView {
             bookie_gpui::messages::noun(rows, "row", "rows"),
             plural(columns, "column", "columns")
         );
-        let scope_segments = scope_options.iter().cloned().map(|(scope, label)| {
-            segment(
-                ("export-scope", scope as usize),
-                label,
-                scope == self.export.file.scope,
-                theme,
-            )
-            .on_click(cx.listener(move |this, _, _, cx| {
-                if this.export.file.cancel.is_none() {
-                    this.set_export_scope(scope);
-                    cx.notify();
-                }
-            }))
-        });
         let current = self.export.file.format;
         let options: Vec<(gpui::SharedString, bookie_core::export::ResultFormat)> =
             formats.iter().map(|format| (format.label().into(), *format)).collect();
@@ -431,18 +443,7 @@ impl GridView {
                                 .child(info),
                         ),
                 )
-                .child(
-                    labelled_row(
-                        theme,
-                        "Rows",
-                        segmented(scope_segments, theme)
-                            .flex_shrink(1.0)
-                            .min_w_0()
-                            .flex_wrap()
-                            .h_auto(),
-                    )
-                    .debug_selector(|| "export-rows".into()),
-                )
+                .child(self.export_scope_row(theme, cx))
                 .child(labelled_row(theme, "Format", format_menu).debug_selector(|| "export-format-row".into()))
                 .children((self.export.file.format == ResultFormat::Csv).then(|| self.csv_export_rows(theme, cx)))
                 .child(field(theme, "File", &input))
